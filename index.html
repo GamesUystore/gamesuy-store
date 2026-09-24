@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=5">
+  <link rel="stylesheet" href="styles.css?v=6">
 </head>
 <body>
 
@@ -65,7 +65,6 @@
   <main class="container">
 
     <section id="page-catalogo" class="page-section active-page">
-
       <div class="announcement-banner" id="announcement-banner">
         <div class="announcement-glow"></div>
         <div class="announcement-content">
@@ -74,7 +73,6 @@
           <p class="announcement-text">Este es el espacio editable desde el panel admin.</p>
         </div>
       </div>
-
       <div class="grid-section">
         <div class="grid-header">
           <h2 class="section-title">Catálogo</h2>
@@ -152,7 +150,6 @@
           <button class="admin-tab" data-tab="mantenimiento">🧹 Mantenimiento</button>
         </div>
 
-        <!-- TAB: PRECIOS -->
         <div class="admin-tab-content active" data-tab-content="precios">
           <div class="admin-grid">
             <div class="admin-card admin-card-wide">
@@ -197,7 +194,6 @@
           </div>
         </div>
 
-        <!-- TAB: EXCEL -->
         <div class="admin-tab-content" data-tab-content="excel">
           <div class="admin-grid">
             <div class="admin-card admin-card-wide">
@@ -230,7 +226,6 @@
           </div>
         </div>
 
-        <!-- TAB: CONFIGURACIÓN -->
         <div class="admin-tab-content" data-tab-content="config">
           <div class="admin-grid">
             <div class="admin-card">
@@ -284,7 +279,7 @@
               <input type="text" id="admin-banner-title" placeholder="Título del anuncio">
               <label class="admin-label">Texto</label>
               <textarea id="admin-banner-text" rows="3" placeholder="Descripción..."></textarea>
-              <label class="admin-label">Imagen (opcional, máx 500 KB)</label>
+              <label class="admin-label">Imagen (opcional)</label>
               <input type="file" id="admin-banner-file" accept="image/*" class="admin-file">
               <input type="text" id="admin-banner-img" placeholder="O pegar URL de imagen">
               <label class="admin-label">Link (opcional)</label>
@@ -297,7 +292,6 @@
           </div>
         </div>
 
-        <!-- TAB: MANTENIMIENTO -->
         <div class="admin-tab-content" data-tab-content="mantenimiento">
           <div class="admin-grid">
             <div class="admin-card admin-card-wide admin-card-danger">
@@ -342,13 +336,85 @@
     </div>
   </div>
 
-  <!-- MODAL DE PRECIOS -->
+  <!-- MODAL DE EDICIÓN (PRECIOS + INFO) -->
   <div id="price-modal" class="admin-modal hidden">
     <div class="modal-content modal-content-large">
       <button class="modal-close" id="price-modal-close" aria-label="Cerrar">✕</button>
-      <h3 class="modal-title" id="price-modal-title">Editar precios</h3>
-      <div id="price-modal-body" class="price-modal-body">
-        <!-- Contenido dinámico -->
+      <h3 class="modal-title" id="price-modal-title">Editar</h3>
+
+      <div class="modal-tabs">
+        <button class="modal-tab active" data-mtab="precios">💰 Precios</button>
+        <button class="modal-tab" data-mtab="info">📷 Información</button>
+      </div>
+
+      <div class="modal-tab-content active" data-mtab-content="precios">
+        <div id="price-modal-precios" class="price-modal-body"></div>
+      </div>
+
+      <div class="modal-tab-content" data-mtab-content="info">
+        <div id="price-modal-info" class="price-modal-body">
+          <div class="info-field">
+            <label class="admin-label">Título del juego</label>
+            <input type="text" id="info-title" placeholder="Ej: Resident Evil Village">
+          </div>
+
+          <div class="info-field">
+            <label class="admin-label">Categorías (separadas por coma)</label>
+            <input type="text" id="info-categories" placeholder="ps4, ps5, ps3, steam, psplus, streaming, otros">
+            <p class="admin-hint">Ejemplo: <strong>ps4, ps5</strong></p>
+          </div>
+
+          <div class="info-field">
+            <label class="admin-label">🖼️ Portada del juego</label>
+            <div class="upload-group">
+              <input type="file" id="info-cover-file" accept="image/*" class="admin-file">
+              <span class="upload-or">o</span>
+              <input type="text" id="info-cover-url" placeholder="Pegar URL de imagen..." class="upload-url">
+            </div>
+            <div id="info-cover-preview-wrap" class="upload-preview hidden">
+              <img id="info-cover-preview" alt="Portada" class="upload-preview-img">
+              <button type="button" class="upload-preview-clear" data-clear="cover">✕ Quitar</button>
+            </div>
+          </div>
+
+          <div class="info-field">
+            <label class="admin-label">🎮 Gameplay / Captura</label>
+            <div class="upload-group">
+              <input type="file" id="info-gameplay-file" accept="image/*" class="admin-file">
+              <span class="upload-or">o</span>
+              <input type="text" id="info-gameplay-url" placeholder="Pegar URL de imagen..." class="upload-url">
+            </div>
+            <div id="info-gameplay-preview-wrap" class="upload-preview hidden">
+              <img id="info-gameplay-preview" alt="Gameplay" class="upload-preview-img">
+              <button type="button" class="upload-preview-clear" data-clear="gameplay">✕ Quitar</button>
+            </div>
+          </div>
+
+          <div class="info-field">
+            <label class="admin-label">🎬 Trailer de YouTube</label>
+            <input type="text" id="info-youtube" placeholder="https://youtube.com/watch?v=...">
+          </div>
+
+          <div class="info-field">
+            <label class="admin-label">📝 Descripción</label>
+            <textarea id="info-description" rows="4" placeholder="Descripción del juego..."></textarea>
+          </div>
+
+          <div class="info-field">
+            <label class="admin-label">📌 Opciones</label>
+            <label class="check-label"><input type="checkbox" id="info-preorder"> Marcar como preventa</label>
+            <label class="check-label"><input type="checkbox" id="info-visible" checked> Visible en la tienda</label>
+          </div>
+
+          <div class="info-field">
+            <label class="admin-label">📅 Fecha de lanzamiento (si es preventa)</label>
+            <input type="date" id="info-release">
+          </div>
+
+          <div class="admin-actions">
+            <button id="btn-save-info" class="btn btn-primary">💾 Guardar información</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -392,16 +458,30 @@
     document.querySelectorAll('.admin-tab').forEach(tab => {
       tab.addEventListener('click', () => window.switchTab(tab.dataset.tab));
     });
+
+    // Tabs del modal de edición
+    window.switchModalTab = function(tabId) {
+      document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.modal-tab-content').forEach(c => c.classList.remove('active'));
+      const tab = document.querySelector('.modal-tab[data-mtab="' + tabId + '"]');
+      const content = document.querySelector('.modal-tab-content[data-mtab-content="' + tabId + '"]');
+      if (tab) tab.classList.add('active');
+      if (content) content.classList.add('active');
+    };
+
+    document.querySelectorAll('.modal-tab').forEach(tab => {
+      tab.addEventListener('click', () => window.switchModalTab(tab.dataset.mtab));
+    });
   </script>
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-  <script type="module" src="js/settings.js?v=5"></script>
-  <script type="module" src="js/auth.js?v=5"></script>
-  <script type="module" src="js/admin.js?v=5"></script>
-  <script type="module" src="js/excel-importer.js?v=5"></script>
-  <script type="module" src="js/maintenance.js?v=5"></script>
-  <script type="module" src="js/precios.js?v=5"></script>
+  <script type="module" src="js/settings.js?v=6"></script>
+  <script type="module" src="js/auth.js?v=6"></script>
+  <script type="module" src="js/admin.js?v=6"></script>
+  <script type="module" src="js/excel-importer.js?v=6"></script>
+  <script type="module" src="js/maintenance.js?v=6"></script>
+  <script type="module" src="js/precios.js?v=6"></script>
 
 </body>
 </html>

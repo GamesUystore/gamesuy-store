@@ -1,18 +1,13 @@
 // ============================================================
 // GAMESUY STORE — Carga de configuración desde Firestore
-// (logo, redes sociales, banner de anuncio)
 // ============================================================
 
 import { db } from './firebase-config.js';
-import {
-  doc,
-  onSnapshot
-} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-// ============================================================
-// 1. LOGO
-// ============================================================
-
+// ---------------------------------------------
+// LOGO
+// ---------------------------------------------
 function aplicarLogo(logoUrl) {
   const img = document.getElementById('store-logo');
   const fallback = document.querySelector('.brand-logo-fallback');
@@ -30,14 +25,12 @@ function aplicarLogo(logoUrl) {
 
 onSnapshot(doc(db, 'settings', 'site'), (snap) => {
   if (!snap.exists()) return;
-  const data = snap.data();
-  aplicarLogo(data.logoUrl || '');
+  aplicarLogo(snap.data().logoUrl || '');
 });
 
-// ============================================================
-// 2. REDES SOCIALES
-// ============================================================
-
+// ---------------------------------------------
+// REDES SOCIALES
+// ---------------------------------------------
 const REDES_DEFAULT = [
   { key: 'wa', emoji: '💬', label: 'WhatsApp' },
   { key: 'ig', emoji: '📸', label: 'Instagram' },
@@ -66,10 +59,9 @@ onSnapshot(doc(db, 'settings', 'social'), (snap) => {
   aplicarRedes(snap.data());
 });
 
-// ============================================================
-// 3. BANNER DE ANUNCIO / NOVEDAD
-// ============================================================
-
+// ---------------------------------------------
+// BANNER DE ANUNCIO
+// ---------------------------------------------
 function aplicarBanner(data) {
   const banner = document.getElementById('announcement-banner');
   if (!banner) return;
@@ -125,8 +117,4 @@ onSnapshot(doc(db, 'settings', 'homeAnnouncement'), (snap) => {
   aplicarBanner(snap.data());
 });
 
-// ============================================================
-// 4. LOG
-// ============================================================
-
-console.log('[GamesUy] settings.js cargado correctamente');
+console.log('[GamesUy] settings.js cargado');

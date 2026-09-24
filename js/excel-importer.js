@@ -1,6 +1,6 @@
 // ============================================================
 // GAMESUY STORE — Importador de Excel
-// Fase 3.5.3: Parser robusto + fix de encoding
+// Fase 3.5.4: Parser agresivo + matching relajado
 // ============================================================
 
 import { db } from './firebase-config.js';
@@ -45,10 +45,10 @@ async function leerExcel(file) {
         const data = new Uint8Array(e.target.result);
         const workbook = XLSX.read(data, {
           type: 'array',
-          cellText: true,       // forzar lectura como texto
+          cellText: true,
           cellDates: false,
-          raw: false,           // no interpretar números, todo string
-          codepage: 65001       // UTF-8 explícito
+          raw: false,
+          codepage: 65001
         });
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
@@ -61,113 +61,71 @@ async function leerExcel(file) {
   });
 }
 
-/**
- * Repara caracteres mal codificados (halfwidth katakana → UTF-8).
- * Ejemplo: "ﾂｮ" → "®", "邃｢" → "™", "ﾃ前L" → "ÓL"
- */
 function repararEncodingRoto(str) {
   if (!str) return str;
   const s = String(str);
-
-  // ¿Hay caracteres sospechosos? (halfwidth katakana U+FF61-U+FF9F, o CJK raros)
   const tieneHalfwidth = /[\uFF61-\uFF9F]/.test(s);
   const tieneRaros = /[\u3000-\u303F\u4E00-\u9FFF\uFF00-\uFFEF]/.test(s);
-
   if (!tieneHalfwidth && !tieneRaros) return s;
 
   try {
     const bytes = [];
     for (let i = 0; i < s.length; i++) {
       const code = s.charCodeAt(i);
-
-      // Halfwidth katakana → byte directo
-      if (code >= 0xFF61 && code <= 0xFF9F) {
-        bytes.push(code - 0xFEC0);
-        continue;
-      }
-
-      // ASCII normal
-      if (code < 0x80) {
-        bytes.push(code);
-        continue;
-      }
-
-      // Latin-1 (0x80-0xFF) → byte directo
-      if (code >= 0x80 && code <= 0xFF) {
-        bytes.push(code);
-        continue;
-      }
-
-      // Caracteres CJK / raros: intentar convertir de UTF-16 a bytes UTF-8
-      // y ver si tiene sentido. Esto es heurístico.
-      // Si encontramos un CJK (U+4E00-U+9FFF), lo tratamos como bytes individuales
-      // que probablemente sean de una codificación rota.
-      if (code >= 0x4E00 && code <= 0x9FFF) {
-        // No podemos hacer nada confiable acá
-        // Devolvemos el string original sin reparar
-        return s;
-      }
-
-      // Otros caracteres: agrego como byte bajo
+      if (code >= 0xFF61 && code <= 0xFF9F) { bytes.push(code - 0xFEC0); continue; }
+      if (code < 0x80) { bytes.push(code); continue; }
+      if (code >= 0x80 && code <= 0xFF) { bytes.push(code); continue; }
+      if (code >= 0x4E00 && code <= 0x9FFF) return s;
       bytes.push(code & 0xFF);
     }
-
-    // Re-decodificar como UTF-8
     const decoded = new TextDecoder('utf-8', { fatal: false }).decode(new Uint8Array(bytes));
-
-    // Si el resultado tiene muchos caracteres de reemplazo (U+FFFD), no sirve
     const reemplazos = (decoded.match(/\uFFFD/g) || []).length;
-    if (reemplazos > s.length * 0.3) {
-      return s; // demasiado roto, mejor devolver original
-    }
-
+    if (reemplazos > s.length * 0.3) return s;
     return decoded;
   } catch (e) {
     return s;
   }
 }
 
-/**
- * Normaliza un título para usarlo como matchKey.
- */
+function limpiarTituloBase(titulo) {
+  let t = String(titulo || '');
+  t = repararEncodingRoto(t);
+  t = t.replace(/[\u00A0\u2007\u202F\u2009\u200A\u200B\u200C\u200D\u2060\uFEFF]/g, ' ');
+  t = t.replace(/[\r\n\t]+/g, ' ');
+  t = t.replace(/[\uFE0E\uFE0F]/g, '');
+  t = t.replace(/^[\p{Emoji_Presentation}\p{Extended_Pictographic}\s]+/u, '');
+  t = t.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '');
+  t = t.replace(/\s+/g, ' ').trim();
+  return t;
+}
+
 function normalizarTitulo(titulo) {
   return String(titulo || '')
-    .replace(/[\uFE0E\uFE0F]/g, '')                    // quita variation selectors
-    .replace(/^[\p{Emoji_Presentation}\p{Extended_Pictographic}\s]+/u, '') // quita emojis al inicio
-    .replace(/[“”«»]/g, '"')                            // comillas curvas → rectas
-    .replace(/[‘’]/g, "'")                              // apóstrofes curvos → rectos
-    .replace(/\s+/g, ' ')                               // espacios múltiples → 1
+    .replace(/[\uFE0E\uFE0F]/g, '')
+    .replace(/^[\p{Emoji_Presentation}\p{Extended_Pictographic}\s]+/u, '')
+    .replace(/[“”«»]/g, '"')
+    .replace(/[‘’]/g, "'")
+    .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase();
 }
 
-/**
- * Parser de títulos del Excel de Ofertas.
- * ORDEN IMPORTANTE:
- *   1. Reparar encoding
- *   2. Quitar emojis al inicio
- *   3. Quitar " -" al final
- *   4. Detectar y quitar "(PS4/PS5)" o "(PS5)"
- *   5. Detectar y quitar " PS5" o " PS4" (palabra suelta)
- */
+function crearClaveRelajada(str) {
+  return String(str || '')
+    .toLowerCase()
+    .replace(/[™®©]/g, '')
+    .replace(/[:\-–—.,;!?'"()\[\]{}]/g, ' ')
+    .replace(/[\uFE0E\uFE0F]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function parsearTituloOferta(tituloRaw) {
-  let titulo = String(tituloRaw || '').trim();
-
-  // 1) Reparar encoding roto
-  titulo = repararEncodingRoto(titulo);
-
-  // 2) Quitar prefijo con emojis
-  titulo = titulo.replace(/^[\p{Emoji_Presentation}\p{Extended_Pictographic}\s]+/u, '').trim();
-
-  // 3) Quitar variation selectors
-  titulo = titulo.replace(/[\uFE0E\uFE0F]/g, '').trim();
-
-  // 4) Quitar " -" al final PRIMERO
-  titulo = titulo.replace(/\s*-\s*$/, '').trim();
-
+  let titulo = limpiarTituloBase(tituloRaw);
   const plataformas = [];
 
-  // 5) Detectar y quitar "(PS4/PS5)" o "(PS5)" entre paréntesis
+  titulo = titulo.replace(/\s*[-–—]\s*$/, '').trim();
+
   const matchParentesis = titulo.match(/\s*\(([^)]+)\)\s*$/);
   if (matchParentesis) {
     const contenido = matchParentesis[1].toUpperCase();
@@ -178,18 +136,21 @@ function parsearTituloOferta(tituloRaw) {
     }
   }
 
-  // 6) Detectar y quitar " PS5" o " PS4" al final
-  const matchPS = titulo.match(/\s+PS([45])\s*$/i);
+  const matchPS = titulo.match(/\s+PS([45])\s*[-–—]?\s*$/i);
   if (matchPS) {
     const plat = 'ps' + matchPS[1];
     if (!plataformas.includes(plat)) plataformas.push(plat);
-    titulo = titulo.replace(/\s+PS[45]\s*$/i, '').trim();
+    titulo = titulo.replace(/\s+PS[45]\s*[-–—]?\s*$/i, '').trim();
   }
 
-  // 7) Quitar " -" nuevamente (por si quedó)
-  titulo = titulo.replace(/\s*-\s*$/, '').trim();
+  const matchPSAny = titulo.match(/PS([45])/i);
+  if (matchPSAny && !plataformas.includes('ps' + matchPSAny[1])) {
+    plataformas.push('ps' + matchPSAny[1]);
+  }
+  titulo = titulo.replace(/\s*[-–—]?\s*PS[45]\s*[-–—]?\s*/gi, ' ').trim();
 
-  // 8) Normalizar comillas curvas
+  titulo = titulo.replace(/\s*[-–—]\s*$/, '').trim();
+  titulo = titulo.replace(/\s+/g, ' ').trim();
   titulo = titulo.replace(/[“”«»]/g, '"').replace(/[‘’]/g, "'");
 
   if (plataformas.length === 0) {
@@ -228,7 +189,7 @@ function extraerFechaVencimiento(rows) {
 }
 
 // ============================================================
-// LISTENERS DE FILE INPUTS
+// LISTENERS
 // ============================================================
 
 function attachFileListener(inputId, tipo, logId, btnId, autoFechaId) {
@@ -278,7 +239,7 @@ attachFileListener('excel-ofertas',  'ofertas',  'ofertas-log',  'btn-process-of
 attachFileListener('excel-preventas','preventas','preventas-log','btn-process-preventas',null);
 
 // ============================================================
-// STOCK (sin cambios)
+// STOCK
 // ============================================================
 
 function construirVariantesStock(fila) {
@@ -346,7 +307,6 @@ function fusionarVarianteStock(varianteNueva, existente) {
 
   const costoViejo = Number(existente.costoARS) || 0;
   const costoNuevo = Number(varianteNueva.costoARS) || 0;
-
   const resultado = { ...existente };
 
   if (costoViejo === costoNuevo) {
@@ -481,8 +441,8 @@ async function procesarOfertas() {
 
   const fechaHasta = $('oferta-fecha-hasta').value;
   if (!fechaHasta) {
-    log('ofertas-log', '⚠ Ingresá la fecha hasta la cual son válidas las ofertas.', 'error');
-    alert('Ingresá la fecha de vencimiento antes de procesar.');
+    log('ofertas-log', '⚠ Ingresá la fecha de vencimiento.', 'error');
+    alert('Ingresá la fecha antes de procesar.');
     return;
   }
 
@@ -491,13 +451,20 @@ async function procesarOfertas() {
 
   const snap = await getDocs(collection(db, 'products'));
   const productosMap = {};
+  const productosMapRelajado = {};
+
   snap.docs.forEach(d => {
     const data = d.data();
-    if (data.matchKey) productosMap[data.matchKey] = { id: d.id, ...data };
+    if (data.matchKey) {
+      productosMap[data.matchKey] = { id: d.id, ...data };
+      const claveRelajada = crearClaveRelajada(data.matchKey);
+      if (!productosMapRelajado[claveRelajada]) {
+        productosMapRelajado[claveRelajada] = { id: d.id, ...data };
+      }
+    }
   });
   log('ofertas-log', `✔ ${snap.size} productos en Firestore.`);
 
-  // Detectar fila donde empiezan los datos
   let inicioIdx = 0;
   for (let i = 0; i < Math.min(excel.rows.length, 20); i++) {
     const fila = excel.rows[i];
@@ -512,7 +479,7 @@ async function procesarOfertas() {
   log('ofertas-log', `📌 Datos desde la fila ${inicioIdx + 1}`);
 
   const filas = excel.rows.slice(inicioIdx);
-  let aplicadas = 0, noEncontradas = 0, sinPrecio = 0, saltadas = 0;
+  let aplicadas = 0, aplicadasRelajado = 0, noEncontradas = 0, sinPrecio = 0, saltadas = 0;
   const operaciones = [];
   const noEncontrados = [];
 
@@ -526,10 +493,21 @@ async function procesarOfertas() {
     const { titulo, plataformas } = parsearTituloOferta(tituloRaw);
     const matchKey = normalizarTitulo(titulo);
 
-    const prod = productosMap[matchKey];
+    let prod = productosMap[matchKey];
+    let usadoRelajado = false;
+
+    if (!prod) {
+      const claveRelajada = crearClaveRelajada(matchKey);
+      const prodRelajado = productosMapRelajado[claveRelajada];
+      if (prodRelajado) {
+        prod = prodRelajado;
+        usadoRelajado = true;
+      }
+    }
+
     if (!prod) {
       noEncontradas++;
-      noEncontrados.push(`${titulo} [${plataformas.join('/')}] (matchKey: "${matchKey}")`);
+      noEncontrados.push(`${titulo} [${plataformas.join('/')}]`);
       continue;
     }
 
@@ -542,7 +520,6 @@ async function procesarOfertas() {
       const costoActual = Number(v.costoARS) || 0;
 
       let ofertaPrecioUYU = 0;
-
       if (precioActual > 0 && costoActual > 0) {
         const variacion = (costoOfertaARS / costoActual) - 1;
         ofertaPrecioUYU = roundUYU(precioActual * (1 + variacion));
@@ -563,10 +540,11 @@ async function procesarOfertas() {
         ref: doc(db, 'products', prod.id),
         data: { variants: nuevasVariantes, updatedAt: new Date().toISOString() }
       });
-      aplicadas++;
+      if (usadoRelajado) aplicadasRelajado++;
+      else aplicadas++;
     } else {
       noEncontradas++;
-      noEncontrados.push(`${titulo} — sin variantes primarias coincidentes`);
+      noEncontrados.push(`${titulo} — sin variantes primarias`);
     }
   }
 
@@ -576,10 +554,11 @@ async function procesarOfertas() {
   log('ofertas-log', '');
   log('ofertas-log', '═══════════════════════════════════');
   log('ofertas-log', `✅ OFERTAS PROCESADAS`);
-  log('ofertas-log', `   🔥 Aplicadas:       ${aplicadas}`);
-  log('ofertas-log', `   ⚠ No encontradas:  ${noEncontradas}`);
-  log('ofertas-log', `   ⏭️  Sin precio:      ${sinPrecio}`);
-  log('ofertas-log', `   ⏭️  Saltadas:        ${saltadas}`);
+  log('ofertas-log', `   🔥 Aplicadas exactas:    ${aplicadas}`);
+  log('ofertas-log', `   🎯 Aplicadas relajadas: ${aplicadasRelajado}`);
+  log('ofertas-log', `   ⚠ No encontradas:       ${noEncontradas}`);
+  log('ofertas-log', `   ⏭️  Sin precio:           ${sinPrecio}`);
+  log('ofertas-log', `   ⏭️  Saltadas:             ${saltadas}`);
   log('ofertas-log', '═══════════════════════════════════');
 
   if (noEncontrados.length > 0) {
@@ -591,7 +570,7 @@ async function procesarOfertas() {
     }
   }
 
-  alert(`✅ Ofertas procesadas\n\nAplicadas: ${aplicadas}\nNo encontradas: ${noEncontradas}`);
+  alert(`✅ Ofertas procesadas\n\nAplicadas exactas: ${aplicadas}\nAplicadas relajadas: ${aplicadasRelajado}\nNo encontradas: ${noEncontradas}`);
 }
 
 // ============================================================
@@ -704,4 +683,4 @@ $('btn-clean-ofertas')?.addEventListener('click', async () => {
   finally { btn.disabled = false; btn.textContent = '🧹 Limpiar ofertas vencidas'; }
 });
 
-console.log('[GamesUy] excel-importer.js v11 cargado (encoding + parser fix)');
+console.log('[GamesUy] excel-importer.js v12 cargado (matching relajado)');

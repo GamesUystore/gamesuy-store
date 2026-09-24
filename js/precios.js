@@ -1,31 +1,20 @@
 // ============================================================
-// GAMESUY STORE — Gestor de precios + Información del juego
-// Versión 9: imágenes como Base64 (sin Cloudinary)
+// GAMESUY STORE — Gestor de precios
+// Modelo: precio normal + precio de oferta (independientes)
 // ============================================================
 
 import { db } from './firebase-config.js';
 import {
-  collection,
-  getDocs,
-  doc,
-  updateDoc,
-  onSnapshot
+  collection, getDocs, doc, updateDoc, onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import {
-  getCostoUYU,
-  calcGananciaPct,
-  calcPrecioUSD,
-  roundUYU,
-  formatUYU,
-  formatUSD
+  getCostoUYU, calcGananciaPct, calcPrecioUSD,
+  roundUYU, formatUYU, formatUSD
 } from './data-model.js';
 
 const $ = (id) => document.getElementById(id);
-
-// Límite de tamaño de imagen (en KB)
 const MAX_IMG_KB = 300;
 
-// Estado
 let productos = [];
 let cotizaciones = { arsAUYU: 0.055, usdAUYU: 39.50 };
 let filtroSearch = '';
@@ -35,12 +24,11 @@ let pagina = 1;
 const POR_PAGINA = 30;
 let productoActivo = null;
 
-console.log('[GamesUy] precios.js v9 (Base64) iniciando...');
+console.log('[GamesUy] precios.js v11 iniciando...');
 
 // ============================================================
 // COTIZACIONES
 // ============================================================
-
 onSnapshot(doc(db, 'settings', 'cotizaciones'), (snap) => {
   if (!snap.exists()) return;
   const c = snap.data();
@@ -52,7 +40,6 @@ onSnapshot(doc(db, 'settings', 'cotizaciones'), (snap) => {
 // ============================================================
 // PRODUCTOS
 // ============================================================
-
 async function cargarProductos() {
   try {
     const snap = await getDocs(collection(db, 'products'));
@@ -60,43 +47,61 @@ async function cargarProductos() {
     console.log('[GamesUy] Productos cargados:', productos.length);
     render();
   } catch (err) {
-    console.error('[GamesUy] Error cargando productos:', err);
+    console.error('[GamesUy] Error:', err);
   }
 }
 
 // ============================================================
 // HELPERS
 // ============================================================
+function tienePrecioNormal(v) { return Number(v?.precioFinalUYU) > 0; }
+function tienePrecioOferta(v) { return Number(v?.ofertaPrecioUYU) > 0; }
 
-function tienePrecio(v) { return Number(v?.precioFinalUYU) > 0; }
+function ofertaVigente(v) {
+  if (!v.enOferta) return false;
+  if (!v.ofertaHasta) return false;
+  const hoy = new Date().toISOString().split('T')[0];
+  return v.ofertaHasta >= hoy && Number(v.ofertaCostoARS) > 0;
+}
 
+/**
+ * Un producto está "completo" si TODAS sus variantes tienen:
+ *  - Precio normal cargado (si tiene costo Stock)
+ *  - Precio de oferta cargado (si tiene oferta vigente)
+ */
 function productoCompleto(p) {
-  const vs = (p.variants || []).filter(v => Number(v.costoARS) > 0);
+  const vs = (p.variants || []).filter(v => Number(v.costoARS) > 0 || Number(v.ofertaCostoARS) > 0);
   if (vs.length === 0) return false;
-  return vs.every(tienePrecio);
+  return vs.every(v => {
+    const necesitaNormal = Number(v.costoARS) > 0;
+    const necesitaOferta = ofertaVigente(v);
+    if (necesitaNormal && !tienePrecioNormal(v)) return false;
+    if (necesitaOferta && !tienePrecioOferta(v)) return false;
+    return true;
+  });
 }
 
 function productoPendiente(p) {
-  const vs = (p.variants || []).filter(v => Number(v.costoARS) > 0);
+  const vs = (p.variants || []).filter(v => Number(v.costoARS) > 0 || Number(v.ofertaCostoARS) > 0);
   if (vs.length === 0) return false;
-  return vs.some(v => !tienePrecio(v));
+  return vs.some(v => {
+    const necesitaNormal = Number(v.costoARS) > 0;
+    const necesitaOferta = ofertaVigente(v);
+    if (necesitaNormal && !tienePrecioNormal(v)) return true;
+    if (necesitaOferta && !tienePrecioOferta(v)) return true;
+    return false;
+  });
 }
 
 function filtrarProductos() {
   let lista = productos.filter(p => (p.variants || []).length > 0);
-
   if (filtroEstado === 'pendientes') lista = lista.filter(productoPendiente);
   else if (filtroEstado === 'completos') lista = lista.filter(productoCompleto);
-
-  if (filtroCat !== 'all') {
-    lista = lista.filter(p => (p.categories || []).includes(filtroCat));
-  }
-
+  if (filtroCat !== 'all') lista = lista.filter(p => (p.categories || []).includes(filtroCat));
   if (filtroSearch) {
     const q = filtroSearch.toLowerCase().trim();
     lista = lista.filter(p => String(p.title || '').toLowerCase().includes(q));
   }
-
   lista.sort((a, b) => String(a.title || '').localeCompare(String(b.title || ''), 'es'));
   return lista;
 }
@@ -116,10 +121,15 @@ function fileToBase64(file) {
   });
 }
 
-// ============================================================
-// RENDER
-// ============================================================
+function formatFecha(dateStr) {
+  if (!dateStr) return '';
+  const parts = String(dateStr).split('-');
+  return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : dateStr;
+}
 
+// ============================================================
+// RENDER LISTA
+// ============================================================
 function render() {
   const list = $('precios-list');
   if (!list) return;
@@ -152,19 +162,34 @@ function render() {
 
   list.innerHTML = enPagina.map(p => {
     const cats = (p.categories || []).map(c => `<span class="badge badge-${c}">${c.toUpperCase()}</span>`).join('');
-    const vs = (p.variants || []).filter(v => Number(v.costoARS) > 0 || tienePrecio(v));
-    const completas = vs.filter(tienePrecio).length;
-    const totales = vs.length;
-    const completo = completas === totales && totales > 0;
-    const progresoClase = completo ? 'progress-done' : (completas > 0 ? 'progress-partial' : 'progress-pending');
+    const vs = (p.variants || []).filter(v => Number(v.costoARS) > 0 || Number(v.ofertaCostoARS) > 0);
+
+    let totalItems = 0;
+    let completosItems = 0;
+    vs.forEach(v => {
+      if (Number(v.costoARS) > 0) {
+        totalItems++;
+        if (tienePrecioNormal(v)) completosItems++;
+      }
+      if (ofertaVigente(v)) {
+        totalItems++;
+        if (tienePrecioOferta(v)) completosItems++;
+      }
+    });
+
+    const completo = completosItems === totalItems && totalItems > 0;
+    const progresoClase = completo ? 'progress-done' : (completosItems > 0 ? 'progress-partial' : 'progress-pending');
     const tieneImg = p.coverUrl ? '<span class="fila-img-badge">🖼️</span> ' : '';
     const oculto = p.visible === false ? '<span style="color:#ff8aa8; font-size:0.7rem;">(oculto)</span> ' : '';
+    const tieneOferta = vs.some(ofertaVigente);
+    const badgeOferta = tieneOferta ? '<span class="fila-oferta-badge">🔥</span> ' : '';
+    const soloOferta = p.soloOferta ? '<span style="color:#00b4d8; font-size:0.68rem;">[SOLO OFERTA]</span> ' : '';
 
     return `
       <div class="fila-juego ${completo ? 'fila-completa' : ''}" data-prod-id="${p.id}">
         <div class="fila-badges">${cats}</div>
-        <div class="fila-titulo">${oculto}${tieneImg}${escapeHtml(p.title || '(sin título)')}</div>
-        <div class="fila-progreso ${progresoClase}">${completas}/${totales}</div>
+        <div class="fila-titulo">${oculto}${tieneImg}${badgeOferta}${soloOferta}${escapeHtml(p.title || '(sin título)')}</div>
+        <div class="fila-progreso ${progresoClase}">${completosItems}/${totalItems}</div>
         <div class="fila-arrow">✏️</div>
       </div>
     `;
@@ -184,7 +209,6 @@ function render() {
 // ============================================================
 // MODAL
 // ============================================================
-
 function abrirModal(prodId) {
   const prod = productos.find(p => p.id === prodId);
   if (!prod) return;
@@ -210,66 +234,168 @@ function cerrarModal() {
 // ============================================================
 // TAB PRECIOS
 // ============================================================
-
 function renderModalPrecios(prod) {
   const body = $('price-modal-precios');
   if (!body) return;
 
-  const variantes = (prod.variants || []).filter(v => Number(v.costoARS) > 0 || tienePrecio(v));
+  const variantes = (prod.variants || []).filter(v =>
+    Number(v.costoARS) > 0 || Number(v.ofertaCostoARS) > 0 || tienePrecioNormal(v) || tienePrecioOferta(v)
+  );
 
   if (variantes.length === 0) {
     body.innerHTML = '<p class="empty-message">Este producto no tiene variantes con costo cargado.</p>';
     return;
   }
 
-  body.innerHTML = variantes.map(v => {
-    const costoARS = Number(v.costoARS) || 0;
-    const costoUYU = getCostoUYU(costoARS, cotizaciones.arsAUYU);
-    const precioActual = Number(v.precioFinalUYU) || 0;
-    const usdPreview = precioActual > 0 ? formatUSD(calcPrecioUSD(precioActual, cotizaciones.usdAUYU)) : '—';
+  body.innerHTML = variantes.map(v => renderVarianteCompleta(v)).join('');
 
-    return `
-      <div class="variante-modal-row">
-        <div class="variante-modal-header">
-          <span class="variante-modal-label">${v.label}</span>
-        </div>
-        <div class="variante-modal-costo">
-          <span class="info-label">Costo proveedor:</span>
-          <span class="info-value">${costoARS} ARS → <strong>${formatUYU(costoUYU)}</strong></span>
-        </div>
-        <div class="variante-modal-input-row">
-          <div class="variante-modal-input-wrap">
-            <span class="input-prefix">$</span>
-            <input type="number" class="variante-modal-input" placeholder="Precio final"
-              value="${precioActual || ''}" data-variant="${v.id}" min="0" step="1">
-            <span class="input-suffix">UYU</span>
-          </div>
-          <span class="variante-modal-usd" data-usd-variant="${v.id}">≈ ${usdPreview}</span>
-        </div>
-        <div class="variante-modal-actions">
-          <button type="button" class="btn btn-primary btn-sm btn-modal-save" data-variant="${v.id}">💾 Guardar</button>
-        </div>
-      </div>
-    `;
-  }).join('');
-
-  body.querySelectorAll('.variante-modal-input').forEach(inp => {
+  // Inputs de precio normal
+  body.querySelectorAll('.variante-input-normal').forEach(inp => {
     inp.addEventListener('input', () => {
       const vid = inp.dataset.variant;
       const val = parseFloat(inp.value) || 0;
-      const usdEl = body.querySelector(`[data-usd-variant="${vid}"]`);
+      const usdEl = body.querySelector(`[data-usd-normal="${vid}"]`);
       if (usdEl) usdEl.textContent = val > 0 ? '≈ ' + formatUSD(calcPrecioUSD(val, cotizaciones.usdAUYU)) : '≈ —';
     });
   });
 
-  body.querySelectorAll('.btn-modal-save').forEach(btn => {
-    btn.addEventListener('click', () => guardarPrecio(prod, btn.dataset.variant, body));
+  // Inputs de precio de oferta
+  body.querySelectorAll('.variante-input-oferta').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const vid = inp.dataset.variant;
+      const val = parseFloat(inp.value) || 0;
+      const usdEl = body.querySelector(`[data-usd-oferta="${vid}"]`);
+      if (usdEl) usdEl.textContent = val > 0 ? '≈ ' + formatUSD(calcPrecioUSD(val, cotizaciones.usdAUYU)) : '≈ —';
+    });
+  });
+
+  // Botones guardar normal
+  body.querySelectorAll('.btn-save-normal').forEach(btn => {
+    btn.addEventListener('click', () => guardarPrecioNormal(prod, btn.dataset.variant, body));
+  });
+
+  // Botones guardar oferta
+  body.querySelectorAll('.btn-save-oferta').forEach(btn => {
+    btn.addEventListener('click', () => guardarPrecioOferta(prod, btn.dataset.variant, body));
   });
 }
 
-async function guardarPrecio(prod, variantId, body) {
-  const input = body.querySelector(`.variante-modal-input[data-variant="${variantId}"]`);
-  const btn = body.querySelector(`.btn-modal-save[data-variant="${variantId}"]`);
+function renderVarianteCompleta(v) {
+  const tieneCostoStock = Number(v.costoARS) > 0;
+  const tieneCostoOferta = Number(v.ofertaCostoARS) > 0;
+  const esOferta = ofertaVigente(v);
+
+  // Si NO tiene costo Stock y SÍ tiene costo Oferta → es "solo oferta"
+  const esSoloOferta = !tieneCostoStock && tieneCostoOferta;
+
+  // Datos precio normal
+  const costoARS = Number(v.costoARS) || 0;
+  const costoUYU = getCostoUYU(costoARS, cotizaciones.arsAUYU);
+  const precioNormal = Number(v.precioFinalUYU) || 0;
+  const usdNormal = precioNormal > 0 ? formatUSD(calcPrecioUSD(precioNormal, cotizaciones.usdAUYU)) : '—';
+
+  // Datos precio oferta
+  const ofertaCostoARS = Number(v.ofertaCostoARS) || 0;
+  const ofertaCostoUYU = getCostoUYU(ofertaCostoARS, cotizaciones.arsAUYU);
+  const ofertaPrecio = Number(v.ofertaPrecioUYU) || 0;
+  const usdOferta = ofertaPrecio > 0 ? formatUSD(calcPrecioUSD(ofertaPrecio, cotizaciones.usdAUYU)) : '—';
+
+  const ofertaBadge = esOferta
+    ? `<span class="variante-oferta-badge">🔥 hasta ${formatFecha(v.ofertaHasta)}</span>`
+    : '';
+
+  // Si es solo oferta, mostramos SOLO la sección de oferta
+  if (esSoloOferta) {
+    return `
+      <div class="variante-bloque variante-con-oferta">
+        <div class="variante-header">
+          <span class="variante-label">${v.label}</span>
+          <span class="variante-solo-badge">SOLO OFERTA</span>
+        </div>
+        <div class="precio-seccion precio-seccion-oferta">
+          <div class="precio-seccion-titulo">🔥 Precio de oferta</div>
+          <div class="variante-costo">
+            <span class="info-label">Costo proveedor:</span>
+            <span class="info-value">${ofertaCostoARS} ARS → <strong>${formatUYU(ofertaCostoUYU)}</strong></span>
+          </div>
+          <div class="variante-input-row">
+            <div class="variante-input-wrap variante-input-wrap-oferta">
+              <span class="input-prefix">$</span>
+              <input type="number" class="variante-input-oferta" placeholder="Precio de oferta"
+                value="${ofertaPrecio || ''}" data-variant="${v.id}" min="0" step="1">
+              <span class="input-suffix">UYU</span>
+            </div>
+            <span class="variante-usd" data-usd-oferta="${v.id}">≈ ${usdOferta}</span>
+          </div>
+          <div class="variante-actions">
+            <button type="button" class="btn btn-primary btn-sm btn-save-oferta" data-variant="${v.id}">💾 Guardar precio</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  // Si tiene Stock → mostrar normal + (oferta si aplica)
+  return `
+    <div class="variante-bloque ${esOferta ? 'variante-con-oferta' : ''}">
+      <div class="variante-header">
+        <span class="variante-label">${v.label}</span>
+        ${ofertaBadge}
+      </div>
+
+      <!-- PRECIO NORMAL -->
+      <div class="precio-seccion">
+        <div class="precio-seccion-titulo">💰 Precio normal</div>
+        <div class="variante-costo">
+          <span class="info-label">Costo proveedor:</span>
+          <span class="info-value">${costoARS} ARS → <strong>${formatUYU(costoUYU)}</strong></span>
+        </div>
+        <div class="variante-input-row">
+          <div class="variante-input-wrap">
+            <span class="input-prefix">$</span>
+            <input type="number" class="variante-input-normal" placeholder="Precio final"
+              value="${precioNormal || ''}" data-variant="${v.id}" min="0" step="1">
+            <span class="input-suffix">UYU</span>
+          </div>
+          <span class="variante-usd" data-usd-normal="${v.id}">≈ ${usdNormal}</span>
+        </div>
+        <div class="variante-actions">
+          <button type="button" class="btn btn-primary btn-sm btn-save-normal" data-variant="${v.id}">💾 Guardar precio normal</button>
+        </div>
+      </div>
+
+      ${esOferta ? `
+        <!-- PRECIO DE OFERTA -->
+        <div class="precio-seccion precio-seccion-oferta">
+          <div class="precio-seccion-titulo">🔥 Precio de oferta</div>
+          <div class="variante-costo">
+            <span class="info-label">Costo proveedor:</span>
+            <span class="info-value">${ofertaCostoARS} ARS → <strong>${formatUYU(ofertaCostoUYU)}</strong></span>
+          </div>
+          <div class="variante-input-row">
+            <div class="variante-input-wrap variante-input-wrap-oferta">
+              <span class="input-prefix">$</span>
+              <input type="number" class="variante-input-oferta" placeholder="Precio de oferta"
+                value="${ofertaPrecio || ''}" data-variant="${v.id}" min="0" step="1">
+              <span class="input-suffix">UYU</span>
+            </div>
+            <span class="variante-usd" data-usd-oferta="${v.id}">≈ ${usdOferta}</span>
+          </div>
+          <div class="variante-actions">
+            <button type="button" class="btn btn-primary btn-sm btn-save-oferta" data-variant="${v.id}">💾 Guardar precio de oferta</button>
+          </div>
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+// ============================================================
+// GUARDAR PRECIO NORMAL
+// ============================================================
+async function guardarPrecioNormal(prod, variantId, body) {
+  const input = body.querySelector(`.variante-input-normal[data-variant="${variantId}"]`);
+  const btn = body.querySelector(`.btn-save-normal[data-variant="${variantId}"]`);
   if (!input || !btn) return;
 
   const nuevoPrecio = parseFloat(input.value) || 0;
@@ -300,21 +426,67 @@ async function guardarPrecio(prod, variantId, body) {
     btn.textContent = '✅ Guardado';
     setTimeout(() => {
       btn.disabled = false;
-      btn.textContent = '💾 Guardar';
+      btn.textContent = '💾 Guardar precio normal';
       render();
     }, 900);
   } catch (err) {
     console.error('[GamesUy] Error:', err);
     alert('Error: ' + err.message);
     btn.disabled = false;
-    btn.textContent = '💾 Guardar';
+    btn.textContent = '💾 Guardar precio normal';
+  }
+}
+
+// ============================================================
+// GUARDAR PRECIO DE OFERTA
+// ============================================================
+async function guardarPrecioOferta(prod, variantId, body) {
+  const input = body.querySelector(`.variante-input-oferta[data-variant="${variantId}"]`);
+  const btn = body.querySelector(`.btn-save-oferta[data-variant="${variantId}"]`);
+  if (!input || !btn) return;
+
+  const nuevoPrecio = parseFloat(input.value) || 0;
+  if (nuevoPrecio <= 0) { alert('Ingresá un precio de oferta mayor a 0.'); return; }
+
+  const variante = (prod.variants || []).find(v => v.id === variantId);
+  if (!variante) return;
+
+  const ofertaCostoARS = Number(variante.ofertaCostoARS) || 0;
+  const ganancia = calcGananciaPct(nuevoPrecio, ofertaCostoARS, cotizaciones.arsAUYU);
+
+  const nuevasVariantes = (prod.variants || []).map(v => {
+    if (v.id !== variantId) return v;
+    return {
+      ...v,
+      ofertaPrecioUYU: roundUYU(nuevoPrecio),
+      ofertaGananciaPct: ganancia,
+      updatedAt: new Date().toISOString()
+    };
+  });
+
+  btn.disabled = true;
+  btn.textContent = '⏳';
+
+  try {
+    await updateDoc(doc(db, 'products', prod.id), { variants: nuevasVariantes });
+    prod.variants = nuevasVariantes;
+    btn.textContent = '✅ Guardado';
+    setTimeout(() => {
+      btn.disabled = false;
+      btn.textContent = '💾 Guardar precio de oferta';
+      render();
+    }, 900);
+  } catch (err) {
+    console.error('[GamesUy] Error:', err);
+    alert('Error: ' + err.message);
+    btn.disabled = false;
+    btn.textContent = '💾 Guardar precio de oferta';
   }
 }
 
 // ============================================================
 // TAB INFORMACIÓN
 // ============================================================
-
 function renderModalInfo(prod) {
   const t = $('info-title'); if (t) t.value = prod.title || '';
   const c = $('info-categories'); if (c) c.value = (prod.categories || []).join(', ');
@@ -331,7 +503,6 @@ function renderModalInfo(prod) {
   const gf = $('info-gameplay-file'); if (gf) gf.value = '';
   const cu = $('info-cover-url'); if (cu) cu.value = '';
   const gu = $('info-gameplay-url'); if (gu) gu.value = '';
-
   const cs = $('info-cover-status'); if (cs) cs.textContent = '';
   const gs = $('info-gameplay-status'); if (gs) gs.textContent = '';
 }
@@ -351,7 +522,6 @@ function actualizarPreview(tipo, url) {
   }
 }
 
-// Listeners de subida (Base64)
 ['cover', 'gameplay'].forEach(tipo => {
   const fileInput = $(`info-${tipo}-file`);
   const urlInput = $(`info-${tipo}-url`);
@@ -361,35 +531,26 @@ function actualizarPreview(tipo, url) {
     fileInput.addEventListener('change', async () => {
       const file = fileInput.files[0];
       if (!file) return;
-
       const sizeKB = Math.round(file.size / 1024);
       if (sizeKB > MAX_IMG_KB) {
-        if (statusEl) statusEl.textContent = `❌ La imagen pesa ${sizeKB} KB (máximo ${MAX_IMG_KB} KB). Comprimila antes.`;
-        alert(`La imagen pesa ${sizeKB} KB. Máximo permitido: ${MAX_IMG_KB} KB.\n\nComprimila en tinypng.com o con un editor de imágenes.`);
+        if (statusEl) statusEl.textContent = `❌ Imagen muy grande (${sizeKB} KB, máx ${MAX_IMG_KB} KB).`;
+        alert(`La imagen pesa ${sizeKB} KB. Máximo: ${MAX_IMG_KB} KB.\n\nComprimila en tinypng.com`);
         fileInput.value = '';
         return;
       }
-
-      if (statusEl) statusEl.textContent = `⏳ Procesando imagen (${sizeKB} KB)...`;
-
+      if (statusEl) statusEl.textContent = `⏳ Procesando (${sizeKB} KB)...`;
       try {
         const b64 = await fileToBase64(file);
         actualizarPreview(tipo, b64);
-        if (statusEl) statusEl.textContent = `✅ Imagen lista (${sizeKB} KB). No olvides Guardar información.`;
-        console.log(`[GamesUy] Imagen ${tipo} cargada en Base64:`, sizeKB, 'KB');
+        if (statusEl) statusEl.textContent = `✅ Imagen lista (${sizeKB} KB). Guardá información.`;
       } catch (err) {
-        console.error('[GamesUy] Error procesando imagen:', err);
         if (statusEl) statusEl.textContent = '❌ Error: ' + err.message;
       }
-
       fileInput.value = '';
     });
   }
-
   if (urlInput) {
-    urlInput.addEventListener('input', () => {
-      actualizarPreview(tipo, urlInput.value);
-    });
+    urlInput.addEventListener('input', () => actualizarPreview(tipo, urlInput.value));
   }
 });
 
@@ -403,7 +564,6 @@ document.querySelectorAll('.upload-preview-clear').forEach(btn => {
   });
 });
 
-// Guardar info
 $('btn-save-info')?.addEventListener('click', async () => {
   if (!productoActivo) return;
   const btn = $('btn-save-info');
@@ -417,15 +577,12 @@ $('btn-save-info')?.addEventListener('click', async () => {
     const gameplayUrl = (gameplayWrap?.dataset.url) || '';
 
     const categorias = $('info-categories').value
-      .split(',')
-      .map(c => c.trim().toLowerCase())
-      .filter(Boolean);
+      .split(',').map(c => c.trim().toLowerCase()).filter(Boolean);
 
     const data = {
       title: $('info-title').value.trim(),
       categories: categorias,
-      coverUrl: coverUrl,
-      gameplayUrl: gameplayUrl,
+      coverUrl, gameplayUrl,
       youtubeUrl: $('info-youtube').value.trim(),
       description: $('info-description').value.trim(),
       isPreorder: $('info-preorder').checked,
@@ -444,7 +601,7 @@ $('btn-save-info')?.addEventListener('click', async () => {
       render();
     }, 900);
   } catch (err) {
-    console.error('[GamesUy] Error guardando info:', err);
+    console.error('[GamesUy] Error:', err);
     alert('Error: ' + err.message);
     btn.disabled = false;
     btn.textContent = '💾 Guardar información';
@@ -454,7 +611,6 @@ $('btn-save-info')?.addEventListener('click', async () => {
 // ============================================================
 // CERRAR MODAL
 // ============================================================
-
 $('price-modal-close')?.addEventListener('click', cerrarModal);
 $('price-modal')?.addEventListener('click', (e) => {
   if (e.target.id === 'price-modal') cerrarModal();
@@ -463,38 +619,14 @@ $('price-modal')?.addEventListener('click', (e) => {
 // ============================================================
 // FILTROS
 // ============================================================
-
-$('precios-search')?.addEventListener('input', (e) => {
-  filtroSearch = e.target.value;
-  pagina = 1;
-  render();
-});
-
-$('precios-cat')?.addEventListener('change', (e) => {
-  filtroCat = e.target.value;
-  pagina = 1;
-  render();
-});
-
-$('precios-estado')?.addEventListener('change', (e) => {
-  filtroEstado = e.target.value;
-  pagina = 1;
-  render();
-});
-
-$('precios-prev')?.addEventListener('click', () => {
-  if (pagina > 1) { pagina--; render(); }
-});
-
-$('precios-next')?.addEventListener('click', () => {
-  pagina++;
-  render();
-});
+$('precios-search')?.addEventListener('input', (e) => { filtroSearch = e.target.value; pagina = 1; render(); });
+$('precios-cat')?.addEventListener('change', (e) => { filtroCat = e.target.value; pagina = 1; render(); });
+$('precios-estado')?.addEventListener('change', (e) => { filtroEstado = e.target.value; pagina = 1; render(); });
+$('precios-prev')?.addEventListener('click', () => { if (pagina > 1) { pagina--; render(); } });
+$('precios-next')?.addEventListener('click', () => { pagina++; render(); });
 
 // ============================================================
 // INIT
 // ============================================================
-
 cargarProductos();
-
-console.log('[GamesUy] precios.js v9 cargado (Base64, sin Cloudinary)');
+console.log('[GamesUy] precios.js v11 cargado');

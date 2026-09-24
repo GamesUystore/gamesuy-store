@@ -91,34 +91,9 @@
               <span class="card-image-placeholder">🎮</span>
             </div>
             <h3 class="card-title">Juego de ejemplo</h3>
-            <div class="card-variant-selectors">
-              <select class="card-select"><option>PS5</option></select>
-              <select class="card-select"><option>Primaria</option></select>
-              <select class="card-select"><option>UYU</option></select>
-            </div>
             <div class="card-price">$ 3.550 <span class="card-price-usd">≈ $89.75 USD</span></div>
             <div class="card-stock stock-ok">Disponible</div>
-            <div class="card-payments">💳 Prex / Mercado Pago / BROU</div>
             <a href="#" class="btn btn-buy">Comprar por WhatsApp</a>
-            <button class="btn btn-secondary">🎬 Trailer</button>
-          </article>
-
-          <article class="product-card">
-            <div class="card-badges"><span class="badge badge-ps4">PS4</span><span class="badge badge-ps5">PS5</span></div>
-            <div class="card-image" style="background-image:linear-gradient(135deg,#2a1030,#0c0e17);">
-              <span class="card-image-placeholder">🎮</span>
-            </div>
-            <h3 class="card-title">Otro juego de ejemplo</h3>
-            <div class="card-variant-selectors">
-              <select class="card-select"><option>PS5</option></select>
-              <select class="card-select"><option>Primaria</option></select>
-              <select class="card-select"><option>UYU</option></select>
-            </div>
-            <div class="card-price">$ 2.100 <span class="card-price-usd">≈ $53.16 USD</span></div>
-            <div class="card-stock stock-ok">Disponible</div>
-            <div class="card-payments">💳 Prex / Mercado Pago / BROU</div>
-            <a href="#" class="btn btn-buy">Comprar por WhatsApp</a>
-            <button class="btn btn-secondary">🎬 Trailer</button>
           </article>
         </div>
       </div>
@@ -227,6 +202,24 @@
             <div class="admin-actions">
               <button id="btn-import-process" class="btn btn-primary" disabled>📥 Procesar y actualizar catálogo</button>
             </div>
+          </div>
+
+          <!-- LIMPIEZA -->
+          <div class="admin-card admin-card-wide admin-card-danger">
+            <h3>🧹 Mantenimiento: limpiar productos viejos</h3>
+            <p class="admin-help">Borra productos que <strong>no tienen <code>matchKey</code></strong> (los de intentos anteriores). Los productos importados del Excel tienen <code>matchKey</code> y <strong>NO</strong> se tocan.</p>
+
+            <div id="clean-log" class="import-log">
+              <em>Click en "Analizar" para ver qué se borraría.</em>
+            </div>
+
+            <div class="admin-actions">
+              <button id="btn-analyze-clean" class="btn btn-secondary">🔍 Analizar</button>
+              <button id="btn-do-clean" class="btn btn-danger" disabled>🗑️ Borrar productos viejos</button>
+            </div>
+
+            <label class="admin-label" style="margin-top:16px;">Para confirmar el borrado, escribí <code>BORRAR</code> acá:</label>
+            <input type="text" id="clean-confirm" placeholder="BORRAR" autocomplete="off" disabled>
           </div>
 
           <!-- COTIZACIONES -->
@@ -378,6 +371,7 @@
   <script type="module" src="js/auth.js"></script>
   <script type="module" src="js/admin.js"></script>
   <script type="module" src="js/excel-importer.js"></script>
+  <script type="module" src="js/maintenance.js"></script>
 
 </body>
 </html>

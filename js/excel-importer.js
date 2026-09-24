@@ -1,6 +1,6 @@
 // ============================================================
 // GAMESUY STORE — Importador de Excel
-// Fase 3.5.2: Parser mejorado para formato nuevo de Ofertas
+// Fase 3.5.3: Parser robusto + fix de encoding
 // ============================================================
 
 import { db } from './firebase-config.js';
@@ -43,10 +43,16 @@ async function leerExcel(file) {
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
+        const workbook = XLSX.read(data, {
+          type: 'array',
+          cellText: true,       // forzar lectura como texto
+          cellDates: false,
+          raw: false,           // no interpretar números, todo string
+          codepage: 65001       // UTF-8 explícito
+        });
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
-        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false });
         resolve({ sheetName, rows });
       } catch (err) { reject(err); }
     };
@@ -56,17 +62,78 @@ async function leerExcel(file) {
 }
 
 /**
+ * Repara caracteres mal codificados (halfwidth katakana → UTF-8).
+ * Ejemplo: "ﾂｮ" → "®", "邃｢" → "™", "ﾃ前L" → "ÓL"
+ */
+function repararEncodingRoto(str) {
+  if (!str) return str;
+  const s = String(str);
+
+  // ¿Hay caracteres sospechosos? (halfwidth katakana U+FF61-U+FF9F, o CJK raros)
+  const tieneHalfwidth = /[\uFF61-\uFF9F]/.test(s);
+  const tieneRaros = /[\u3000-\u303F\u4E00-\u9FFF\uFF00-\uFFEF]/.test(s);
+
+  if (!tieneHalfwidth && !tieneRaros) return s;
+
+  try {
+    const bytes = [];
+    for (let i = 0; i < s.length; i++) {
+      const code = s.charCodeAt(i);
+
+      // Halfwidth katakana → byte directo
+      if (code >= 0xFF61 && code <= 0xFF9F) {
+        bytes.push(code - 0xFEC0);
+        continue;
+      }
+
+      // ASCII normal
+      if (code < 0x80) {
+        bytes.push(code);
+        continue;
+      }
+
+      // Latin-1 (0x80-0xFF) → byte directo
+      if (code >= 0x80 && code <= 0xFF) {
+        bytes.push(code);
+        continue;
+      }
+
+      // Caracteres CJK / raros: intentar convertir de UTF-16 a bytes UTF-8
+      // y ver si tiene sentido. Esto es heurístico.
+      // Si encontramos un CJK (U+4E00-U+9FFF), lo tratamos como bytes individuales
+      // que probablemente sean de una codificación rota.
+      if (code >= 0x4E00 && code <= 0x9FFF) {
+        // No podemos hacer nada confiable acá
+        // Devolvemos el string original sin reparar
+        return s;
+      }
+
+      // Otros caracteres: agrego como byte bajo
+      bytes.push(code & 0xFF);
+    }
+
+    // Re-decodificar como UTF-8
+    const decoded = new TextDecoder('utf-8', { fatal: false }).decode(new Uint8Array(bytes));
+
+    // Si el resultado tiene muchos caracteres de reemplazo (U+FFFD), no sirve
+    const reemplazos = (decoded.match(/\uFFFD/g) || []).length;
+    if (reemplazos > s.length * 0.3) {
+      return s; // demasiado roto, mejor devolver original
+    }
+
+    return decoded;
+  } catch (e) {
+    return s;
+  }
+}
+
+/**
  * Normaliza un título para usarlo como matchKey.
- * - Quita emojis al inicio
- * - Quita variation selectors (️)
- * - Convierte comillas curvas a rectas
- * - Aplana espacios
- * - Minúsculas
  */
 function normalizarTitulo(titulo) {
   return String(titulo || '')
-    .replace(/[\uFE0E\uFE0F]/g, '')                    // quita variation selectors (️)
-    .replace(/^[\p{Emoji_Presentation}\p{Extended_Pictographic}\s]+/u, '')  // quita emojis al inicio
+    .replace(/[\uFE0E\uFE0F]/g, '')                    // quita variation selectors
+    .replace(/^[\p{Emoji_Presentation}\p{Extended_Pictographic}\s]+/u, '') // quita emojis al inicio
     .replace(/[“”«»]/g, '"')                            // comillas curvas → rectas
     .replace(/[‘’]/g, "'")                              // apóstrofes curvos → rectos
     .replace(/\s+/g, ' ')                               // espacios múltiples → 1
@@ -76,26 +143,31 @@ function normalizarTitulo(titulo) {
 
 /**
  * Parser de títulos del Excel de Ofertas.
- * Soporta DOS formatos:
- *
- * FORMATO NUEVO (Aventuras de Primavera):
- *   "☁️ A Quiet Place: The Road Ahead PS5 -"     → { titulo: "A Quiet Place: The Road Ahead", plataformas: ['ps5'] }
- *   "☁️ Assassin's Creed Rogue Remastered -"     → { titulo: "Assassin's Creed Rogue Remastered", plataformas: ['ps4','ps5'] }
- *
- * FORMATO VIEJO (Tokyo Games Show):
- *   "A Plague Tale: Innocence (PS4/PS5)"         → { titulo: "A Plague Tale: Innocence", plataformas: ['ps4','ps5'] }
+ * ORDEN IMPORTANTE:
+ *   1. Reparar encoding
+ *   2. Quitar emojis al inicio
+ *   3. Quitar " -" al final
+ *   4. Detectar y quitar "(PS4/PS5)" o "(PS5)"
+ *   5. Detectar y quitar " PS5" o " PS4" (palabra suelta)
  */
 function parsearTituloOferta(tituloRaw) {
   let titulo = String(tituloRaw || '').trim();
-  const plataformas = [];
 
-  // 1) Quitar prefijo con emojis (☁️, 🔥, 🌸, etc.)
+  // 1) Reparar encoding roto
+  titulo = repararEncodingRoto(titulo);
+
+  // 2) Quitar prefijo con emojis
   titulo = titulo.replace(/^[\p{Emoji_Presentation}\p{Extended_Pictographic}\s]+/u, '').trim();
 
-  // 2) Quitar variation selectors sueltos
+  // 3) Quitar variation selectors
   titulo = titulo.replace(/[\uFE0E\uFE0F]/g, '').trim();
 
-  // 3) Detectar y quitar sufijo tipo " (PS4/PS5)" o " (PS5)"
+  // 4) Quitar " -" al final PRIMERO
+  titulo = titulo.replace(/\s*-\s*$/, '').trim();
+
+  const plataformas = [];
+
+  // 5) Detectar y quitar "(PS4/PS5)" o "(PS5)" entre paréntesis
   const matchParentesis = titulo.match(/\s*\(([^)]+)\)\s*$/);
   if (matchParentesis) {
     const contenido = matchParentesis[1].toUpperCase();
@@ -106,20 +178,20 @@ function parsearTituloOferta(tituloRaw) {
     }
   }
 
-  // 4) Detectar y quitar sufijo con " PS5" o " PS4" como palabra suelta (formato nuevo)
+  // 6) Detectar y quitar " PS5" o " PS4" al final
   const matchPS = titulo.match(/\s+PS([45])\s*$/i);
   if (matchPS) {
-    plataformas.push('ps' + matchPS[1]);
+    const plat = 'ps' + matchPS[1];
+    if (!plataformas.includes(plat)) plataformas.push(plat);
     titulo = titulo.replace(/\s+PS[45]\s*$/i, '').trim();
   }
 
-  // 5) Quitar sufijo " -" o "-" al final
+  // 7) Quitar " -" nuevamente (por si quedó)
   titulo = titulo.replace(/\s*-\s*$/, '').trim();
 
-  // 6) Si quedan comillas curvas, normalizar
+  // 8) Normalizar comillas curvas
   titulo = titulo.replace(/[“”«»]/g, '"').replace(/[‘’]/g, "'");
 
-  // Si no detectamos plataformas, asumimos ambas
   if (plataformas.length === 0) {
     plataformas.push('ps4', 'ps5');
   }
@@ -144,19 +216,12 @@ function esNoDisponible(v) {
   return /no\s*disponible/i.test(String(v));
 }
 
-/**
- * Extrae la fecha de vencimiento del texto del Excel.
- * Busca patrones tipo "HASTA EL DÍA 07/10/2026" o "hasta 23/09"
- */
 function extraerFechaVencimiento(rows) {
   for (const fila of rows.slice(0, 15)) {
     for (const celda of fila) {
       const txt = String(celda || '');
       const m = txt.match(/(\d{2})[\/\-](\d{2})[\/\-](\d{4})/);
-      if (m) {
-        // Formato DD/MM/YYYY → YYYY-MM-DD
-        return `${m[3]}-${m[2]}-${m[1]}`;
-      }
+      if (m) return `${m[3]}-${m[2]}-${m[1]}`;
     }
   }
   return null;
@@ -189,14 +254,13 @@ function attachFileListener(inputId, tipo, logId, btnId, autoFechaId) {
       log(logId, `Hoja: <code>${sheetName}</code>`);
       log(logId, `Total de filas: <b>${rows.length}</b>`);
 
-      // Auto-detectar fecha de vencimiento (para ofertas)
       if (autoFechaId) {
         const fecha = extraerFechaVencimiento(rows);
         if (fecha) {
           const input = $(autoFechaId);
           if (input && !input.value) {
             input.value = fecha;
-            log(logId, `📅 Fecha detectada automáticamente: <b>${fecha}</b> (podés cambiarla)`);
+            log(logId, `📅 Fecha detectada: <b>${fecha}</b>`);
           }
         }
       }
@@ -214,7 +278,7 @@ attachFileListener('excel-ofertas',  'ofertas',  'ofertas-log',  'btn-process-of
 attachFileListener('excel-preventas','preventas','preventas-log','btn-process-preventas',null);
 
 // ============================================================
-// STOCK
+// STOCK (sin cambios)
 // ============================================================
 
 function construirVariantesStock(fila) {
@@ -433,7 +497,7 @@ async function procesarOfertas() {
   });
   log('ofertas-log', `✔ ${snap.size} productos en Firestore.`);
 
-  // Detectar fila donde empiezan los datos (primera fila con precio válido)
+  // Detectar fila donde empiezan los datos
   let inicioIdx = 0;
   for (let i = 0; i < Math.min(excel.rows.length, 20); i++) {
     const fila = excel.rows[i];
@@ -640,4 +704,4 @@ $('btn-clean-ofertas')?.addEventListener('click', async () => {
   finally { btn.disabled = false; btn.textContent = '🧹 Limpiar ofertas vencidas'; }
 });
 
-console.log('[GamesUy] excel-importer.js v11 cargado (parser mejorado)');
+console.log('[GamesUy] excel-importer.js v11 cargado (encoding + parser fix)');

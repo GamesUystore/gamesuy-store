@@ -1,6 +1,5 @@
 // ============================================================
-// GAMESUY STORE — Gestor de precios
-// Permite asignar precio final UYU a cada variante
+// GAMESUY STORE — Gestor de precios (vista lista + modal)
 // ============================================================
 
 import { db } from './firebase-config.js';
@@ -16,26 +15,22 @@ import {
   calcGananciaPct,
   calcPrecioUSD,
   roundUYU,
-  roundUSD,
   formatUYU,
   formatUSD
 } from './data-model.js';
 
 const $ = (id) => document.getElementById(id);
 
-// ---------------------------------------------
-// ESTADO
-// ---------------------------------------------
 let productos = [];
 let cotizaciones = { arsAUYU: 0.055, usdAUYU: 39.50 };
 let filtroSearch = '';
 let filtroCat = 'all';
 let filtroEstado = 'pendientes';
 let pagina = 1;
-const POR_PAGINA = 50;
+const POR_PAGINA = 30;
 
 // ---------------------------------------------
-// CARGA DE DATOS
+// CARGA
 // ---------------------------------------------
 
 onSnapshot(doc(db, 'settings', 'cotizaciones'), (snap) => {
@@ -56,15 +51,12 @@ async function cargarProductos() {
 // HELPERS
 // ---------------------------------------------
 
-function tienePrecio(variante) {
-  return Number(variante.precioFinalUYU) > 0;
-}
+function tienePrecio(v) { return Number(v.precioFinalUYU) > 0; }
 
 function productoCompleto(p) {
-  // Un producto está completo si TODAS las variantes con costo válido tienen precio
   const vs = (p.variants || []).filter(v => Number(v.costoARS) > 0);
   if (vs.length === 0) return false;
-  return vs.every(v => tienePrecio(v));
+  return vs.every(tienePrecio);
 }
 
 function productoPendiente(p) {
@@ -76,205 +68,187 @@ function productoPendiente(p) {
 function filtrarProductos() {
   let lista = productos.filter(p => (p.variants || []).length > 0);
 
-  // Filtro por estado
-  if (filtroEstado === 'pendientes') {
-    lista = lista.filter(p => productoPendiente(p));
-  } else if (filtroEstado === 'completos') {
-    lista = lista.filter(p => productoCompleto(p));
-  }
+  if (filtroEstado === 'pendientes') lista = lista.filter(productoPendiente);
+  else if (filtroEstado === 'completos') lista = lista.filter(productoCompleto);
 
-  // Filtro por categoría
-  if (filtroCat !== 'all') {
-    lista = lista.filter(p => (p.categories || []).includes(filtroCat));
-  }
+  if (filtroCat !== 'all') lista = lista.filter(p => (p.categories || []).includes(filtroCat));
 
-  // Filtro por búsqueda
   if (filtroSearch) {
     const q = filtroSearch.toLowerCase().trim();
     lista = lista.filter(p => String(p.title || '').toLowerCase().includes(q));
   }
 
-  // Ordenar alfabéticamente
   lista.sort((a, b) => String(a.title || '').localeCompare(String(b.title || ''), 'es'));
-
   return lista;
 }
 
 // ---------------------------------------------
-// RENDER DE UNA VARIANTE
+// RENDER: LISTA COMPACTA
 // ---------------------------------------------
 
-function renderVariante(prodId, variante) {
-  const costoARS = Number(variante.costoARS) || 0;
-  const costoUYU = getCostoUYU(costoARS, cotizaciones.arsAUYU);
-  const precioActual = Number(variante.precioFinalUYU) || 0;
-  const completo = precioActual > 0;
-  const varianteId = `${prodId}_${variante.id}`;
-
-  return `
-    <div class="variante-row ${completo ? 'variante-done' : 'variante-pending'}" data-vid="${varianteId}">
-      <div class="variante-info">
-        <span class="variante-label">${variante.label}</span>
-        <span class="variante-costo">
-          Costo: ${costoARS} ARS → <strong>${formatUYU(costoUYU)}</strong>
-        </span>
-      </div>
-      <div class="variante-input-wrap">
-        <span class="input-prefix">$</span>
-        <input
-          type="number"
-          class="variante-input"
-          placeholder="Precio final"
-          value="${precioActual || ''}"
-          data-prod="${prodId}"
-          data-variant="${variante.id}"
-          min="0"
-          step="1"
-        >
-        <span class="input-suffix">UYU</span>
-      </div>
-      <div class="variante-usd">
-        <span class="variante-usd-label">≈</span>
-        <span class="variante-usd-value" id="usd-${varianteId}">${precioActual > 0 ? formatUSD(calcPrecioUSD(precioActual, cotizaciones.usdAUYU)) : '—'}</span>
-      </div>
-      <div class="variante-actions">
-        <button class="btn btn-primary btn-sm btn-save-variante" data-prod="${prodId}" data-variant="${variante.id}">
-          ${completo ? '💾 Guardar' : '💾 Guardar'}
-        </button>
-      </div>
-    </div>
-  `;
-}
-
-// ---------------------------------------------
-// RENDER DE UN PRODUCTO (ACORDEÓN)
-// ---------------------------------------------
-
-function renderProducto(p) {
+function renderFila(p) {
   const cats = (p.categories || []).map(c => `<span class="badge badge-${c}">${c.toUpperCase()}</span>`).join('');
-  const variantes = (p.variants || []).filter(v => Number(v.costoARS) > 0 || tienePrecio(v));
-
-  const completas = variantes.filter(v => tienePrecio(v)).length;
-  const totales = variantes.length;
+  const vs = (p.variants || []).filter(v => Number(v.costoARS) > 0 || tienePrecio(v));
+  const completas = vs.filter(tienePrecio).length;
+  const totales = vs.length;
   const completo = completas === totales && totales > 0;
 
+  const progresoClase = completo ? 'progress-done' : (completas > 0 ? 'progress-partial' : 'progress-pending');
+
   return `
-    <div class="precio-card ${completo ? 'precio-card-done' : ''}" data-prod-id="${p.id}">
-      <div class="precio-card-header" data-toggle="${p.id}">
-        <div class="precio-card-title-wrap">
-          <div class="precio-card-badges">${cats}</div>
-          <h4 class="precio-card-title">${p.title || '(sin título)'}</h4>
-          <span class="precio-card-progress ${completo ? 'progress-done' : 'progress-pending'}">
-            ${completas}/${totales} variantes con precio
-          </span>
-        </div>
-        <div class="precio-card-toggle">▼</div>
-      </div>
-      <div class="precio-card-body hidden" id="body-${p.id}">
-        ${variantes.map(v => renderVariante(p.id, v)).join('')}
-      </div>
+    <div class="fila-juego ${completo ? 'fila-completa' : ''}" data-prod-id="${p.id}">
+      <div class="fila-badges">${cats}</div>
+      <div class="fila-titulo">${p.title || '(sin título)'}</div>
+      <div class="fila-progreso ${progresoClase}">${completas}/${totales}</div>
+      <div class="fila-arrow">✏️</div>
     </div>
   `;
 }
-
-// ---------------------------------------------
-// RENDER GENERAL
-// ---------------------------------------------
 
 function render() {
   const list = $('precios-list');
   if (!list) return;
 
-  // Estadísticas globales
   const totalProds = productos.filter(p => (p.variants || []).length > 0).length;
-  const pendientes = productos.filter(p => productoPendiente(p)).length;
-  const completos = productos.filter(p => productoCompleto(p)).length;
+  const pendientes = productos.filter(productoPendiente).length;
+  const completos = productos.filter(productoCompleto).length;
 
   $('stat-total').textContent = totalProds;
   $('stat-pending').textContent = pendientes;
   $('stat-done').textContent = completos;
 
-  // Filtrado
   const filtrados = filtrarProductos();
   const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA));
   if (pagina > totalPaginas) pagina = totalPaginas;
 
   const inicio = (pagina - 1) * POR_PAGINA;
-  const fin = inicio + POR_PAGINA;
-  const enPagina = filtrados.slice(inicio, fin);
+  const enPagina = filtrados.slice(inicio, inicio + POR_PAGINA);
 
-  // Info paginación
   $('precios-page-info').textContent = `Página ${pagina} de ${totalPaginas} (${filtrados.length} resultados)`;
   $('precios-prev').disabled = pagina <= 1;
   $('precios-next').disabled = pagina >= totalPaginas;
 
-  // Render
   if (enPagina.length === 0) {
-    list.innerHTML = '<p class="empty-message">No hay productos que coincidan con los filtros.</p>';
+    list.innerHTML = '<p class="empty-message">No hay productos que coincidan.</p>';
     return;
   }
 
-  list.innerHTML = enPagina.map(p => renderProducto(p)).join('');
+  list.innerHTML = enPagina.map(renderFila).join('');
 
-  // Listeners
-  list.querySelectorAll('.precio-card-header').forEach(h => {
-    h.addEventListener('click', () => {
-      const id = h.dataset.toggle;
-      const body = document.getElementById('body-' + id);
-      if (body) {
-        body.classList.toggle('hidden');
-        h.querySelector('.precio-card-toggle').textContent = body.classList.contains('hidden') ? '▼' : '▲';
-      }
-    });
-  });
-
-  list.querySelectorAll('.variante-input').forEach(inp => {
-    inp.addEventListener('input', () => {
-      const prodId = inp.dataset.prod;
-      const variantId = inp.dataset.variant;
-      const val = parseFloat(inp.value) || 0;
-      const usdEl = document.getElementById(`usd-${prodId}_${variantId}`);
-      if (usdEl) {
-        usdEl.textContent = val > 0 ? formatUSD(calcPrecioUSD(val, cotizaciones.usdAUYU)) : '—';
-      }
-    });
-  });
-
-  list.querySelectorAll('.btn-save-variante').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      await guardarPrecioVariante(btn.dataset.prod, btn.dataset.variant);
+  list.querySelectorAll('.fila-juego').forEach(fila => {
+    fila.addEventListener('click', () => {
+      const id = fila.dataset.prodId;
+      abrirModalPrecios(id);
     });
   });
 }
 
 // ---------------------------------------------
-// GUARDAR PRECIO DE UNA VARIANTE
+// MODAL DE PRECIOS
 // ---------------------------------------------
 
-async function guardarPrecioVariante(prodId, varianteId) {
-  const input = document.querySelector(`.variante-input[data-prod="${prodId}"][data-variant="${varianteId}"]`);
-  const btn = document.querySelector(`.btn-save-variante[data-prod="${prodId}"][data-variant="${varianteId}"]`);
+function abrirModalPrecios(prodId) {
+  const prod = productos.find(p => p.id === prodId);
+  if (!prod) return;
+
+  const modal = $('price-modal');
+  const title = $('price-modal-title');
+  const body = $('price-modal-body');
+
+  title.textContent = prod.title || 'Editar precios';
+
+  const variantes = (prod.variants || []).filter(v => Number(v.costoARS) > 0 || tienePrecio(v));
+
+  if (variantes.length === 0) {
+    body.innerHTML = '<p class="empty-message">Este producto no tiene variantes con costo cargado.</p>';
+    modal.classList.remove('hidden');
+    return;
+  }
+
+  body.innerHTML = variantes.map(v => {
+    const costoARS = Number(v.costoARS) || 0;
+    const costoUYU = getCostoUYU(costoARS, cotizaciones.arsAUYU);
+    const precioActual = Number(v.precioFinalUYU) || 0;
+    const usdPreview = precioActual > 0 ? formatUSD(calcPrecioUSD(precioActual, cotizaciones.usdAUYU)) : '—';
+
+    return `
+      <div class="variante-modal-row" data-variant-id="${v.id}">
+        <div class="variante-modal-header">
+          <span class="variante-modal-label">${v.label}</span>
+        </div>
+        <div class="variante-modal-info">
+          <div class="variante-modal-costo">
+            <span class="info-label">Costo proveedor:</span>
+            <span class="info-value">${costoARS} ARS → <strong>${formatUYU(costoUYU)}</strong></span>
+          </div>
+        </div>
+        <div class="variante-modal-input-row">
+          <div class="variante-modal-input-wrap">
+            <span class="input-prefix">$</span>
+            <input
+              type="number"
+              class="variante-modal-input"
+              placeholder="Precio final"
+              value="${precioActual || ''}"
+              data-variant="${v.id}"
+              min="0"
+              step="1"
+            >
+            <span class="input-suffix">UYU</span>
+          </div>
+          <span class="variante-modal-usd" data-usd-variant="${v.id}">≈ ${usdPreview}</span>
+        </div>
+        <div class="variante-modal-actions">
+          <button class="btn btn-primary btn-sm btn-modal-save" data-variant="${v.id}">💾 Guardar</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Listeners
+  body.querySelectorAll('.variante-modal-input').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const variantId = inp.dataset.variant;
+      const val = parseFloat(inp.value) || 0;
+      const usdEl = body.querySelector(`[data-usd-variant="${variantId}"]`);
+      if (usdEl) {
+        usdEl.textContent = val > 0 ? '≈ ' + formatUSD(calcPrecioUSD(val, cotizaciones.usdAUYU)) : '≈ —';
+      }
+    });
+  });
+
+  body.querySelectorAll('.btn-modal-save').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      await guardarPrecio(prod, btn.dataset.variant, body);
+    });
+  });
+
+  modal.classList.remove('hidden');
+}
+
+function cerrarModalPrecios() {
+  $('price-modal')?.classList.add('hidden');
+}
+
+async function guardarPrecio(prod, variantId, body) {
+  const input = body.querySelector(`.variante-modal-input[data-variant="${variantId}"]`);
+  const btn = body.querySelector(`.btn-modal-save[data-variant="${variantId}"]`);
   if (!input || !btn) return;
 
   const nuevoPrecio = parseFloat(input.value) || 0;
-
   if (nuevoPrecio <= 0) {
     alert('Ingresá un precio mayor a 0.');
     return;
   }
 
-  const prod = productos.find(p => p.id === prodId);
-  if (!prod) return;
-
-  const variante = (prod.variants || []).find(v => v.id === varianteId);
+  const variante = (prod.variants || []).find(v => v.id === variantId);
   if (!variante) return;
 
   const costoARS = Number(variante.costoARS) || 0;
   const ganancia = calcGananciaPct(nuevoPrecio, costoARS, cotizaciones.arsAUYU);
 
   const nuevasVariantes = (prod.variants || []).map(v => {
-    if (v.id !== varianteId) return v;
+    if (v.id !== variantId) return v;
     return {
       ...v,
       precioFinalUYU: roundUYU(nuevoPrecio),
@@ -287,17 +261,15 @@ async function guardarPrecioVariante(prodId, varianteId) {
   btn.textContent = '⏳';
 
   try {
-    await updateDoc(doc(db, 'products', prodId), { variants: nuevasVariantes });
-
-    // Actualizar estado local
+    await updateDoc(doc(db, 'products', prod.id), { variants: nuevasVariantes });
     prod.variants = nuevasVariantes;
-    btn.textContent = '✅';
+    btn.textContent = '✅ Guardado';
+
     setTimeout(() => {
       btn.disabled = false;
       btn.textContent = '💾 Guardar';
-    }, 800);
-
-    render();
+      render();
+    }, 900);
   } catch (err) {
     console.error('[GamesUy] Error guardando precio:', err);
     alert('Error: ' + err.message);
@@ -307,7 +279,16 @@ async function guardarPrecioVariante(prodId, varianteId) {
 }
 
 // ---------------------------------------------
-// FILTROS Y PAGINACIÓN
+// EVENTOS DE MODAL
+// ---------------------------------------------
+
+$('price-modal-close')?.addEventListener('click', cerrarModalPrecios);
+$('price-modal')?.addEventListener('click', (e) => {
+  if (e.target.id === 'price-modal') cerrarModalPrecios();
+});
+
+// ---------------------------------------------
+// FILTROS
 // ---------------------------------------------
 
 $('precios-search')?.addEventListener('input', (e) => {
@@ -343,4 +324,4 @@ $('precios-next')?.addEventListener('click', () => {
 
 cargarProductos();
 
-console.log('[GamesUy] precios.js cargado');
+console.log('[GamesUy] precios.js cargado (vista lista + modal)');

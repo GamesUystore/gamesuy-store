@@ -1051,3 +1051,28 @@ body::after {
   .import-preview-table { font-size: 0.68rem; }
   .import-preview-table td { max-width: 90px; }
 }
+
+/* ============================================================
+   LOG DEL IMPORTADOR — mejoras
+   ============================================================ */
+
+.import-ok {
+  color: #00ff9d;
+  padding: 4px 0;
+}
+
+.import-log > div {
+  padding: 2px 0;
+}
+
+.import-log strong {
+  color: var(--cyan);
+  font-weight: 700;
+}
+
+.import-log code {
+  color: var(--cyan);
+  background: rgba(0, 240, 255, 0.08);
+  padding: 1px 6px;
+  border-radius: 4px;
+}

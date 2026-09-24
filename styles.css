@@ -1644,3 +1644,35 @@ body::after {
   .variante-modal-input-row { grid-template-columns: 1fr; }
   .variante-modal-usd { text-align: left; }
 }
+
+/* ============================================================
+   IMPORTADOR v10 — Fecha de oferta
+   ============================================================ */
+
+.oferta-fecha-row {
+  padding: 14px;
+  background: var(--bg-2);
+  border: 1px solid rgba(255, 0, 85, 0.3);
+  border-radius: var(--r-md);
+  margin-bottom: 16px;
+}
+.oferta-fecha-row .admin-label {
+  margin-top: 0;
+  color: #ff4d6d;
+}
+.oferta-fecha-row input[type="date"] {
+  width: 100%;
+  font-family: inherit;
+  font-size: 1rem;
+  color: var(--text);
+  background: var(--bg-0);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 10px 12px;
+  outline: none;
+  margin-bottom: 6px;
+}
+.oferta-fecha-row input[type="date"]:focus {
+  border-color: var(--magenta);
+  box-shadow: 0 0 0 3px rgba(255, 0, 85, 0.15);
+}

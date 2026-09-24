@@ -5,23 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GamesUy Store | Tienda Digital Gamer</title>
 
-  <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
-
-  <!-- Estilos -->
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
-  <!-- ============================================================
-       HEADER — Logo, redes, nav, buscador, categorías
-       ============================================================ -->
   <header class="site-header">
     <div class="header-inner">
 
-      <!-- LOGO + BRAND -->
       <div class="brand">
         <div class="brand-logo-wrap">
           <img id="store-logo" src="" alt="GamesUy Store" class="brand-logo"
@@ -34,15 +27,10 @@
         </div>
       </div>
 
-      <!-- REDES SOCIALES (editables desde admin) -->
       <div class="social-bar" id="social-bar">
-        <a href="#" class="social-link" target="_blank" data-net="wa">💬 WhatsApp</a>
-        <a href="#" class="social-link" target="_blank" data-net="ig">📸 Instagram</a>
-        <a href="#" class="social-link" target="_blank" data-net="fb">📘 Facebook</a>
-        <a href="#" class="social-link" target="_blank" data-net="tt">🎵 TikTok</a>
+        <span class="social-link" style="opacity:.5;cursor:default;">Cargando redes...</span>
       </div>
 
-      <!-- NAV PRINCIPAL -->
       <nav class="top-nav" id="top-nav">
         <button class="nav-btn active" data-page="catalogo">Catálogo</button>
         <button class="nav-btn nav-btn-hot" data-page="ofertas">🔥 Ofertas</button>
@@ -53,7 +41,6 @@
         <button class="nav-btn nav-btn-admin" data-page="admin">[ Admin ]</button>
       </nav>
 
-      <!-- BUSCADOR -->
       <div class="search-bar">
         <span class="search-icon">🔍</span>
         <input type="text" id="search-input" class="search-input"
@@ -61,7 +48,6 @@
                autocomplete="off" spellcheck="false">
       </div>
 
-      <!-- CATEGORÍAS -->
       <nav class="categories-nav" id="cat-nav">
         <button class="cat-btn active" data-cat="all">Todos</button>
         <button class="cat-btn" data-cat="ps5">PS5</button>
@@ -76,15 +62,11 @@
     </div>
   </header>
 
-  <!-- ============================================================
-       MAIN
-       ============================================================ -->
   <main class="container">
 
-    <!-- ========== PÁGINA CATÁLOGO ========== -->
+    <!-- CATÁLOGO -->
     <section id="page-catalogo" class="page-section active-page">
 
-      <!-- Banner de anuncios (editable desde admin: texto, imagen, link) -->
       <div class="announcement-banner" id="announcement-banner">
         <div class="announcement-glow"></div>
         <div class="announcement-content">
@@ -97,7 +79,6 @@
         </div>
       </div>
 
-      <!-- Grid de productos -->
       <div class="grid-section">
         <div class="grid-header">
           <h2 class="section-title">Catálogo</h2>
@@ -105,7 +86,6 @@
         </div>
 
         <div id="product-grid" class="product-grid">
-          <!-- Placeholder de ejemplo (se borra cuando conectemos Firestore) -->
           <article class="product-card">
             <div class="card-badges"><span class="badge badge-ps5">PS5</span></div>
             <div class="card-image" style="background-image:linear-gradient(135deg,#1a1f3a,#0c0e17);">
@@ -145,7 +125,7 @@
       </div>
     </section>
 
-    <!-- ========== PÁGINA OFERTAS ========== -->
+    <!-- OFERTAS -->
     <section id="page-ofertas" class="page-section">
       <h2 class="section-title section-title-hot">🔥 Ofertas Especiales</h2>
       <p class="section-subtitle">Juegos y suscripciones con descuentos por tiempo limitado.</p>
@@ -154,7 +134,7 @@
       </div>
     </section>
 
-    <!-- ========== PÁGINA PREVENTAS ========== -->
+    <!-- PREVENTAS -->
     <section id="page-preventas" class="page-section">
       <h2 class="section-title section-title-new">🚀 Preventas</h2>
       <p class="section-subtitle">Títulos próximos a salir. Reservá tu copia antes del lanzamiento.</p>
@@ -163,7 +143,7 @@
       </div>
     </section>
 
-    <!-- ========== PÁGINA FAQ ========== -->
+    <!-- FAQ -->
     <section id="page-faq" class="page-section">
       <h2 class="section-title">Preguntas Frecuentes</h2>
       <div id="faq-list" class="faq-list">
@@ -171,7 +151,7 @@
       </div>
     </section>
 
-    <!-- ========== PÁGINA TÉRMINOS ========== -->
+    <!-- TÉRMINOS -->
     <section id="page-terminos" class="page-section">
       <h2 class="section-title">Términos y Condiciones</h2>
       <div id="terminos-text" class="terms-text">
@@ -179,7 +159,7 @@
       </div>
     </section>
 
-    <!-- ========== PÁGINA CONTACTO ========== -->
+    <!-- CONTACTO -->
     <section id="page-contacto" class="page-section">
       <h2 class="section-title">Contacto</h2>
       <form action="https://formsubmit.co/thedkshopone@gmail.com" method="POST" class="contact-form">
@@ -194,26 +174,96 @@
       </form>
     </section>
 
-    <!-- ========== PÁGINA ADMIN (placeholder) ========== -->
+    <!-- ADMIN -->
     <section id="page-admin" class="page-section">
       <h2 class="section-title section-title-admin">⚙️ Panel de Administración</h2>
-      <p class="section-subtitle">Esta sección se conecta en el sub-paso 1.3.</p>
+
+      <div id="admin-not-logged" class="admin-placeholder">
+        <p class="section-subtitle">Necesitás iniciar sesión para acceder al panel de administración.</p>
+        <button class="btn btn-primary" id="btn-open-login">🔐 Iniciar sesión</button>
+      </div>
+
+      <div id="admin-logged" class="hidden">
+        <div class="admin-header">
+          <div>
+            <span class="admin-badge">● Sesión activa</span>
+            <p class="admin-user">Bienvenido, <strong id="admin-user-email"></strong></p>
+          </div>
+          <button id="btn-logout" class="btn btn-secondary admin-logout">Cerrar sesión</button>
+        </div>
+
+        <div class="admin-section">
+          <h3>🚧 Panel en construcción</h3>
+          <p>En el próximo sub-paso vas a poder:</p>
+          <ul>
+            <li>Subir el logo de la tienda</li>
+            <li>Configurar redes sociales</li>
+            <li>Editar el banner de anuncios</li>
+            <li>Configurar cotizaciones ARS→UYU y USD→UYU</li>
+          </ul>
+        </div>
+      </div>
     </section>
 
   </main>
 
-  <!-- ============================================================
-       FOOTER
-       ============================================================ -->
   <footer class="site-footer">
     <p>© 2026 GamesUy Store — Juegos digitales en Uruguay</p>
   </footer>
 
-  <!-- WhatsApp flotante -->
-  <a href="https://wa.me/59896572226" class="chat-float" target="_blank" rel="noopener">
-    💬
-  </a>
-  <!-- Lógica de settings (logo, redes, banner) -->
+  <a href="https://wa.me/59896572226" class="chat-float" target="_blank" rel="noopener">💬</a>
+
+  <!-- MODAL LOGIN -->
+  <div id="login-modal" class="admin-modal hidden">
+    <div class="modal-content">
+      <button class="modal-close" id="login-close" aria-label="Cerrar">✕</button>
+      <h3 class="modal-title">🔐 Acceso Administrador</h3>
+      <p class="modal-subtitle">Ingresá con tu cuenta de administrador</p>
+
+      <label for="admin-email">Email</label>
+      <input type="email" id="admin-email" placeholder="admin@ejemplo.com" autocomplete="email">
+
+      <label for="admin-pass">Contraseña</label>
+      <input type="password" id="admin-pass" placeholder="••••••••" autocomplete="current-password">
+
+      <button id="btn-login" class="btn btn-primary">Ingresar</button>
+
+      <p id="login-error" class="login-error hidden"></p>
+    </div>
+  </div>
+
+  <!-- SCRIPT INLINE — Navegación -->
+  <script>
+    window.switchPage = function(pageId) {
+      document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active-page'));
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+
+      const target = document.getElementById('page-' + pageId);
+      if (target) target.classList.add('active-page');
+
+      const btn = document.querySelector('.nav-btn[data-page="' + pageId + '"]');
+      if (btn) btn.classList.add('active');
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const page = btn.dataset.page;
+        if (page) window.switchPage(page);
+      });
+    });
+
+    document.querySelectorAll('.cat-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+    });
+  </script>
+
   <script type="module" src="js/settings.js"></script>
+  <script type="module" src="js/auth.js"></script>
+
 </body>
 </html>

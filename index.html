@@ -17,7 +17,7 @@
 
       <div class="brand">
         <div class="brand-logo-wrap">
-          <img id="store-logo" src="" alt="GamesUy Store" class="brand-logo"
+          <img id="store-logo" src="" alt="" class="brand-logo"
                onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
           <div class="brand-logo-fallback">🎮</div>
         </div>
@@ -45,7 +45,7 @@
         <span class="search-icon">🔍</span>
         <input type="text" id="search-input" class="search-input"
                placeholder="Buscar juego, suscripción, servicio..."
-               autocomplete="off" spellcheck="false" name="gamesuy_q">
+               autocomplete="off" spellcheck="false">
       </div>
 
       <nav class="categories-nav" id="cat-nav">
@@ -73,8 +73,7 @@
           <span class="announcement-label">📢 NOVEDAD</span>
           <h2 class="announcement-title">Bienvenido a GamesUy Store</h2>
           <p class="announcement-text">
-            Este es el espacio editable desde el panel admin. Podés poner ofertas, noticias,
-            avisos, fotos o cualquier contenido que quieras destacar en el inicio.
+            Este es el espacio editable desde el panel admin.
           </p>
         </div>
       </div>
@@ -196,11 +195,31 @@
 
         <div class="admin-grid">
 
+          <!-- COTIZACIONES -->
+          <div class="admin-card">
+            <h3>💱 Cotizaciones</h3>
+            <p class="admin-help">Estos valores se usan para calcular todos los precios del catálogo. Cambiarlos recalcula todo automáticamente.</p>
+
+            <label class="admin-label">Peso Argentino → Peso Uruguayo</label>
+            <input type="number" id="admin-cot-ars" step="0.0001" min="0.0001" placeholder="0.0550">
+            <p class="admin-hint">Ejemplo: si 1 ARS = 0.055 UYU, escribí <strong>0.055</strong></p>
+
+            <label class="admin-label">Dólar → Peso Uruguayo</label>
+            <input type="number" id="admin-cot-usd" step="0.01" min="0.01" placeholder="39.50">
+            <p class="admin-hint">Ejemplo: si 1 USD = 39.50 UYU, escribí <strong>39.50</strong></p>
+
+            <div class="admin-actions">
+              <button id="btn-save-cot" class="btn btn-primary">Guardar cotizaciones</button>
+            </div>
+
+            <p class="admin-hint" id="admin-cot-updated" style="margin-top:12px;"></p>
+          </div>
+
           <!-- LOGO -->
           <div class="admin-card">
             <h3>🖼️ Logo de la tienda</h3>
             <div class="admin-preview">
-              <img id="admin-logo-preview" alt="Preview logo" src="">
+              <img id="admin-logo-preview" alt="" src="">
               <span id="admin-logo-preview-fallback" class="admin-preview-fallback">🎮</span>
             </div>
             <label class="admin-label">Subir archivo (máx 300 KB)</label>
@@ -302,7 +321,6 @@
     };
 
     document.querySelectorAll('.nav-btn').forEach(btn => {
-      // El botón Admin lo maneja auth.js por separado
       if (btn.classList.contains('nav-btn-admin')) return;
       btn.addEventListener('click', () => {
         const page = btn.dataset.page;

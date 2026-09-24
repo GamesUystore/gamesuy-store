@@ -1076,3 +1076,27 @@ body::after {
   padding: 1px 6px;
   border-radius: 4px;
 }
+
+/* ============================================================
+   TARJETA DE MANTENIMIENTO / PELIGRO
+   ============================================================ */
+
+.admin-card-danger {
+  border-color: rgba(214, 48, 49, 0.4);
+}
+.admin-card-danger h3 {
+  color: #ff8aa8;
+  border-bottom-color: rgba(214, 48, 49, 0.3);
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, #b71c1c, #d63031);
+  color: #fff;
+}
+.btn-danger:hover:not(:disabled) {
+  box-shadow: 0 8px 24px rgba(214, 48, 49, 0.5);
+}
+.btn-danger:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

@@ -36,10 +36,10 @@ let pagina = 1;
 const POR_PAGINA = 30;
 let productoActivo = null;
 
-console.log('[GamesUy] precios.js iniciando...');
+console.log('[GamesUy] precios.js v8 iniciando...');
 
 // ============================================================
-// CARGA DE COTIZACIONES
+// COTIZACIONES
 // ============================================================
 
 onSnapshot(doc(db, 'settings', 'cotizaciones'), (snap) => {
@@ -47,17 +47,15 @@ onSnapshot(doc(db, 'settings', 'cotizaciones'), (snap) => {
   const c = snap.data();
   cotizaciones.arsAUYU = Number(c.arsAUYU) || 0.055;
   cotizaciones.usdAUYU = Number(c.usdAUYU) || 39.50;
-  console.log('[GamesUy] Cotizaciones cargadas:', cotizaciones);
   render();
 });
 
 // ============================================================
-// CARGA DE PRODUCTOS
+// PRODUCTOS
 // ============================================================
 
 async function cargarProductos() {
   try {
-    console.log('[GamesUy] Cargando productos...');
     const snap = await getDocs(collection(db, 'products'));
     productos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     console.log('[GamesUy] Productos cargados:', productos.length);
@@ -104,16 +102,19 @@ function filtrarProductos() {
   return lista;
 }
 
+function escapeHtml(str) {
+  return String(str ?? '').replace(/[&<>'"]/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+  }[ch]));
+}
+
 // ============================================================
 // RENDER
 // ============================================================
 
 function render() {
   const list = $('precios-list');
-  if (!list) {
-    console.warn('[GamesUy] precios-list no encontrado');
-    return;
-  }
+  if (!list) return;
 
   const totalProds = productos.filter(p => (p.variants || []).length > 0).length;
   const pendientes = productos.filter(productoPendiente).length;
@@ -141,7 +142,6 @@ function render() {
     return;
   }
 
-  // HTML
   list.innerHTML = enPagina.map(p => {
     const cats = (p.categories || []).map(c => `<span class="badge badge-${c}">${c.toUpperCase()}</span>`).join('');
     const vs = (p.variants || []).filter(v => Number(v.costoARS) > 0 || tienePrecio(v));
@@ -150,20 +150,18 @@ function render() {
     const completo = completas === totales && totales > 0;
     const progresoClase = completo ? 'progress-done' : (completas > 0 ? 'progress-partial' : 'progress-pending');
     const tieneImg = p.coverUrl ? '<span class="fila-img-badge">🖼️</span> ' : '';
-    const editBadge = p.visible === false ? '<span style="color:#ff8aa8; font-size:0.7rem;">(oculto)</span> ' : '';
+    const oculto = p.visible === false ? '<span style="color:#ff8aa8; font-size:0.7rem;">(oculto)</span> ' : '';
 
     return `
       <div class="fila-juego ${completo ? 'fila-completa' : ''}" data-prod-id="${p.id}">
         <div class="fila-badges">${cats}</div>
-        <div class="fila-titulo">${editBadge}${tieneImg}${escapeHtml(p.title || '(sin título)')}</div>
+        <div class="fila-titulo">${oculto}${tieneImg}${escapeHtml(p.title || '(sin título)')}</div>
         <div class="fila-progreso ${progresoClase}">${completas}/${totales}</div>
         <div class="fila-arrow">✏️</div>
       </div>
     `;
   }).join('');
 
-  // Listeners por delegación (más robusto que por fila)
-  // Se agrega UNA SOLA VEZ al contenedor
   if (!list.dataset.delegado) {
     list.addEventListener('click', (e) => {
       const fila = e.target.closest('.fila-juego');
@@ -172,14 +170,7 @@ function render() {
       if (id) abrirModal(id);
     });
     list.dataset.delegado = '1';
-    console.log('[GamesUy] Delegación de eventos activada');
   }
-}
-
-function escapeHtml(str) {
-  return String(str ?? '').replace(/[&<>'"]/g, ch => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
-  }[ch]));
 }
 
 // ============================================================
@@ -187,12 +178,8 @@ function escapeHtml(str) {
 // ============================================================
 
 function abrirModal(prodId) {
-  console.log('[GamesUy] Abriendo modal para:', prodId);
   const prod = productos.find(p => p.id === prodId);
-  if (!prod) {
-    console.warn('[GamesUy] Producto no encontrado:', prodId);
-    return;
-  }
+  if (!prod) return;
   productoActivo = prod;
 
   const title = $('price-modal-title');
@@ -213,7 +200,7 @@ function cerrarModal() {
 }
 
 // ============================================================
-// MODAL — TAB PRECIOS
+// TAB PRECIOS
 // ============================================================
 
 function renderModalPrecios(prod) {
@@ -234,7 +221,7 @@ function renderModalPrecios(prod) {
     const usdPreview = precioActual > 0 ? formatUSD(calcPrecioUSD(precioActual, cotizaciones.usdAUYU)) : '—';
 
     return `
-      <div class="variante-modal-row" data-variant-row="${v.id}">
+      <div class="variante-modal-row">
         <div class="variante-modal-header">
           <span class="variante-modal-label">${v.label}</span>
         </div>
@@ -258,7 +245,6 @@ function renderModalPrecios(prod) {
     `;
   }).join('');
 
-  // Input listeners
   body.querySelectorAll('.variante-modal-input').forEach(inp => {
     inp.addEventListener('input', () => {
       const vid = inp.dataset.variant;
@@ -268,7 +254,6 @@ function renderModalPrecios(prod) {
     });
   });
 
-  // Save listeners
   body.querySelectorAll('.btn-modal-save').forEach(btn => {
     btn.addEventListener('click', () => guardarPrecio(prod, btn.dataset.variant, body));
   });
@@ -319,7 +304,7 @@ async function guardarPrecio(prod, variantId, body) {
 }
 
 // ============================================================
-// MODAL — TAB INFORMACIÓN
+// TAB INFORMACIÓN
 // ============================================================
 
 function renderModalInfo(prod) {
@@ -408,11 +393,16 @@ document.querySelectorAll('.upload-preview-clear').forEach(btn => {
   });
 });
 
+// ============================================================
+// SUBIR A CLOUDINARY
+// ============================================================
+
 async function subirACloudinary(file) {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-  formData.append('folder', 'gamesuy');
+  // NO mandamos 'folder' porque el preset unsigned no lo acepta
+  // (Si querés organizar por carpeta, se configura EN el preset, en Cloudinary)
 
   console.log('[GamesUy] Subiendo a Cloudinary:', file.name, file.size, 'bytes');
 
@@ -423,6 +413,7 @@ async function subirACloudinary(file) {
     try {
       const errData = await res.json();
       msg = errData?.error?.message || msg;
+      console.error('[GamesUy] Respuesta Cloudinary:', errData);
     } catch (e) {}
     throw new Error(msg);
   }
@@ -493,33 +484,23 @@ $('price-modal')?.addEventListener('click', (e) => {
 // FILTROS Y PAGINACIÓN
 // ============================================================
 
-const searchInp = $('precios-search');
-if (searchInp) {
-  searchInp.addEventListener('input', (e) => {
-    filtroSearch = e.target.value;
-    pagina = 1;
-    render();
-  });
-  console.log('[GamesUy] Listener de búsqueda activado');
-}
+$('precios-search')?.addEventListener('input', (e) => {
+  filtroSearch = e.target.value;
+  pagina = 1;
+  render();
+});
 
-const catSel = $('precios-cat');
-if (catSel) {
-  catSel.addEventListener('change', (e) => {
-    filtroCat = e.target.value;
-    pagina = 1;
-    render();
-  });
-}
+$('precios-cat')?.addEventListener('change', (e) => {
+  filtroCat = e.target.value;
+  pagina = 1;
+  render();
+});
 
-const estSel = $('precios-estado');
-if (estSel) {
-  estSel.addEventListener('change', (e) => {
-    filtroEstado = e.target.value;
-    pagina = 1;
-    render();
-  });
-}
+$('precios-estado')?.addEventListener('change', (e) => {
+  filtroEstado = e.target.value;
+  pagina = 1;
+  render();
+});
 
 $('precios-prev')?.addEventListener('click', () => {
   if (pagina > 1) { pagina--; render(); }
@@ -536,4 +517,4 @@ $('precios-next')?.addEventListener('click', () => {
 
 cargarProductos();
 
-console.log('[GamesUy] precios.js cargado completamente');
+console.log('[GamesUy] precios.js v8 cargado');

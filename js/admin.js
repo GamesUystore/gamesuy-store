@@ -1,12 +1,10 @@
 // ============================================================
 // GAMESUY STORE — Panel de Administración
-// (subir logo, editar redes, configurar banner)
 // ============================================================
 
-import { db, auth } from './firebase-config.js';
+import { db } from './firebase-config.js';
 import {
   doc,
-  getDoc,
   setDoc,
   onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
@@ -40,15 +38,68 @@ async function validarImagen(file, maxKB) {
   if (file.size > maxKB * 1024) {
     throw new Error(`La imagen supera el límite de ${maxKB} KB. Comprimila antes.`);
   }
-  const b64 = await fileToBase64(file);
-  return b64;
+  return await fileToBase64(file);
 }
 
 // ============================================================
-// CARGAR VALORES ACTUALES EN LOS CAMPOS
+// COTIZACIONES
 // ============================================================
 
-// --- LOGO ---
+onSnapshot(doc(db, 'settings', 'cotizaciones'), (snap) => {
+  if (!snap.exists()) return;
+  const c = snap.data();
+  const elArs = $('admin-cot-ars');
+  const elUsd = $('admin-cot-usd');
+  const elUpd = $('admin-cot-updated');
+
+  if (elArs && !elArs.dataset.dirty) elArs.value = c.arsAUYU ?? '';
+  if (elUsd && !elUsd.dataset.dirty) elUsd.value = c.usdAUYU ?? '';
+
+  if (elUpd && c.actualizado) {
+    const d = new Date(c.actualizado);
+    elUpd.textContent = 'Última actualización: ' + d.toLocaleString('es-UY');
+  }
+});
+
+['admin-cot-ars', 'admin-cot-usd'].forEach(id => {
+  const el = $(id);
+  if (el) el.addEventListener('input', () => { el.dataset.dirty = '1'; });
+});
+
+$('btn-save-cot')?.addEventListener('click', async () => {
+  try {
+    const ars = parseFloat($('admin-cot-ars').value);
+    const usd = parseFloat($('admin-cot-usd').value);
+
+    if (!(ars > 0)) {
+      mostrarToast('La cotización ARS→UYU debe ser mayor a 0.', 'error');
+      return;
+    }
+    if (!(usd > 0)) {
+      mostrarToast('La cotización USD→UYU debe ser mayor a 0.', 'error');
+      return;
+    }
+
+    await setDoc(doc(db, 'settings', 'cotizaciones'), {
+      arsAUYU: ars,
+      usdAUYU: usd,
+      actualizado: new Date().toISOString()
+    }, { merge: true });
+
+    delete $('admin-cot-ars').dataset.dirty;
+    delete $('admin-cot-usd').dataset.dirty;
+
+    mostrarToast('✅ Cotizaciones guardadas');
+  } catch (err) {
+    console.error('[GamesUy] Error al guardar cotizaciones:', err);
+    mostrarToast('❌ ' + err.message, 'error');
+  }
+});
+
+// ============================================================
+// LOGO
+// ============================================================
+
 function pintarPreviewLogo(url) {
   const img = $('admin-logo-preview');
   const fb  = $('admin-logo-preview-fallback');
@@ -68,43 +119,6 @@ onSnapshot(doc(db, 'settings', 'site'), (snap) => {
   const url = snap.exists() ? (snap.data().logoUrl || '') : '';
   pintarPreviewLogo(url);
 });
-
-// --- REDES ---
-onSnapshot(doc(db, 'settings', 'social'), (snap) => {
-  if (!snap.exists()) return;
-  const s = snap.data();
-  ['wa', 'ig', 'fb', 'tt'].forEach(k => {
-    const input = $('admin-social-' + k);
-    if (input && !input.dataset.dirty) input.value = s[k] || '';
-  });
-});
-
-// --- BANNER ---
-onSnapshot(doc(db, 'settings', 'homeAnnouncement'), (snap) => {
-  if (!snap.exists()) return;
-  const b = snap.data();
-  const set = (id, val) => {
-    const el = $(id);
-    if (el && !el.dataset.dirty) el.value = val || '';
-  };
-  set('admin-banner-label', b.label);
-  set('admin-banner-title', b.title);
-  set('admin-banner-text',  b.text);
-  set('admin-banner-img',   b.imageUrl);
-  set('admin-banner-link',  b.link);
-});
-
-// Marcar campos como "tocados" para no sobreescribir lo que el admin está escribiendo
-['admin-social-wa','admin-social-ig','admin-social-fb','admin-social-tt',
- 'admin-banner-label','admin-banner-title','admin-banner-text','admin-banner-img','admin-banner-link']
-.forEach(id => {
-  const el = $(id);
-  if (el) el.addEventListener('input', () => { el.dataset.dirty = '1'; });
-});
-
-// ============================================================
-// GUARDAR LOGO
-// ============================================================
 
 $('btn-save-logo')?.addEventListener('click', async () => {
   try {
@@ -139,8 +153,22 @@ $('btn-clear-logo')?.addEventListener('click', async () => {
 });
 
 // ============================================================
-// GUARDAR REDES
+// REDES
 // ============================================================
+
+onSnapshot(doc(db, 'settings', 'social'), (snap) => {
+  if (!snap.exists()) return;
+  const s = snap.data();
+  ['wa', 'ig', 'fb', 'tt'].forEach(k => {
+    const input = $('admin-social-' + k);
+    if (input && !input.dataset.dirty) input.value = s[k] || '';
+  });
+});
+
+['admin-social-wa','admin-social-ig','admin-social-fb','admin-social-tt'].forEach(id => {
+  const el = $(id);
+  if (el) el.addEventListener('input', () => { el.dataset.dirty = '1'; });
+});
 
 $('btn-save-social')?.addEventListener('click', async () => {
   try {
@@ -160,8 +188,27 @@ $('btn-save-social')?.addEventListener('click', async () => {
 });
 
 // ============================================================
-// GUARDAR BANNER
+// BANNER
 // ============================================================
+
+onSnapshot(doc(db, 'settings', 'homeAnnouncement'), (snap) => {
+  if (!snap.exists()) return;
+  const b = snap.data();
+  const set = (id, val) => {
+    const el = $(id);
+    if (el && !el.dataset.dirty) el.value = val || '';
+  };
+  set('admin-banner-label', b.label);
+  set('admin-banner-title', b.title);
+  set('admin-banner-text',  b.text);
+  set('admin-banner-img',   b.imageUrl);
+  set('admin-banner-link',  b.link);
+});
+
+['admin-banner-label','admin-banner-title','admin-banner-text','admin-banner-img','admin-banner-link'].forEach(id => {
+  const el = $(id);
+  if (el) el.addEventListener('input', () => { el.dataset.dirty = '1'; });
+});
 
 $('btn-save-banner')?.addEventListener('click', async () => {
   try {

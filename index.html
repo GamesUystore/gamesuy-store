@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=9">
+  <link rel="stylesheet" href="styles.css?v=10">
 </head>
 <body>
 
@@ -192,31 +192,56 @@
 
         <div class="admin-tab-content" data-tab-content="excel">
           <div class="admin-grid">
+
+            <!-- STOCK -->
             <div class="admin-card admin-card-wide">
-              <h3>📥 Importar Excel del proveedor</h3>
-              <p class="admin-help">Subí los archivos para actualizar el catálogo.</p>
+              <h3>📥 1. Importar STOCK (mensual)</h3>
+              <p class="admin-help">Este Excel trae todos los juegos con sus costos. Se usa una vez por mes para crear/actualizar el catálogo.</p>
 
-              <div class="import-grid">
-                <div class="import-field">
-                  <label class="admin-label">1. Excel de STOCK</label>
-                  <input type="file" id="excel-stock" accept=".xlsx,.xls" class="admin-file">
-                </div>
-                <div class="import-field">
-                  <label class="admin-label">2. Excel de OFERTAS</label>
-                  <input type="file" id="excel-ofertas" accept=".xlsx,.xls" class="admin-file">
-                </div>
-                <div class="import-field">
-                  <label class="admin-label">3. Excel de PREVENTAS</label>
-                  <input type="file" id="excel-preventas" accept=".xlsx,.xls" class="admin-file">
-                </div>
-              </div>
+              <input type="file" id="excel-stock" accept=".xlsx,.xls" class="admin-file">
 
-              <div id="import-log" class="import-log"><em>Esperando archivos...</em></div>
+              <div id="stock-log" class="import-log"><em>Esperando archivo...</em></div>
 
               <div class="admin-actions">
-                <button id="btn-import-process" class="btn btn-primary" disabled>📥 Procesar y actualizar catálogo</button>
+                <button id="btn-process-stock" class="btn btn-primary" disabled>📥 Procesar Stock</button>
               </div>
             </div>
+
+            <!-- OFERTAS -->
+            <div class="admin-card admin-card-wide">
+              <h3>🔥 2. Importar OFERTAS (cada 15 días)</h3>
+              <p class="admin-help">Este Excel trae las ofertas vigentes (solo Primaria). Ingresá la fecha hasta la cual estarán vigentes.</p>
+
+              <div class="oferta-fecha-row">
+                <label class="admin-label">📅 Válidas hasta:</label>
+                <input type="date" id="oferta-fecha-hasta">
+                <p class="admin-hint">Las ofertas se limpian automáticamente cuando vence esta fecha.</p>
+              </div>
+
+              <input type="file" id="excel-ofertas" accept=".xlsx,.xls" class="admin-file">
+
+              <div id="ofertas-log" class="import-log"><em>Esperando archivo...</em></div>
+
+              <div class="admin-actions">
+                <button id="btn-process-ofertas" class="btn btn-primary" disabled>🔥 Procesar Ofertas</button>
+                <button id="btn-clean-ofertas" class="btn btn-secondary">🧹 Limpiar ofertas vencidas</button>
+              </div>
+            </div>
+
+            <!-- PREVENTAS -->
+            <div class="admin-card admin-card-wide">
+              <h3>🚀 3. Importar PREVENTAS</h3>
+              <p class="admin-help">Este Excel trae los juegos próximos a salir (PS5, solo Primaria).</p>
+
+              <input type="file" id="excel-preventas" accept=".xlsx,.xls" class="admin-file">
+
+              <div id="preventas-log" class="import-log"><em>Esperando archivo...</em></div>
+
+              <div class="admin-actions">
+                <button id="btn-process-preventas" class="btn btn-primary" disabled>🚀 Procesar Preventas</button>
+              </div>
+            </div>
+
           </div>
         </div>
 
@@ -466,12 +491,12 @@
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-  <script type="module" src="js/settings.js?v=9"></script>
-  <script type="module" src="js/auth.js?v=9"></script>
-  <script type="module" src="js/admin.js?v=9"></script>
-  <script type="module" src="js/excel-importer.js?v=9"></script>
-  <script type="module" src="js/maintenance.js?v=9"></script>
-  <script type="module" src="js/precios.js?v=9"></script>
+  <script type="module" src="js/settings.js?v=10"></script>
+  <script type="module" src="js/auth.js?v=10"></script>
+  <script type="module" src="js/admin.js?v=10"></script>
+  <script type="module" src="js/excel-importer.js?v=10"></script>
+  <script type="module" src="js/maintenance.js?v=10"></script>
+  <script type="module" src="js/precios.js?v=10"></script>
 
 </body>
 </html>

@@ -1,6 +1,6 @@
 // ============================================================
 // GAMESUY STORE — Importador de Excel
-// Fase 3.5: Stock + Ofertas + Preventas (botones separados)
+// Fase 3.5.2: Parser mejorado para formato nuevo de Ofertas
 // ============================================================
 
 import { db } from './firebase-config.js';
@@ -19,7 +19,6 @@ import {
 
 const $ = (id) => document.getElementById(id);
 
-// Excel cargados en memoria
 const EXCEL = {
   stock:    null,
   ofertas:  null,
@@ -36,11 +35,6 @@ function log(id, msg, tipo = 'info') {
   const cls = tipo === 'error' ? 'import-error' : (tipo === 'ok' ? 'import-ok' : '');
   el.innerHTML += `<div class="${cls}">${msg}</div>`;
   el.scrollTop = el.scrollHeight;
-}
-
-function logClear(id) {
-  const el = $(id);
-  if (el) el.innerHTML = '';
 }
 
 async function leerExcel(file) {
@@ -61,25 +55,50 @@ async function leerExcel(file) {
   });
 }
 
+/**
+ * Normaliza un título para usarlo como matchKey.
+ * - Quita emojis al inicio
+ * - Quita variation selectors (️)
+ * - Convierte comillas curvas a rectas
+ * - Aplana espacios
+ * - Minúsculas
+ */
 function normalizarTitulo(titulo) {
   return String(titulo || '')
-    .toLowerCase()
+    .replace(/[\uFE0E\uFE0F]/g, '')                    // quita variation selectors (️)
+    .replace(/^[\p{Emoji_Presentation}\p{Extended_Pictographic}\s]+/u, '')  // quita emojis al inicio
+    .replace(/[“”«»]/g, '"')                            // comillas curvas → rectas
+    .replace(/[‘’]/g, "'")                              // apóstrofes curvos → rectos
+    .replace(/\s+/g, ' ')                               // espacios múltiples → 1
     .trim()
-    .replace(/\s+/g, ' ');
+    .toLowerCase();
 }
 
 /**
- * Quita sufijos tipo " (PS4/PS5)" o " (PS5)" del título del Excel de Ofertas.
- * Devuelve { titulo, plataformas: ['ps4','ps5'] }
+ * Parser de títulos del Excel de Ofertas.
+ * Soporta DOS formatos:
+ *
+ * FORMATO NUEVO (Aventuras de Primavera):
+ *   "☁️ A Quiet Place: The Road Ahead PS5 -"     → { titulo: "A Quiet Place: The Road Ahead", plataformas: ['ps5'] }
+ *   "☁️ Assassin's Creed Rogue Remastered -"     → { titulo: "Assassin's Creed Rogue Remastered", plataformas: ['ps4','ps5'] }
+ *
+ * FORMATO VIEJO (Tokyo Games Show):
+ *   "A Plague Tale: Innocence (PS4/PS5)"         → { titulo: "A Plague Tale: Innocence", plataformas: ['ps4','ps5'] }
  */
 function parsearTituloOferta(tituloRaw) {
   let titulo = String(tituloRaw || '').trim();
   const plataformas = [];
 
-  // Buscar sufijo entre paréntesis al final
-  const match = titulo.match(/\s*\(([^)]+)\)\s*$/);
-  if (match) {
-    const contenido = match[1].toUpperCase();
+  // 1) Quitar prefijo con emojis (☁️, 🔥, 🌸, etc.)
+  titulo = titulo.replace(/^[\p{Emoji_Presentation}\p{Extended_Pictographic}\s]+/u, '').trim();
+
+  // 2) Quitar variation selectors sueltos
+  titulo = titulo.replace(/[\uFE0E\uFE0F]/g, '').trim();
+
+  // 3) Detectar y quitar sufijo tipo " (PS4/PS5)" o " (PS5)"
+  const matchParentesis = titulo.match(/\s*\(([^)]+)\)\s*$/);
+  if (matchParentesis) {
+    const contenido = matchParentesis[1].toUpperCase();
     if (contenido.includes('PS5')) plataformas.push('ps5');
     if (contenido.includes('PS4')) plataformas.push('ps4');
     if (plataformas.length > 0) {
@@ -87,7 +106,20 @@ function parsearTituloOferta(tituloRaw) {
     }
   }
 
-  // Si no detectamos plataformas en el sufijo, asumimos ambas
+  // 4) Detectar y quitar sufijo con " PS5" o " PS4" como palabra suelta (formato nuevo)
+  const matchPS = titulo.match(/\s+PS([45])\s*$/i);
+  if (matchPS) {
+    plataformas.push('ps' + matchPS[1]);
+    titulo = titulo.replace(/\s+PS[45]\s*$/i, '').trim();
+  }
+
+  // 5) Quitar sufijo " -" o "-" al final
+  titulo = titulo.replace(/\s*-\s*$/, '').trim();
+
+  // 6) Si quedan comillas curvas, normalizar
+  titulo = titulo.replace(/[“”«»]/g, '"').replace(/[‘’]/g, "'");
+
+  // Si no detectamos plataformas, asumimos ambas
   if (plataformas.length === 0) {
     plataformas.push('ps4', 'ps5');
   }
@@ -98,8 +130,12 @@ function parsearTituloOferta(tituloRaw) {
 function esFilaEncabezado(titulo) {
   const t = String(titulo || '').trim();
   if (!t) return true;
-  if (t.toUpperCase() === 'JUEGO') return true;
+  const upper = t.toUpperCase();
+  if (upper === 'JUEGO') return true;
   if (/🎮|TOKYO|VIGENTES|PARA USAR LA FUNCION|IMPORTANTE|SI EL JUEGO/i.test(t)) return true;
+  if (/OFERTAS|AVENTURAS DE PRIMAVERA|DESTACADAS HASTA/i.test(t)) return true;
+  if (/CUENTA ORIGINAL|CON GARANTIA|STOCKEABLE|CONSULTAR SECUNDARIA/i.test(t)) return true;
+  if (/^▬+|^[━═]+$/.test(t)) return true;
   return false;
 }
 
@@ -108,11 +144,29 @@ function esNoDisponible(v) {
   return /no\s*disponible/i.test(String(v));
 }
 
+/**
+ * Extrae la fecha de vencimiento del texto del Excel.
+ * Busca patrones tipo "HASTA EL DÍA 07/10/2026" o "hasta 23/09"
+ */
+function extraerFechaVencimiento(rows) {
+  for (const fila of rows.slice(0, 15)) {
+    for (const celda of fila) {
+      const txt = String(celda || '');
+      const m = txt.match(/(\d{2})[\/\-](\d{2})[\/\-](\d{4})/);
+      if (m) {
+        // Formato DD/MM/YYYY → YYYY-MM-DD
+        return `${m[3]}-${m[2]}-${m[1]}`;
+      }
+    }
+  }
+  return null;
+}
+
 // ============================================================
 // LISTENERS DE FILE INPUTS
 // ============================================================
 
-function attachFileListener(inputId, tipo, logId, btnId) {
+function attachFileListener(inputId, tipo, logId, btnId, autoFechaId) {
   const input = $(inputId);
   if (!input) return;
 
@@ -135,6 +189,18 @@ function attachFileListener(inputId, tipo, logId, btnId) {
       log(logId, `Hoja: <code>${sheetName}</code>`);
       log(logId, `Total de filas: <b>${rows.length}</b>`);
 
+      // Auto-detectar fecha de vencimiento (para ofertas)
+      if (autoFechaId) {
+        const fecha = extraerFechaVencimiento(rows);
+        if (fecha) {
+          const input = $(autoFechaId);
+          if (input && !input.value) {
+            input.value = fecha;
+            log(logId, `📅 Fecha detectada automáticamente: <b>${fecha}</b> (podés cambiarla)`);
+          }
+        }
+      }
+
       if (btn) btn.disabled = false;
     } catch (err) {
       log(logId, `❌ Error al leer: ${err.message}`, 'error');
@@ -143,12 +209,12 @@ function attachFileListener(inputId, tipo, logId, btnId) {
   });
 }
 
-attachFileListener('excel-stock',    'stock',    'stock-log',    'btn-process-stock');
-attachFileListener('excel-ofertas',  'ofertas',  'ofertas-log',  'btn-process-ofertas');
-attachFileListener('excel-preventas','preventas','preventas-log','btn-process-preventas');
+attachFileListener('excel-stock',    'stock',    'stock-log',    'btn-process-stock',    null);
+attachFileListener('excel-ofertas',  'ofertas',  'ofertas-log',  'btn-process-ofertas',  'oferta-fecha-hasta');
+attachFileListener('excel-preventas','preventas','preventas-log','btn-process-preventas',null);
 
 // ============================================================
-// STOCK — Procesamiento
+// STOCK
 // ============================================================
 
 function construirVariantesStock(fila) {
@@ -339,19 +405,8 @@ async function procesarStock() {
 }
 
 // ============================================================
-// OFERTAS — Procesamiento
+// OFERTAS
 // ============================================================
-
-function construirVarianteOferta(fila, plataformas, fechaHasta) {
-  // Excel de Ofertas:
-  //   col 0 → JUEGO
-  //   col 1 → PRECIO ARS
-  //   col 2 → USDT (ignoramos)
-  const costoOfertaARS = parseCosto(fila[1]);
-  if (!costoOfertaARS) return null;
-
-  return { costoOfertaARS, plataformas, fechaHasta };
-}
 
 async function procesarOfertas() {
   const excel = EXCEL.ofertas;
@@ -363,7 +418,7 @@ async function procesarOfertas() {
   const fechaHasta = $('oferta-fecha-hasta').value;
   if (!fechaHasta) {
     log('ofertas-log', '⚠ Ingresá la fecha hasta la cual son válidas las ofertas.', 'error');
-    alert('Ingresá la fecha de vencimiento de las ofertas antes de procesar.');
+    alert('Ingresá la fecha de vencimiento antes de procesar.');
     return;
   }
 
@@ -378,56 +433,62 @@ async function procesarOfertas() {
   });
   log('ofertas-log', `✔ ${snap.size} productos en Firestore.`);
 
-  const filas = excel.rows.slice(4); // Ofertas: primeras ~4 filas son encabezados
-  let aplicadas = 0, noEncontradas = 0, sinPrecio = 0;
+  // Detectar fila donde empiezan los datos (primera fila con precio válido)
+  let inicioIdx = 0;
+  for (let i = 0; i < Math.min(excel.rows.length, 20); i++) {
+    const fila = excel.rows[i];
+    if (!fila) continue;
+    const titulo = String(fila[0] || '').trim();
+    const costo = parseCosto(fila[1]);
+    if (titulo && costo > 0 && !esFilaEncabezado(titulo)) {
+      inicioIdx = i;
+      break;
+    }
+  }
+  log('ofertas-log', `📌 Datos desde la fila ${inicioIdx + 1}`);
+
+  const filas = excel.rows.slice(inicioIdx);
+  let aplicadas = 0, noEncontradas = 0, sinPrecio = 0, saltadas = 0;
   const operaciones = [];
   const noEncontrados = [];
 
   for (const fila of filas) {
     const tituloRaw = String(fila[0] || '').trim();
-    if (esFilaEncabezado(tituloRaw)) continue;
+    if (esFilaEncabezado(tituloRaw)) { saltadas++; continue; }
+
+    const costoOfertaARS = parseCosto(fila[1]);
+    if (!costoOfertaARS) { sinPrecio++; continue; }
 
     const { titulo, plataformas } = parsearTituloOferta(tituloRaw);
     const matchKey = normalizarTitulo(titulo);
-    const ofertaData = construirVarianteOferta(fila, plataformas, fechaHasta);
-
-    if (!ofertaData) { sinPrecio++; continue; }
 
     const prod = productosMap[matchKey];
     if (!prod) {
       noEncontradas++;
-      noEncontrados.push(titulo);
+      noEncontrados.push(`${titulo} [${plataformas.join('/')}] (matchKey: "${matchKey}")`);
       continue;
     }
 
-    // Aplicar oferta a las variantes primarias de las plataformas indicadas
     let modificado = false;
     const nuevasVariantes = (prod.variants || []).map(v => {
-      // Solo primarias de las plataformas correspondientes
       if (v.tipo !== 'primaria') return v;
       if (!plataformas.includes(v.categoria)) return v;
 
       const precioActual = Number(v.precioFinalUYU) || 0;
       const costoActual = Number(v.costoARS) || 0;
 
-      // Calcular precio de oferta
       let ofertaPrecioUYU = 0;
-      let ofertaGanancia = v.gananciaPct;
 
       if (precioActual > 0 && costoActual > 0) {
-        // Aplicar variación al precio final
-        const variacion = (ofertaData.costoOfertaARS / costoActual) - 1;
+        const variacion = (costoOfertaARS / costoActual) - 1;
         ofertaPrecioUYU = roundUYU(precioActual * (1 + variacion));
-      } else {
-        // No tiene precio final todavía → solo guardamos el costo de oferta
-        ofertaPrecioUYU = 0;
       }
 
       modificado = true;
       return {
         ...v,
         enOferta: true,
-        ofertaCostoARS: ofertaData.costoOfertaARS,
+        ofertaCostoARS: costoOfertaARS,
         ofertaPrecioUYU: ofertaPrecioUYU,
         ofertaHasta: fechaHasta
       };
@@ -441,7 +502,7 @@ async function procesarOfertas() {
       aplicadas++;
     } else {
       noEncontradas++;
-      noEncontrados.push(titulo);
+      noEncontrados.push(`${titulo} — sin variantes primarias coincidentes`);
     }
   }
 
@@ -454,12 +515,16 @@ async function procesarOfertas() {
   log('ofertas-log', `   🔥 Aplicadas:       ${aplicadas}`);
   log('ofertas-log', `   ⚠ No encontradas:  ${noEncontradas}`);
   log('ofertas-log', `   ⏭️  Sin precio:      ${sinPrecio}`);
+  log('ofertas-log', `   ⏭️  Saltadas:        ${saltadas}`);
   log('ofertas-log', '═══════════════════════════════════');
 
   if (noEncontrados.length > 0) {
     log('ofertas-log', '');
-    log('ofertas-log', '<b>Primeras 20 no encontradas:</b>');
-    noEncontrados.slice(0, 20).forEach(t => log('ofertas-log', `• ${t}`));
+    log('ofertas-log', `<b>Primeras 30 no encontradas:</b>`);
+    noEncontrados.slice(0, 30).forEach(t => log('ofertas-log', `• ${t}`));
+    if (noEncontrados.length > 30) {
+      log('ofertas-log', `... y ${noEncontrados.length - 30} más.`);
+    }
   }
 
   alert(`✅ Ofertas procesadas\n\nAplicadas: ${aplicadas}\nNo encontradas: ${noEncontradas}`);
@@ -484,7 +549,6 @@ async function limpiarOfertasVencidas() {
   const hoy = new Date().toISOString().split('T')[0];
   const snap = await getDocs(collection(db, 'products'));
   const operaciones = [];
-  let limpiadas = 0;
 
   snap.docs.forEach(d => {
     const data = d.data();
@@ -511,7 +575,6 @@ async function limpiarOfertasVencidas() {
         ref: doc(db, 'products', d.id),
         data: { variants: nuevasVariantes, updatedAt: new Date().toISOString() }
       });
-      limpiadas++;
     }
   });
 
@@ -522,7 +585,7 @@ async function limpiarOfertasVencidas() {
 
   log('ofertas-log', `⏳ Limpiando ${operaciones.length} ofertas vencidas...`);
   await ejecutarBatches(operaciones, 'ofertas-log');
-  log('ofertas-log', `✅ ${operaciones.length} productos con ofertas vencidas fueron limpiados.`);
+  log('ofertas-log', `✅ ${operaciones.length} productos limpiados.`);
   alert(`✅ ${operaciones.length} productos actualizados.`);
 }
 
@@ -547,8 +610,7 @@ async function ejecutarBatches(operaciones, logId) {
 
 $('btn-process-stock')?.addEventListener('click', async () => {
   const btn = $('btn-process-stock');
-  btn.disabled = true;
-  btn.textContent = '⏳ Procesando...';
+  btn.disabled = true; btn.textContent = '⏳ Procesando...';
   try { await procesarStock(); }
   catch (err) { log('stock-log', `❌ ${err.message}`, 'error'); console.error(err); }
   finally { btn.disabled = false; btn.textContent = '📥 Procesar Stock'; }
@@ -556,8 +618,7 @@ $('btn-process-stock')?.addEventListener('click', async () => {
 
 $('btn-process-ofertas')?.addEventListener('click', async () => {
   const btn = $('btn-process-ofertas');
-  btn.disabled = true;
-  btn.textContent = '⏳ Procesando...';
+  btn.disabled = true; btn.textContent = '⏳ Procesando...';
   try { await procesarOfertas(); }
   catch (err) { log('ofertas-log', `❌ ${err.message}`, 'error'); console.error(err); }
   finally { btn.disabled = false; btn.textContent = '🔥 Procesar Ofertas'; }
@@ -565,8 +626,7 @@ $('btn-process-ofertas')?.addEventListener('click', async () => {
 
 $('btn-process-preventas')?.addEventListener('click', async () => {
   const btn = $('btn-process-preventas');
-  btn.disabled = true;
-  btn.textContent = '⏳ Procesando...';
+  btn.disabled = true; btn.textContent = '⏳ Procesando...';
   try { await procesarPreventas(); }
   catch (err) { log('preventas-log', `❌ ${err.message}`, 'error'); console.error(err); }
   finally { btn.disabled = false; btn.textContent = '🚀 Procesar Preventas'; }
@@ -574,11 +634,10 @@ $('btn-process-preventas')?.addEventListener('click', async () => {
 
 $('btn-clean-ofertas')?.addEventListener('click', async () => {
   const btn = $('btn-clean-ofertas');
-  btn.disabled = true;
-  btn.textContent = '⏳ Limpiando...';
+  btn.disabled = true; btn.textContent = '⏳ Limpiando...';
   try { await limpiarOfertasVencidas(); }
   catch (err) { log('ofertas-log', `❌ ${err.message}`, 'error'); console.error(err); }
   finally { btn.disabled = false; btn.textContent = '🧹 Limpiar ofertas vencidas'; }
 });
 
-console.log('[GamesUy] excel-importer.js v10 cargado (Stock + Ofertas)');
+console.log('[GamesUy] excel-importer.js v11 cargado (parser mejorado)');

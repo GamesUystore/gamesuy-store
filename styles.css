@@ -575,7 +575,7 @@ body::after {
   box-shadow: 0 8px 24px rgba(0, 240, 255, 0.4);
   filter: brightness(1.1);
 }
-.btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
 .btn + .btn { margin-top: 8px; }
 .btn-primary { background: linear-gradient(135deg, #005bb5, var(--cyan)); }
 .btn-buy { background: linear-gradient(135deg, #00a870, var(--green)); color: #001a10; }
@@ -929,30 +929,13 @@ body::after {
   color: #ff8aa8;
 }
 
-/* RESPONSIVE */
-@media (max-width: 760px) {
-  .header-inner { padding: 18px 14px 14px; gap: 14px; }
-  .brand { flex-direction: column; gap: 10px; }
-  .brand-logo, .brand-logo-fallback { width: 64px; height: 64px; }
-  .container { padding: 22px 14px 80px; }
-  .product-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
-  .announcement-banner { padding: 24px 20px; }
-  .section-title { font-size: 1.3rem; }
-  .admin-grid { grid-template-columns: 1fr; }
-  .admin-actions .btn { min-width: 100%; }
-}
-
-/* ============================================================
-   HELPERS DEL ADMIN
-   ============================================================ */
-
+/* HELPERS DEL ADMIN */
 .admin-help {
   font-size: 0.85rem;
   color: var(--text-dim);
   margin-bottom: 14px;
   line-height: 1.5;
 }
-
 .admin-hint {
   font-size: 0.78rem;
   color: var(--text-muted);
@@ -960,13 +943,76 @@ body::after {
   margin-bottom: 8px;
   line-height: 1.4;
 }
-
 .admin-hint strong {
   color: var(--cyan);
   font-weight: 700;
 }
 
-/* Quitar flechitas de los input number */
+/* IMPORTADOR EXCEL */
+.import-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin-bottom: 18px;
+}
+.import-field {
+  padding: 12px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+.import-field .admin-label {
+  margin-top: 0;
+}
+.import-field .admin-hint {
+  margin-bottom: 0;
+}
+.import-log {
+  background: #000;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 14px;
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 0.82rem;
+  color: #a8e6cf;
+  max-height: 320px;
+  overflow-y: auto;
+  margin-bottom: 16px;
+  white-space: pre-wrap;
+  line-height: 1.55;
+}
+.import-block {
+  padding: 10px 0;
+  border-bottom: 1px dashed var(--border);
+}
+.import-block:last-child { border-bottom: none; }
+.import-block code {
+  color: var(--cyan);
+  background: rgba(0, 240, 255, 0.08);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.import-preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  font-size: 0.75rem;
+}
+.import-preview-table td {
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  color: var(--text);
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.import-error {
+  color: #ff8aa8;
+  padding: 8px;
+}
+
+/* QUITAR FLECHITAS DE NUMBER */
 .admin-card input[type="number"] {
   width: 100%;
   font-family: inherit;
@@ -988,4 +1034,20 @@ body::after {
 .admin-card input[type="number"]:focus {
   border-color: var(--cyan);
   box-shadow: 0 0 0 3px var(--cyan-soft);
+}
+
+/* RESPONSIVE */
+@media (max-width: 760px) {
+  .header-inner { padding: 18px 14px 14px; gap: 14px; }
+  .brand { flex-direction: column; gap: 10px; }
+  .brand-logo, .brand-logo-fallback { width: 64px; height: 64px; }
+  .container { padding: 22px 14px 80px; }
+  .product-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+  .announcement-banner { padding: 24px 20px; }
+  .section-title { font-size: 1.3rem; }
+  .admin-grid { grid-template-columns: 1fr; }
+  .admin-actions .btn { min-width: 100%; }
+  .import-grid { grid-template-columns: 1fr; }
+  .import-preview-table { font-size: 0.68rem; }
+  .import-preview-table td { max-width: 90px; }
 }

@@ -1,6 +1,6 @@
 // ============================================================
 // GAMESUY STORE — Catálogo público
-// Fase 4: Muestra productos con precio en la tienda
+// Fase 4.1: Imagen con <img> (compatible Base64)
 // ============================================================
 
 import { db } from './firebase-config.js';
@@ -92,6 +92,14 @@ function escapeHtml(str) {
   }[ch]));
 }
 
+/**
+ * Prepara una URL para usarla en un atributo HTML.
+ * Base64 y URLs normales funcionan sin cambios.
+ */
+function safeUrl(url) {
+  return String(url || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 // ============================================================
 // FILTROS
 // ============================================================
@@ -147,11 +155,9 @@ function render() {
 
   grid.innerHTML = enPagina.map(renderCard).join('');
 
-  // Listeners
   enPagina.forEach(p => {
     const cardId = p.id;
 
-    // Selector de consola
     const selConsole = document.getElementById(`sel-console-${cardId}`);
     const selAccount = document.getElementById(`sel-account-${cardId}`);
     const selCurrency = document.getElementById(`sel-currency-${cardId}`);
@@ -169,7 +175,6 @@ function render() {
       selCurrency.addEventListener('change', () => actualizarPrecio(p, cardId));
     }
 
-    // Estado inicial
     if (selConsole) actualizarSelectoresCuenta(p, cardId);
     actualizarPrecio(p, cardId);
   });
@@ -216,15 +221,16 @@ function renderCard(p) {
     .map(c => `<span class="badge badge-${c}">${c.toUpperCase()}</span>`)
     .join('');
 
+  // ⚠️ CAMBIO IMPORTANTE: usar <img> en vez de background-image
+  // para que funcione con Base64 y URLs externas.
   const imagen = p.coverUrl
-    ? `<div class="card-image" style="background-image: url('${p.coverUrl}')"></div>`
+    ? `<div class="card-image"><img src="${safeUrl(p.coverUrl)}" alt="${escapeHtml(p.title || '')}" class="card-image-img" loading="lazy"></div>`
     : `<div class="card-image card-image-empty"><span class="card-image-placeholder">🎮</span></div>`;
 
   const preorderBadge = p.isPreorder
     ? `<div class="card-preorder-badge">🚀 PREVENTA${p.releaseDate ? ` · ${formatearFecha(p.releaseDate)}` : ''}</div>`
     : '';
 
-  // Selectores disponibles
   const consolasDisponibles = cats.filter(c => {
     return (p.variants || []).some(v => v.categoria === c && varianteDisponible(v));
   });
@@ -297,7 +303,6 @@ function actualizarSelectoresCuenta(p, cardId) {
     `<option value="${t}" ${t === valorActual ? 'selected' : ''}>${t === 'primaria' ? 'Primaria' : 'Secundaria'}</option>`
   ).join('');
 
-  // Si no hay tipos, dejar vacío
   if (tipos.length === 0) {
     selAccount.innerHTML = '<option value="">—</option>';
   }
@@ -345,7 +350,6 @@ function actualizarPrecio(p, cardId) {
     ? formatUSD(calcPrecioUSD(precioActivo, cotizaciones.usdAUYU))
     : formatUYU(precioActivo);
 
-  // Precio secundario (siempre mostrar en la otra moneda)
   const precioSecundario = moneda === 'USD'
     ? formatUYU(precioActivo)
     : '≈ ' + formatUSD(calcPrecioUSD(precioActivo, cotizaciones.usdAUYU));
@@ -387,7 +391,6 @@ function actualizarPrecio(p, cardId) {
     stockWrap.innerHTML = `<span class="stock-badge stock-ok">✓ Disponible</span>`;
   }
 
-  // WhatsApp
   if (waBtn) {
     const tipoLabel = acc === 'secundaria' ? 'Secundaria' : 'Primaria';
     const catLabel = cat.toUpperCase();
@@ -444,7 +447,7 @@ window.abrirTrailer = function(cardId) {
     }
   }
   if (p.gameplayUrl) {
-    html += `<div style="margin-top:12px;"><h4 style="color:var(--cyan);margin-bottom:8px;">🎮 Gameplay</h4><img src="${p.gameplayUrl}" style="width:100%;border-radius:12px;border:1px solid var(--border);"></div>`;
+    html += `<div style="margin-top:12px;"><h4 style="color:var(--cyan);margin-bottom:8px;">🎮 Gameplay</h4><img src="${safeUrl(p.gameplayUrl)}" style="width:100%;border-radius:12px;border:1px solid var(--border);"></div>`;
   }
   if (!html) html = '<p class="empty-message">Sin contenido disponible.</p>';
 
@@ -481,7 +484,6 @@ document.querySelectorAll('#cat-nav .cat-btn').forEach(btn => {
   });
 });
 
-// Cerrar modal trailer
 document.getElementById('trailer-close')?.addEventListener('click', () => {
   document.getElementById('trailer-modal')?.classList.add('hidden');
 });
@@ -491,4 +493,4 @@ document.getElementById('trailer-modal')?.addEventListener('click', (e) => {
   }
 });
 
-console.log('[GamesUy] store.js cargado');
+console.log('[GamesUy] store.js cargado (Fase 4.1 - con <img>)');

@@ -1565,3 +1565,169 @@ body::after {
   .upload-group { grid-template-columns: 1fr; }
   .upload-or { text-align: center; }
 }
+
+/* ============================================================
+   MODAL DE PRECIOS — Precio normal + Oferta
+   ============================================================ */
+
+.fila-oferta-badge {
+  font-size: 0.8rem;
+  margin-right: 2px;
+}
+
+.variante-bloque {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 16px;
+  margin-bottom: 14px;
+}
+.variante-bloque.variante-con-oferta {
+  border-color: rgba(255, 0, 85, 0.4);
+  box-shadow: 0 0 20px rgba(255, 0, 85, 0.1);
+}
+
+.variante-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 12px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.variante-label {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--cyan);
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+.variante-oferta-badge {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  background: linear-gradient(90deg, #ff0055, #ff3377);
+  color: #fff;
+  text-transform: uppercase;
+  box-shadow: 0 0 12px rgba(255, 0, 85, 0.4);
+}
+.variante-solo-badge {
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  padding: 3px 8px;
+  border-radius: var(--r-sm);
+  background: rgba(0, 180, 216, 0.15);
+  border: 1px solid rgba(0, 180, 216, 0.5);
+  color: #00b4d8;
+  text-transform: uppercase;
+}
+
+.precio-seccion {
+  padding: 12px;
+  background: var(--bg-0);
+  border-radius: var(--r-sm);
+  margin-bottom: 12px;
+}
+.precio-seccion:last-child { margin-bottom: 0; }
+.precio-seccion-oferta {
+  background: linear-gradient(135deg, rgba(255, 0, 85, 0.08), rgba(255, 51, 119, 0.08));
+  border: 1px solid rgba(255, 0, 85, 0.25);
+}
+
+.precio-seccion-titulo {
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+}
+.precio-seccion-oferta .precio-seccion-titulo { color: #ff4d6d; }
+
+.variante-costo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.82rem;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.variante-costo .info-label { color: var(--text-muted); }
+.variante-costo .info-value { color: var(--text); }
+.variante-costo strong { color: var(--cyan); font-weight: 700; }
+
+.variante-input-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.variante-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 10px 14px;
+}
+.variante-input-wrap:focus-within {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 3px var(--cyan-soft);
+}
+.variante-input-wrap-oferta:focus-within {
+  border-color: #ff4d6d;
+  box-shadow: 0 0 0 3px rgba(255, 77, 109, 0.15);
+}
+.variante-input-wrap .input-prefix,
+.variante-input-wrap .input-suffix {
+  color: var(--text-muted);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+.variante-input-normal,
+.variante-input-oferta {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 1.1rem;
+  font-weight: 700;
+  text-align: center;
+  outline: none;
+  -moz-appearance: textfield;
+}
+.variante-input-normal::-webkit-outer-spin-button,
+.variante-input-normal::-webkit-inner-spin-button,
+.variante-input-oferta::-webkit-outer-spin-button,
+.variante-input-oferta::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.variante-usd {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  min-width: 90px;
+  text-align: right;
+}
+.variante-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.variante-actions .btn { min-width: 180px; }
+
+@media (max-width: 760px) {
+  .variante-input-row { grid-template-columns: 1fr; }
+  .variante-usd { text-align: left; }
+  .variante-actions .btn { min-width: 100%; }
+}

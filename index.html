@@ -168,140 +168,207 @@
 
         <div id="admin-toast" class="admin-toast hidden"></div>
 
-        <div class="admin-grid">
-
-          <!-- IMPORTADOR EXCEL -->
-          <div class="admin-card admin-card-wide">
-            <h3>📥 Importar Excel del proveedor</h3>
-            <p class="admin-help">Subí los archivos para actualizar el catálogo. El sistema detecta cambios de precio y los aplica automáticamente, sin pisar tus datos manuales (portada, YouTube, descripción, ganancia).</p>
-
-            <div class="import-grid">
-              <div class="import-field">
-                <label class="admin-label">1. Excel de STOCK</label>
-                <input type="file" id="excel-stock" accept=".xlsx,.xls" class="admin-file">
-                <p class="admin-hint">Listado completo de juegos disponibles.</p>
-              </div>
-
-              <div class="import-field">
-                <label class="admin-label">2. Excel de OFERTAS</label>
-                <input type="file" id="excel-ofertas" accept=".xlsx,.xls" class="admin-file">
-                <p class="admin-hint">Ofertas vigentes (solo primaria).</p>
-              </div>
-
-              <div class="import-field">
-                <label class="admin-label">3. Excel de PREVENTAS</label>
-                <input type="file" id="excel-preventas" accept=".xlsx,.xls" class="admin-file">
-                <p class="admin-hint">Preventas con fecha de estreno.</p>
-              </div>
-            </div>
-
-            <div id="import-log" class="import-log">
-              <em>Esperando archivos...</em>
-            </div>
-
-            <div class="admin-actions">
-              <button id="btn-import-process" class="btn btn-primary" disabled>📥 Procesar y actualizar catálogo</button>
-            </div>
-          </div>
-
-          <!-- LIMPIEZA -->
-          <div class="admin-card admin-card-wide admin-card-danger">
-            <h3>🧹 Mantenimiento: limpiar productos viejos</h3>
-            <p class="admin-help">Borra productos que <strong>no tienen <code>matchKey</code></strong> (los de intentos anteriores). Los productos importados del Excel tienen <code>matchKey</code> y <strong>NO</strong> se tocan.</p>
-
-            <div id="clean-log" class="import-log">
-              <em>Click en "Analizar" para ver qué se borraría.</em>
-            </div>
-
-            <div class="admin-actions">
-              <button id="btn-analyze-clean" class="btn btn-secondary">🔍 Analizar</button>
-              <button id="btn-do-clean" class="btn btn-danger" disabled>🗑️ Borrar productos viejos</button>
-            </div>
-
-            <label class="admin-label" style="margin-top:16px;">Para confirmar el borrado, escribí <code>BORRAR</code> acá:</label>
-            <input type="text" id="clean-confirm" placeholder="BORRAR" autocomplete="off" disabled>
-          </div>
-
-          <!-- COTIZACIONES -->
-          <div class="admin-card">
-            <h3>💱 Cotizaciones</h3>
-            <p class="admin-help">Estos valores se usan para calcular todos los precios del catálogo. Cambiarlos recalcula todo automáticamente.</p>
-
-            <label class="admin-label">Peso Argentino → Peso Uruguayo</label>
-            <input type="number" id="admin-cot-ars" step="0.0001" min="0.0001" placeholder="0.0550">
-            <p class="admin-hint">Ejemplo: si 1 ARS = 0.055 UYU, escribí <strong>0.055</strong></p>
-
-            <label class="admin-label">Dólar → Peso Uruguayo</label>
-            <input type="number" id="admin-cot-usd" step="0.01" min="0.01" placeholder="39.50">
-            <p class="admin-hint">Ejemplo: si 1 USD = 39.50 UYU, escribí <strong>39.50</strong></p>
-
-            <div class="admin-actions">
-              <button id="btn-save-cot" class="btn btn-primary">Guardar cotizaciones</button>
-            </div>
-
-            <p class="admin-hint" id="admin-cot-updated" style="margin-top:12px;"></p>
-          </div>
-
-          <!-- LOGO -->
-          <div class="admin-card">
-            <h3>🖼️ Logo de la tienda</h3>
-            <div class="admin-preview">
-              <img id="admin-logo-preview" alt="" src="">
-              <span id="admin-logo-preview-fallback" class="admin-preview-fallback">🎮</span>
-            </div>
-            <label class="admin-label">Subir archivo (máx 300 KB)</label>
-            <input type="file" id="admin-logo-file" accept="image/*" class="admin-file">
-            <label class="admin-label">O pegar URL</label>
-            <input type="text" id="admin-logo-url" placeholder="https://...">
-            <div class="admin-actions">
-              <button id="btn-save-logo" class="btn btn-primary">Guardar logo</button>
-              <button id="btn-clear-logo" class="btn btn-secondary">Quitar logo</button>
-            </div>
-          </div>
-
-          <!-- REDES -->
-          <div class="admin-card">
-            <h3>📱 Redes sociales</h3>
-            <label class="admin-label">WhatsApp (URL completa)</label>
-            <input type="text" id="admin-social-wa" placeholder="https://wa.me/59896572226">
-            <label class="admin-label">Instagram</label>
-            <input type="text" id="admin-social-ig" placeholder="https://instagram.com/tu_cuenta">
-            <label class="admin-label">Facebook</label>
-            <input type="text" id="admin-social-fb" placeholder="https://facebook.com/tu_pagina">
-            <label class="admin-label">TikTok</label>
-            <input type="text" id="admin-social-tt" placeholder="https://tiktok.com/@tu_cuenta">
-            <div class="admin-actions">
-              <button id="btn-save-social" class="btn btn-primary">Guardar redes</button>
-            </div>
-          </div>
-
-          <!-- BANNER -->
-          <div class="admin-card admin-card-wide">
-            <h3>📢 Banner de anuncio (página de inicio)</h3>
-
-            <label class="admin-label">Etiqueta pequeña</label>
-            <input type="text" id="admin-banner-label" placeholder="📢 NOVEDAD">
-
-            <label class="admin-label">Título</label>
-            <input type="text" id="admin-banner-title" placeholder="Ej: Nueva colección disponible">
-
-            <label class="admin-label">Texto</label>
-            <textarea id="admin-banner-text" rows="3" placeholder="Descripción del anuncio..."></textarea>
-
-            <label class="admin-label">Imagen (opcional, máx 500 KB)</label>
-            <input type="file" id="admin-banner-file" accept="image/*" class="admin-file">
-            <input type="text" id="admin-banner-img" placeholder="O pegar URL de imagen">
-
-            <label class="admin-label">Link (opcional, si querés que el banner sea clickeable)</label>
-            <input type="text" id="admin-banner-link" placeholder="https://...">
-
-            <div class="admin-actions">
-              <button id="btn-save-banner" class="btn btn-primary">Guardar banner</button>
-              <button id="btn-clear-banner" class="btn btn-secondary">Ocultar banner</button>
-            </div>
-          </div>
-
+        <!-- TABS DEL ADMIN -->
+        <div class="admin-tabs">
+          <button class="admin-tab active" data-tab="precios">💰 Precios</button>
+          <button class="admin-tab" data-tab="excel">📥 Importar Excel</button>
+          <button class="admin-tab" data-tab="config">⚙️ Configuración</button>
+          <button class="admin-tab" data-tab="mantenimiento">🧹 Mantenimiento</button>
         </div>
+
+        <!-- TAB: PRECIOS -->
+        <div class="admin-tab-content active" data-tab-content="precios">
+          <div class="admin-grid">
+
+            <div class="admin-card admin-card-wide">
+              <h3>💰 Gestionar precios</h3>
+              <p class="admin-help">Poné el precio final en pesos uruguayos de cada variante. El sistema calcula la ganancia automáticamente y ajusta los precios cuando cambia el costo del proveedor.</p>
+
+              <div class="precios-stats">
+                <span class="stat-badge">📊 Total: <strong id="stat-total">0</strong></span>
+                <span class="stat-badge stat-pending">⏳ Pendientes: <strong id="stat-pending">0</strong></span>
+                <span class="stat-badge stat-done">✅ Completos: <strong id="stat-done">0</strong></span>
+              </div>
+
+              <div class="precios-filters">
+                <input type="text" id="precios-search" placeholder="🔍 Buscar juego por título...">
+                <select id="precios-cat">
+                  <option value="all">Todas las categorías</option>
+                  <option value="ps5">PS5</option>
+                  <option value="ps4">PS4</option>
+                  <option value="ps3">PS3</option>
+                  <option value="steam">Steam</option>
+                  <option value="psplus">PS Plus</option>
+                  <option value="streaming">Streaming</option>
+                  <option value="otros">Otros</option>
+                </select>
+                <select id="precios-estado">
+                  <option value="pendientes">Solo pendientes</option>
+                  <option value="todos">Todos</option>
+                  <option value="completos">Solo completos</option>
+                </select>
+              </div>
+
+              <div id="precios-list" class="precios-list">
+                <p class="empty-message">Cargando productos...</p>
+              </div>
+
+              <div class="precios-pagination">
+                <button id="precios-prev" class="btn btn-secondary">← Anterior</button>
+                <span id="precios-page-info">Página 1 de 1</span>
+                <button id="precios-next" class="btn btn-secondary">Siguiente →</button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- TAB: EXCEL -->
+        <div class="admin-tab-content" data-tab-content="excel">
+          <div class="admin-grid">
+
+            <div class="admin-card admin-card-wide">
+              <h3>📥 Importar Excel del proveedor</h3>
+              <p class="admin-help">Subí los archivos para actualizar el catálogo. El sistema detecta cambios de precio y los aplica automáticamente, sin pisar tus datos manuales (portada, YouTube, descripción, ganancia).</p>
+
+              <div class="import-grid">
+                <div class="import-field">
+                  <label class="admin-label">1. Excel de STOCK</label>
+                  <input type="file" id="excel-stock" accept=".xlsx,.xls" class="admin-file">
+                  <p class="admin-hint">Listado completo de juegos disponibles.</p>
+                </div>
+
+                <div class="import-field">
+                  <label class="admin-label">2. Excel de OFERTAS</label>
+                  <input type="file" id="excel-ofertas" accept=".xlsx,.xls" class="admin-file">
+                  <p class="admin-hint">Ofertas vigentes (solo primaria).</p>
+                </div>
+
+                <div class="import-field">
+                  <label class="admin-label">3. Excel de PREVENTAS</label>
+                  <input type="file" id="excel-preventas" accept=".xlsx,.xls" class="admin-file">
+                  <p class="admin-hint">Preventas con fecha de estreno.</p>
+                </div>
+              </div>
+
+              <div id="import-log" class="import-log">
+                <em>Esperando archivos...</em>
+              </div>
+
+              <div class="admin-actions">
+                <button id="btn-import-process" class="btn btn-primary" disabled>📥 Procesar y actualizar catálogo</button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- TAB: CONFIGURACIÓN -->
+        <div class="admin-tab-content" data-tab-content="config">
+          <div class="admin-grid">
+
+            <div class="admin-card">
+              <h3>💱 Cotizaciones</h3>
+              <p class="admin-help">Estos valores se usan para calcular todos los precios. Cambiarlos recalcula todo automáticamente.</p>
+
+              <label class="admin-label">Peso Argentino → Peso Uruguayo</label>
+              <input type="number" id="admin-cot-ars" step="0.0001" min="0.0001" placeholder="0.0550">
+              <p class="admin-hint">Ejemplo: si 1 ARS = 0.055 UYU, escribí <strong>0.055</strong></p>
+
+              <label class="admin-label">Dólar → Peso Uruguayo</label>
+              <input type="number" id="admin-cot-usd" step="0.01" min="0.01" placeholder="39.50">
+              <p class="admin-hint">Ejemplo: si 1 USD = 39.50 UYU, escribí <strong>39.50</strong></p>
+
+              <div class="admin-actions">
+                <button id="btn-save-cot" class="btn btn-primary">Guardar cotizaciones</button>
+              </div>
+
+              <p class="admin-hint" id="admin-cot-updated" style="margin-top:12px;"></p>
+            </div>
+
+            <div class="admin-card">
+              <h3>🖼️ Logo de la tienda</h3>
+              <div class="admin-preview">
+                <img id="admin-logo-preview" alt="" src="">
+                <span id="admin-logo-preview-fallback" class="admin-preview-fallback">🎮</span>
+              </div>
+              <label class="admin-label">Subir archivo (máx 300 KB)</label>
+              <input type="file" id="admin-logo-file" accept="image/*" class="admin-file">
+              <label class="admin-label">O pegar URL</label>
+              <input type="text" id="admin-logo-url" placeholder="https://...">
+              <div class="admin-actions">
+                <button id="btn-save-logo" class="btn btn-primary">Guardar logo</button>
+                <button id="btn-clear-logo" class="btn btn-secondary">Quitar logo</button>
+              </div>
+            </div>
+
+            <div class="admin-card">
+              <h3>📱 Redes sociales</h3>
+              <label class="admin-label">WhatsApp (URL completa)</label>
+              <input type="text" id="admin-social-wa" placeholder="https://wa.me/59896572226">
+              <label class="admin-label">Instagram</label>
+              <input type="text" id="admin-social-ig" placeholder="https://instagram.com/tu_cuenta">
+              <label class="admin-label">Facebook</label>
+              <input type="text" id="admin-social-fb" placeholder="https://facebook.com/tu_pagina">
+              <label class="admin-label">TikTok</label>
+              <input type="text" id="admin-social-tt" placeholder="https://tiktok.com/@tu_cuenta">
+              <div class="admin-actions">
+                <button id="btn-save-social" class="btn btn-primary">Guardar redes</button>
+              </div>
+            </div>
+
+            <div class="admin-card admin-card-wide">
+              <h3>📢 Banner de anuncio (página de inicio)</h3>
+
+              <label class="admin-label">Etiqueta pequeña</label>
+              <input type="text" id="admin-banner-label" placeholder="📢 NOVEDAD">
+
+              <label class="admin-label">Título</label>
+              <input type="text" id="admin-banner-title" placeholder="Ej: Nueva colección disponible">
+
+              <label class="admin-label">Texto</label>
+              <textarea id="admin-banner-text" rows="3" placeholder="Descripción del anuncio..."></textarea>
+
+              <label class="admin-label">Imagen (opcional, máx 500 KB)</label>
+              <input type="file" id="admin-banner-file" accept="image/*" class="admin-file">
+              <input type="text" id="admin-banner-img" placeholder="O pegar URL de imagen">
+
+              <label class="admin-label">Link (opcional, si querés que el banner sea clickeable)</label>
+              <input type="text" id="admin-banner-link" placeholder="https://...">
+
+              <div class="admin-actions">
+                <button id="btn-save-banner" class="btn btn-primary">Guardar banner</button>
+                <button id="btn-clear-banner" class="btn btn-secondary">Ocultar banner</button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- TAB: MANTENIMIENTO -->
+        <div class="admin-tab-content" data-tab-content="mantenimiento">
+          <div class="admin-grid">
+
+            <div class="admin-card admin-card-wide admin-card-danger">
+              <h3>🧹 Limpiar productos viejos</h3>
+              <p class="admin-help">Borra productos que <strong>no tienen <code>matchKey</code></strong> (los de intentos anteriores). Los productos importados del Excel tienen <code>matchKey</code> y <strong>NO</strong> se tocan.</p>
+
+              <div id="clean-log" class="import-log">
+                <em>Click en "Analizar" para ver qué se borraría.</em>
+              </div>
+
+              <div class="admin-actions">
+                <button id="btn-analyze-clean" class="btn btn-secondary">🔍 Analizar</button>
+                <button id="btn-do-clean" class="btn btn-danger" disabled>🗑️ Borrar productos viejos</button>
+              </div>
+
+              <label class="admin-label" style="margin-top:16px;">Para confirmar el borrado, escribí <code>BORRAR</code> acá:</label>
+              <input type="text" id="clean-confirm" placeholder="BORRAR" autocomplete="off" disabled>
+            </div>
+
+          </div>
+        </div>
+
       </div>
     </section>
 
@@ -361,17 +428,35 @@
         btn.classList.add('active');
       });
     });
+
+    // TABS DEL ADMIN
+    window.switchTab = function(tabId) {
+      document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.admin-tab-content').forEach(c => c.classList.remove('active'));
+
+      const tab = document.querySelector(`.admin-tab[data-tab="${tabId}"]`);
+      const content = document.querySelector(`.admin-tab-content[data-tab-content="${tabId}"]`);
+      if (tab) tab.classList.add('active');
+      if (content) content.classList.add('active');
+    };
+
+    document.querySelectorAll('.admin-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        window.switchTab(tab.dataset.tab);
+      });
+    });
   </script>
 
-  <!-- SheetJS — lector de Excel -->
+  <!-- SheetJS -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-  <!-- Módulos del sitio -->
+  <!-- Módulos -->
   <script type="module" src="js/settings.js"></script>
   <script type="module" src="js/auth.js"></script>
   <script type="module" src="js/admin.js"></script>
   <script type="module" src="js/excel-importer.js"></script>
   <script type="module" src="js/maintenance.js"></script>
+  <script type="module" src="js/precios.js"></script>
 
 </body>
 </html>

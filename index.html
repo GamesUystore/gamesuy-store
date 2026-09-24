@@ -195,6 +195,40 @@
 
         <div class="admin-grid">
 
+          <!-- IMPORTADOR EXCEL -->
+          <div class="admin-card admin-card-wide">
+            <h3>📥 Importar Excel del proveedor</h3>
+            <p class="admin-help">Subí los archivos para actualizar el catálogo. El sistema detecta cambios de precio y los aplica automáticamente, sin pisar tus datos manuales (portada, YouTube, descripción, ganancia).</p>
+
+            <div class="import-grid">
+              <div class="import-field">
+                <label class="admin-label">1. Excel de STOCK</label>
+                <input type="file" id="excel-stock" accept=".xlsx,.xls" class="admin-file">
+                <p class="admin-hint">Listado completo de juegos disponibles.</p>
+              </div>
+
+              <div class="import-field">
+                <label class="admin-label">2. Excel de OFERTAS</label>
+                <input type="file" id="excel-ofertas" accept=".xlsx,.xls" class="admin-file">
+                <p class="admin-hint">Ofertas vigentes (solo primaria).</p>
+              </div>
+
+              <div class="import-field">
+                <label class="admin-label">3. Excel de PREVENTAS</label>
+                <input type="file" id="excel-preventas" accept=".xlsx,.xls" class="admin-file">
+                <p class="admin-hint">Preventas con fecha de estreno.</p>
+              </div>
+            </div>
+
+            <div id="import-log" class="import-log">
+              <em>Esperando archivos...</em>
+            </div>
+
+            <div class="admin-actions">
+              <button id="btn-import-process" class="btn btn-primary" disabled>📥 Procesar y actualizar catálogo</button>
+            </div>
+          </div>
+
           <!-- COTIZACIONES -->
           <div class="admin-card">
             <h3>💱 Cotizaciones</h3>
@@ -336,9 +370,14 @@
     });
   </script>
 
+  <!-- SheetJS — lector de Excel -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <!-- Módulos del sitio -->
   <script type="module" src="js/settings.js"></script>
   <script type="module" src="js/auth.js"></script>
   <script type="module" src="js/admin.js"></script>
+  <script type="module" src="js/excel-importer.js"></script>
 
 </body>
 </html>

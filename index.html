@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=5">
 </head>
 <body>
 
@@ -64,7 +64,6 @@
 
   <main class="container">
 
-    <!-- CATÁLOGO -->
     <section id="page-catalogo" class="page-section active-page">
 
       <div class="announcement-banner" id="announcement-banner">
@@ -72,9 +71,7 @@
         <div class="announcement-content">
           <span class="announcement-label">📢 NOVEDAD</span>
           <h2 class="announcement-title">Bienvenido a GamesUy Store</h2>
-          <p class="announcement-text">
-            Este es el espacio editable desde el panel admin.
-          </p>
+          <p class="announcement-text">Este es el espacio editable desde el panel admin.</p>
         </div>
       </div>
 
@@ -83,57 +80,38 @@
           <h2 class="section-title">Catálogo</h2>
           <span class="results-count" id="results-count">Mostrando todos los productos</span>
         </div>
-
         <div id="product-grid" class="product-grid">
-          <article class="product-card">
-            <div class="card-badges"><span class="badge badge-ps5">PS5</span></div>
-            <div class="card-image" style="background-image:linear-gradient(135deg,#1a1f3a,#0c0e17);">
-              <span class="card-image-placeholder">🎮</span>
-            </div>
-            <h3 class="card-title">Juego de ejemplo</h3>
-            <div class="card-price">$ 3.550 <span class="card-price-usd">≈ $89.75 USD</span></div>
-            <div class="card-stock stock-ok">Disponible</div>
-            <a href="#" class="btn btn-buy">Comprar por WhatsApp</a>
-          </article>
+          <p class="empty-message">Próximamente: catálogo real.</p>
         </div>
       </div>
     </section>
 
-    <!-- OFERTAS -->
     <section id="page-ofertas" class="page-section">
       <h2 class="section-title section-title-hot">🔥 Ofertas Especiales</h2>
       <p class="section-subtitle">Juegos y suscripciones con descuentos por tiempo limitado.</p>
       <div id="ofertas-grid" class="product-grid">
-        <p class="empty-message">Próximamente: ofertas desde Firestore.</p>
+        <p class="empty-message">Próximamente.</p>
       </div>
     </section>
 
-    <!-- PREVENTAS -->
     <section id="page-preventas" class="page-section">
       <h2 class="section-title section-title-new">🚀 Preventas</h2>
-      <p class="section-subtitle">Títulos próximos a salir. Reservá tu copia antes del lanzamiento.</p>
+      <p class="section-subtitle">Títulos próximos a salir.</p>
       <div id="preventas-grid" class="product-grid">
-        <p class="empty-message">Próximamente: preventas desde Firestore.</p>
+        <p class="empty-message">Próximamente.</p>
       </div>
     </section>
 
-    <!-- FAQ -->
     <section id="page-faq" class="page-section">
       <h2 class="section-title">Preguntas Frecuentes</h2>
-      <div id="faq-list" class="faq-list">
-        <p class="empty-message">Cargando preguntas...</p>
-      </div>
+      <div id="faq-list" class="faq-list"><p class="empty-message">Cargando...</p></div>
     </section>
 
-    <!-- TÉRMINOS -->
     <section id="page-terminos" class="page-section">
       <h2 class="section-title">Términos y Condiciones</h2>
-      <div id="terminos-text" class="terms-text">
-        <p class="empty-message">Cargando términos...</p>
-      </div>
+      <div id="terminos-text" class="terms-text"><p class="empty-message">Cargando...</p></div>
     </section>
 
-    <!-- CONTACTO -->
     <section id="page-contacto" class="page-section">
       <h2 class="section-title">Contacto</h2>
       <form action="https://formsubmit.co/thedkshopone@gmail.com" method="POST" class="contact-form">
@@ -148,12 +126,11 @@
       </form>
     </section>
 
-    <!-- ADMIN -->
     <section id="page-admin" class="page-section">
       <h2 class="section-title section-title-admin">⚙️ Panel de Administración</h2>
 
       <div id="admin-not-logged" class="admin-placeholder">
-        <p class="section-subtitle">Necesitás iniciar sesión para acceder al panel de administración.</p>
+        <p class="section-subtitle">Necesitás iniciar sesión.</p>
         <button class="btn btn-primary" id="btn-open-login">🔐 Iniciar sesión</button>
       </div>
 
@@ -168,7 +145,6 @@
 
         <div id="admin-toast" class="admin-toast hidden"></div>
 
-        <!-- TABS DEL ADMIN -->
         <div class="admin-tabs">
           <button class="admin-tab active" data-tab="precios">💰 Precios</button>
           <button class="admin-tab" data-tab="excel">📥 Importar Excel</button>
@@ -179,10 +155,9 @@
         <!-- TAB: PRECIOS -->
         <div class="admin-tab-content active" data-tab-content="precios">
           <div class="admin-grid">
-
             <div class="admin-card admin-card-wide">
               <h3>💰 Gestionar precios</h3>
-              <p class="admin-help">Poné el precio final en pesos uruguayos de cada variante. El sistema calcula la ganancia automáticamente y ajusta los precios cuando cambia el costo del proveedor.</p>
+              <p class="admin-help">Poné el precio final en pesos uruguayos de cada variante. El sistema calcula la ganancia automáticamente.</p>
 
               <div class="precios-stats">
                 <span class="stat-badge">📊 Total: <strong id="stat-total">0</strong></span>
@@ -219,35 +194,28 @@
                 <button id="precios-next" class="btn btn-secondary">Siguiente →</button>
               </div>
             </div>
-
           </div>
         </div>
 
         <!-- TAB: EXCEL -->
         <div class="admin-tab-content" data-tab-content="excel">
           <div class="admin-grid">
-
             <div class="admin-card admin-card-wide">
               <h3>📥 Importar Excel del proveedor</h3>
-              <p class="admin-help">Subí los archivos para actualizar el catálogo. El sistema detecta cambios de precio y los aplica automáticamente, sin pisar tus datos manuales (portada, YouTube, descripción, ganancia).</p>
+              <p class="admin-help">Subí los archivos para actualizar el catálogo.</p>
 
               <div class="import-grid">
                 <div class="import-field">
                   <label class="admin-label">1. Excel de STOCK</label>
                   <input type="file" id="excel-stock" accept=".xlsx,.xls" class="admin-file">
-                  <p class="admin-hint">Listado completo de juegos disponibles.</p>
                 </div>
-
                 <div class="import-field">
                   <label class="admin-label">2. Excel de OFERTAS</label>
                   <input type="file" id="excel-ofertas" accept=".xlsx,.xls" class="admin-file">
-                  <p class="admin-hint">Ofertas vigentes (solo primaria).</p>
                 </div>
-
                 <div class="import-field">
                   <label class="admin-label">3. Excel de PREVENTAS</label>
                   <input type="file" id="excel-preventas" accept=".xlsx,.xls" class="admin-file">
-                  <p class="admin-hint">Preventas con fecha de estreno.</p>
                 </div>
               </div>
 
@@ -259,30 +227,21 @@
                 <button id="btn-import-process" class="btn btn-primary" disabled>📥 Procesar y actualizar catálogo</button>
               </div>
             </div>
-
           </div>
         </div>
 
         <!-- TAB: CONFIGURACIÓN -->
         <div class="admin-tab-content" data-tab-content="config">
           <div class="admin-grid">
-
             <div class="admin-card">
               <h3>💱 Cotizaciones</h3>
-              <p class="admin-help">Estos valores se usan para calcular todos los precios. Cambiarlos recalcula todo automáticamente.</p>
-
               <label class="admin-label">Peso Argentino → Peso Uruguayo</label>
               <input type="number" id="admin-cot-ars" step="0.0001" min="0.0001" placeholder="0.0550">
-              <p class="admin-hint">Ejemplo: si 1 ARS = 0.055 UYU, escribí <strong>0.055</strong></p>
-
               <label class="admin-label">Dólar → Peso Uruguayo</label>
               <input type="number" id="admin-cot-usd" step="0.01" min="0.01" placeholder="39.50">
-              <p class="admin-hint">Ejemplo: si 1 USD = 39.50 UYU, escribí <strong>39.50</strong></p>
-
               <div class="admin-actions">
                 <button id="btn-save-cot" class="btn btn-primary">Guardar cotizaciones</button>
               </div>
-
               <p class="admin-hint" id="admin-cot-updated" style="margin-top:12px;"></p>
             </div>
 
@@ -304,68 +263,56 @@
 
             <div class="admin-card">
               <h3>📱 Redes sociales</h3>
-              <label class="admin-label">WhatsApp (URL completa)</label>
-              <input type="text" id="admin-social-wa" placeholder="https://wa.me/59896572226">
+              <label class="admin-label">WhatsApp</label>
+              <input type="text" id="admin-social-wa" placeholder="https://wa.me/...">
               <label class="admin-label">Instagram</label>
-              <input type="text" id="admin-social-ig" placeholder="https://instagram.com/tu_cuenta">
+              <input type="text" id="admin-social-ig" placeholder="https://instagram.com/...">
               <label class="admin-label">Facebook</label>
-              <input type="text" id="admin-social-fb" placeholder="https://facebook.com/tu_pagina">
+              <input type="text" id="admin-social-fb" placeholder="https://facebook.com/...">
               <label class="admin-label">TikTok</label>
-              <input type="text" id="admin-social-tt" placeholder="https://tiktok.com/@tu_cuenta">
+              <input type="text" id="admin-social-tt" placeholder="https://tiktok.com/@...">
               <div class="admin-actions">
                 <button id="btn-save-social" class="btn btn-primary">Guardar redes</button>
               </div>
             </div>
 
             <div class="admin-card admin-card-wide">
-              <h3>📢 Banner de anuncio (página de inicio)</h3>
-
-              <label class="admin-label">Etiqueta pequeña</label>
+              <h3>📢 Banner de anuncio</h3>
+              <label class="admin-label">Etiqueta</label>
               <input type="text" id="admin-banner-label" placeholder="📢 NOVEDAD">
-
               <label class="admin-label">Título</label>
-              <input type="text" id="admin-banner-title" placeholder="Ej: Nueva colección disponible">
-
+              <input type="text" id="admin-banner-title" placeholder="Título del anuncio">
               <label class="admin-label">Texto</label>
-              <textarea id="admin-banner-text" rows="3" placeholder="Descripción del anuncio..."></textarea>
-
+              <textarea id="admin-banner-text" rows="3" placeholder="Descripción..."></textarea>
               <label class="admin-label">Imagen (opcional, máx 500 KB)</label>
               <input type="file" id="admin-banner-file" accept="image/*" class="admin-file">
               <input type="text" id="admin-banner-img" placeholder="O pegar URL de imagen">
-
-              <label class="admin-label">Link (opcional, si querés que el banner sea clickeable)</label>
+              <label class="admin-label">Link (opcional)</label>
               <input type="text" id="admin-banner-link" placeholder="https://...">
-
               <div class="admin-actions">
                 <button id="btn-save-banner" class="btn btn-primary">Guardar banner</button>
                 <button id="btn-clear-banner" class="btn btn-secondary">Ocultar banner</button>
               </div>
             </div>
-
           </div>
         </div>
 
         <!-- TAB: MANTENIMIENTO -->
         <div class="admin-tab-content" data-tab-content="mantenimiento">
           <div class="admin-grid">
-
             <div class="admin-card admin-card-wide admin-card-danger">
               <h3>🧹 Limpiar productos viejos</h3>
-              <p class="admin-help">Borra productos que <strong>no tienen <code>matchKey</code></strong> (los de intentos anteriores). Los productos importados del Excel tienen <code>matchKey</code> y <strong>NO</strong> se tocan.</p>
-
+              <p class="admin-help">Borra productos que no tienen <code>matchKey</code>.</p>
               <div id="clean-log" class="import-log">
                 <em>Click en "Analizar" para ver qué se borraría.</em>
               </div>
-
               <div class="admin-actions">
                 <button id="btn-analyze-clean" class="btn btn-secondary">🔍 Analizar</button>
                 <button id="btn-do-clean" class="btn btn-danger" disabled>🗑️ Borrar productos viejos</button>
               </div>
-
-              <label class="admin-label" style="margin-top:16px;">Para confirmar el borrado, escribí <code>BORRAR</code> acá:</label>
+              <label class="admin-label" style="margin-top:16px;">Escribí <code>BORRAR</code> para confirmar:</label>
               <input type="text" id="clean-confirm" placeholder="BORRAR" autocomplete="off" disabled>
             </div>
-
           </div>
         </div>
 
@@ -385,32 +332,36 @@
     <div class="modal-content">
       <button class="modal-close" id="login-close" aria-label="Cerrar">✕</button>
       <h3 class="modal-title">🔐 Acceso Administrador</h3>
-      <p class="modal-subtitle">Ingresá con tu cuenta de administrador</p>
-
+      <p class="modal-subtitle">Ingresá con tu cuenta</p>
       <label for="admin-email">Email</label>
       <input type="email" id="admin-email" placeholder="admin@ejemplo.com" autocomplete="email">
-
       <label for="admin-pass">Contraseña</label>
       <input type="password" id="admin-pass" placeholder="••••••••" autocomplete="current-password">
-
       <button id="btn-login" class="btn btn-primary">Ingresar</button>
-
       <p id="login-error" class="login-error hidden"></p>
     </div>
   </div>
 
-  <!-- SCRIPT INLINE — Navegación -->
+  <!-- MODAL DE PRECIOS -->
+  <div id="price-modal" class="admin-modal hidden">
+    <div class="modal-content modal-content-large">
+      <button class="modal-close" id="price-modal-close" aria-label="Cerrar">✕</button>
+      <h3 class="modal-title" id="price-modal-title">Editar precios</h3>
+      <div id="price-modal-body" class="price-modal-body">
+        <!-- Contenido dinámico -->
+      </div>
+    </div>
+  </div>
+
+  <!-- SCRIPT INLINE -->
   <script>
     window.switchPage = function(pageId) {
       document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active-page'));
       document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-
       const target = document.getElementById('page-' + pageId);
       if (target) target.classList.add('active-page');
-
       const btn = document.querySelector('.nav-btn[data-page="' + pageId + '"]');
       if (btn) btn.classList.add('active');
-
       window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
@@ -429,34 +380,28 @@
       });
     });
 
-    // TABS DEL ADMIN
     window.switchTab = function(tabId) {
       document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
       document.querySelectorAll('.admin-tab-content').forEach(c => c.classList.remove('active'));
-
-      const tab = document.querySelector(`.admin-tab[data-tab="${tabId}"]`);
-      const content = document.querySelector(`.admin-tab-content[data-tab-content="${tabId}"]`);
+      const tab = document.querySelector('.admin-tab[data-tab="' + tabId + '"]');
+      const content = document.querySelector('.admin-tab-content[data-tab-content="' + tabId + '"]');
       if (tab) tab.classList.add('active');
       if (content) content.classList.add('active');
     };
 
     document.querySelectorAll('.admin-tab').forEach(tab => {
-      tab.addEventListener('click', () => {
-        window.switchTab(tab.dataset.tab);
-      });
+      tab.addEventListener('click', () => window.switchTab(tab.dataset.tab));
     });
   </script>
 
-  <!-- SheetJS -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-  <!-- Módulos -->
-  <script type="module" src="js/settings.js"></script>
-  <script type="module" src="js/auth.js"></script>
-  <script type="module" src="js/admin.js"></script>
-  <script type="module" src="js/excel-importer.js"></script>
-  <script type="module" src="js/maintenance.js"></script>
-  <script type="module" src="js/precios.js"></script>
+  <script type="module" src="js/settings.js?v=5"></script>
+  <script type="module" src="js/auth.js?v=5"></script>
+  <script type="module" src="js/admin.js?v=5"></script>
+  <script type="module" src="js/excel-importer.js?v=5"></script>
+  <script type="module" src="js/maintenance.js?v=5"></script>
+  <script type="module" src="js/precios.js?v=5"></script>
 
 </body>
 </html>

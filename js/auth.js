@@ -9,65 +9,88 @@ import {
   onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
-const loginModal     = document.getElementById('login-modal');
-const loginClose     = document.getElementById('login-close');
-const loginBtn       = document.getElementById('btn-login');
-const loginError     = document.getElementById('login-error');
-const adminBtn       = document.querySelector('.nav-btn-admin');
-const adminNotLogged = document.getElementById('admin-not-logged');
-const adminLogged    = document.getElementById('admin-logged');
-const adminEmailEl   = document.getElementById('admin-user-email');
-const logoutBtn      = document.getElementById('btn-logout');
-const openLoginBtn   = document.getElementById('btn-open-login');
+const $ = (id) => document.getElementById(id);
+
+// Helper robusto: forzar mostrar/ocultar aunque haya conflictos de CSS
+function setVisible(el, visible) {
+  if (!el) return;
+  if (visible) {
+    el.classList.remove('hidden');
+    el.style.removeProperty('display');
+  } else {
+    el.classList.add('hidden');
+    el.style.setProperty('display', 'none', 'important');
+  }
+}
 
 function openLoginModal() {
-  if (!loginModal) return;
-  loginModal.classList.remove('hidden');
-  loginError.classList.add('hidden');
-  setTimeout(() => document.getElementById('admin-email')?.focus(), 50);
+  const modal = $('login-modal');
+  if (!modal) return;
+  setVisible(modal, true);
+  setVisible($('login-error'), false);
+  setTimeout(() => $('admin-email')?.focus(), 50);
 }
 
 function closeLoginModal() {
-  if (!loginModal) return;
-  loginModal.classList.add('hidden');
-  loginError.classList.add('hidden');
-  const pass = document.getElementById('admin-pass');
+  const modal = $('login-modal');
+  if (!modal) return;
+  setVisible(modal, false);
+  setVisible($('login-error'), false);
+  const pass = $('admin-pass');
   if (pass) pass.value = '';
 }
 
+// ---------------------------------------------
+// Botón [ Admin ] del nav
+// ---------------------------------------------
+const adminBtn = document.querySelector('.nav-btn-admin');
 if (adminBtn) {
-  adminBtn.addEventListener('click', () => {
+  adminBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
     if (auth.currentUser) {
       window.switchPage('admin');
     } else {
       openLoginModal();
     }
-  });
+  }, true); // captura → se ejecuta antes que otros listeners
 }
+
+// ---------------------------------------------
+// Botones de abrir/cerrar modal
+// ---------------------------------------------
+const openLoginBtn = $('btn-open-login');
+const loginClose   = $('login-close');
 
 if (openLoginBtn) openLoginBtn.addEventListener('click', openLoginModal);
 if (loginClose)   loginClose.addEventListener('click', closeLoginModal);
 
+const loginModal = $('login-modal');
 if (loginModal) {
   loginModal.addEventListener('click', (e) => {
     if (e.target === loginModal) closeLoginModal();
   });
 }
 
+// ---------------------------------------------
+// Login
+// ---------------------------------------------
 async function doLogin() {
-  const email = document.getElementById('admin-email').value.trim();
-  const pass  = document.getElementById('admin-pass').value;
+  const email = $('admin-email').value.trim();
+  const pass  = $('admin-pass').value;
+  const btn   = $('btn-login');
+  const errEl = $('login-error');
 
-  loginError.classList.add('hidden');
+  setVisible(errEl, false);
 
   if (!email || !pass) {
-    loginError.textContent = 'Completá email y contraseña.';
-    loginError.classList.remove('hidden');
+    errEl.textContent = 'Completá email y contraseña.';
+    setVisible(errEl, true);
     return;
   }
 
-  loginBtn.disabled = true;
-  loginBtn.textContent = 'Ingresando...';
+  btn.disabled = true;
+  btn.textContent = 'Ingresando...';
 
   try {
     await signInWithEmailAndPassword(auth, email, pass);
@@ -83,21 +106,26 @@ async function doLogin() {
       'auth/network-request-failed':  'Sin conexión. Verificá tu internet.',
       'auth/unauthorized-domain':     'Este dominio no está autorizado en Firebase Auth.'
     };
-    loginError.textContent = msgs[err.code] || ('Error: ' + err.message);
-    loginError.classList.remove('hidden');
+    errEl.textContent = msgs[err.code] || ('Error: ' + err.message);
+    setVisible(errEl, true);
     console.error('[GamesUy] Error login:', err);
   } finally {
-    loginBtn.disabled = false;
-    loginBtn.textContent = 'Ingresar';
+    btn.disabled = false;
+    btn.textContent = 'Ingresar';
   }
 }
 
+const loginBtn = $('btn-login');
 if (loginBtn) loginBtn.addEventListener('click', doLogin);
 
-document.getElementById('admin-pass')?.addEventListener('keypress', (e) => {
+$('admin-pass')?.addEventListener('keypress', (e) => {
   if (e.key === 'Enter') doLogin();
 });
 
+// ---------------------------------------------
+// Logout
+// ---------------------------------------------
+const logoutBtn = $('btn-logout');
 if (logoutBtn) {
   logoutBtn.addEventListener('click', async () => {
     if (confirm('¿Cerrar sesión de administrador?')) {
@@ -107,23 +135,31 @@ if (logoutBtn) {
   });
 }
 
+// ---------------------------------------------
+// Observer de sesión
+// ---------------------------------------------
 onAuthStateChanged(auth, (user) => {
+  const adminNotLogged = $('admin-not-logged');
+  const adminLogged    = $('admin-logged');
+  const adminEmailEl   = $('admin-user-email');
+
   if (user) {
     if (adminBtn) {
       adminBtn.textContent = '[ Panel ]';
       adminBtn.style.color = '#00ff9d';
     }
-    if (adminNotLogged) adminNotLogged.classList.add('hidden');
-    if (adminLogged)    adminLogged.classList.remove('hidden');
-    if (adminEmailEl)   adminEmailEl.textContent = user.email;
+    setVisible(adminNotLogged, false);
+    setVisible(adminLogged, true);
+    if (adminEmailEl) adminEmailEl.textContent = user.email;
+    closeLoginModal(); // por si quedó abierto
     console.log('[GamesUy] Admin logueado:', user.email);
   } else {
     if (adminBtn) {
       adminBtn.textContent = '[ Admin ]';
       adminBtn.style.color = '';
     }
-    if (adminNotLogged) adminNotLogged.classList.remove('hidden');
-    if (adminLogged)    adminLogged.classList.add('hidden');
+    setVisible(adminNotLogged, true);
+    setVisible(adminLogged, false);
     console.log('[GamesUy] Admin deslogueado');
   }
 });

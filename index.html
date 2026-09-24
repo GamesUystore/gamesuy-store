@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=15">
+  <link rel="stylesheet" href="styles.css?v=16">
 </head>
 <body>
 
@@ -76,11 +76,12 @@
       <div class="grid-section">
         <div class="grid-header">
           <h2 class="section-title">Catálogo</h2>
-          <span class="results-count" id="results-count">Mostrando todos los productos</span>
+          <span class="results-count" id="results-count">Cargando...</span>
         </div>
         <div id="product-grid" class="product-grid">
-          <p class="empty-message">Próximamente: catálogo real.</p>
+          <p class="empty-message">Cargando catálogo...</p>
         </div>
+        <div id="catalog-pagination" class="catalog-pagination"></div>
       </div>
     </section>
 
@@ -437,6 +438,15 @@
     </div>
   </div>
 
+  <!-- MODAL TRAILER -->
+  <div id="trailer-modal" class="admin-modal hidden">
+    <div class="modal-content modal-content-large">
+      <button class="modal-close" id="trailer-close" aria-label="Cerrar">✕</button>
+      <h3 class="modal-title" id="trailer-title">Trailer</h3>
+      <div id="trailer-body"></div>
+    </div>
+  </div>
+
   <script>
     window.switchPage = function(pageId) {
       document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active-page'));
@@ -453,13 +463,6 @@
       btn.addEventListener('click', () => {
         const page = btn.dataset.page;
         if (page) window.switchPage(page);
-      });
-    });
-
-    document.querySelectorAll('.cat-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
       });
     });
 
@@ -492,12 +495,13 @@
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-  <script type="module" src="js/settings.js?v=15"></script>
-  <script type="module" src="js/auth.js?v=15"></script>
-  <script type="module" src="js/admin.js?v=15"></script>
-  <script type="module" src="js/excel-importer.js?v=15"></script>
-  <script type="module" src="js/maintenance.js?v=15"></script>
-  <script type="module" src="js/precios.js?v=15"></script>
+  <script type="module" src="js/settings.js?v=16"></script>
+  <script type="module" src="js/auth.js?v=16"></script>
+  <script type="module" src="js/admin.js?v=16"></script>
+  <script type="module" src="js/excel-importer.js?v=16"></script>
+  <script type="module" src="js/maintenance.js?v=16"></script>
+  <script type="module" src="js/precios.js?v=16"></script>
+  <script type="module" src="js/store.js?v=16"></script>
 
 </body>
 </html>

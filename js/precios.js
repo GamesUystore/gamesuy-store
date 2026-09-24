@@ -1,5 +1,6 @@
 // ============================================================
 // GAMESUY STORE — Gestor de precios + Información del juego
+// Versión 9: imágenes como Base64 (sin Cloudinary)
 // ============================================================
 
 import { db } from './firebase-config.js';
@@ -21,10 +22,8 @@ import {
 
 const $ = (id) => document.getElementById(id);
 
-// Cloudinary
-const CLOUDINARY_CLOUD_NAME = 'takxvid9';
-const CLOUDINARY_UPLOAD_PRESET = 'gamesuy_unsigned';
-const CLOUDINARY_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+// Límite de tamaño de imagen (en KB)
+const MAX_IMG_KB = 300;
 
 // Estado
 let productos = [];
@@ -36,7 +35,7 @@ let pagina = 1;
 const POR_PAGINA = 30;
 let productoActivo = null;
 
-console.log('[GamesUy] precios.js v8 iniciando...');
+console.log('[GamesUy] precios.js v9 (Base64) iniciando...');
 
 // ============================================================
 // COTIZACIONES
@@ -108,6 +107,15 @@ function escapeHtml(str) {
   }[ch]));
 }
 
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 // ============================================================
 // RENDER
 // ============================================================
@@ -138,7 +146,7 @@ function render() {
   const nextBtn = $('precios-next'); if (nextBtn) nextBtn.disabled = pagina >= totalPaginas;
 
   if (enPagina.length === 0) {
-    list.innerHTML = '<p class="empty-message">No hay productos que coincidan con los filtros.</p>';
+    list.innerHTML = '<p class="empty-message">No hay productos que coincidan.</p>';
     return;
   }
 
@@ -343,33 +351,35 @@ function actualizarPreview(tipo, url) {
   }
 }
 
-// Upload listeners
+// Listeners de subida (Base64)
 ['cover', 'gameplay'].forEach(tipo => {
   const fileInput = $(`info-${tipo}-file`);
   const urlInput = $(`info-${tipo}-url`);
+  const statusEl = $(`info-${tipo}-status`);
 
   if (fileInput) {
     fileInput.addEventListener('change', async () => {
       const file = fileInput.files[0];
       if (!file) return;
 
-      if (file.size > 5 * 1024 * 1024) {
-        alert('La imagen supera los 5 MB.');
+      const sizeKB = Math.round(file.size / 1024);
+      if (sizeKB > MAX_IMG_KB) {
+        if (statusEl) statusEl.textContent = `❌ La imagen pesa ${sizeKB} KB (máximo ${MAX_IMG_KB} KB). Comprimila antes.`;
+        alert(`La imagen pesa ${sizeKB} KB. Máximo permitido: ${MAX_IMG_KB} KB.\n\nComprimila en tinypng.com o con un editor de imágenes.`);
         fileInput.value = '';
         return;
       }
 
-      const statusEl = $(`info-${tipo}-status`);
-      if (statusEl) statusEl.textContent = '⏳ Subiendo a Cloudinary...';
+      if (statusEl) statusEl.textContent = `⏳ Procesando imagen (${sizeKB} KB)...`;
 
       try {
-        const url = await subirACloudinary(file);
-        actualizarPreview(tipo, url);
-        if (statusEl) statusEl.textContent = '✅ Imagen subida. No olvides Guardar información.';
+        const b64 = await fileToBase64(file);
+        actualizarPreview(tipo, b64);
+        if (statusEl) statusEl.textContent = `✅ Imagen lista (${sizeKB} KB). No olvides Guardar información.`;
+        console.log(`[GamesUy] Imagen ${tipo} cargada en Base64:`, sizeKB, 'KB');
       } catch (err) {
-        console.error('[GamesUy] Error subiendo:', err);
-        if (statusEl) statusEl.textContent = '❌ Error: ' + (err.message || 'desconocido');
-        alert('❌ Error al subir:\n' + err.message);
+        console.error('[GamesUy] Error procesando imagen:', err);
+        if (statusEl) statusEl.textContent = '❌ Error: ' + err.message;
       }
 
       fileInput.value = '';
@@ -392,36 +402,6 @@ document.querySelectorAll('.upload-preview-clear').forEach(btn => {
     const status = $(`info-${tipo}-status`); if (status) status.textContent = '';
   });
 });
-
-// ============================================================
-// SUBIR A CLOUDINARY
-// ============================================================
-
-async function subirACloudinary(file) {
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-  // NO mandamos 'folder' porque el preset unsigned no lo acepta
-  // (Si querés organizar por carpeta, se configura EN el preset, en Cloudinary)
-
-  console.log('[GamesUy] Subiendo a Cloudinary:', file.name, file.size, 'bytes');
-
-  const res = await fetch(CLOUDINARY_URL, { method: 'POST', body: formData });
-
-  if (!res.ok) {
-    let msg = 'Error HTTP ' + res.status;
-    try {
-      const errData = await res.json();
-      msg = errData?.error?.message || msg;
-      console.error('[GamesUy] Respuesta Cloudinary:', errData);
-    } catch (e) {}
-    throw new Error(msg);
-  }
-
-  const data = await res.json();
-  console.log('[GamesUy] Subida OK:', data.secure_url);
-  return data.secure_url;
-}
 
 // Guardar info
 $('btn-save-info')?.addEventListener('click', async () => {
@@ -481,7 +461,7 @@ $('price-modal')?.addEventListener('click', (e) => {
 });
 
 // ============================================================
-// FILTROS Y PAGINACIÓN
+// FILTROS
 // ============================================================
 
 $('precios-search')?.addEventListener('input', (e) => {
@@ -517,4 +497,4 @@ $('precios-next')?.addEventListener('click', () => {
 
 cargarProductos();
 
-console.log('[GamesUy] precios.js v8 cargado');
+console.log('[GamesUy] precios.js v9 cargado (Base64, sin Cloudinary)');

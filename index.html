@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=12">
+  <link rel="stylesheet" href="styles.css?v=13">
 </head>
 <body>
 
@@ -311,13 +311,17 @@
         <div class="admin-tab-content" data-tab-content="mantenimiento">
           <div class="admin-grid">
             <div class="admin-card admin-card-wide admin-card-danger">
-              <h3>🧹 Limpiar productos viejos</h3>
-              <p class="admin-help">Borra productos que no tienen <code>matchKey</code>.</p>
+              <h3>🧹 Limpiar productos</h3>
+              <p class="admin-help">Dos formas de limpiar: por falta de <code>matchKey</code> (productos viejos de intentos anteriores) o por fecha (productos creados recientemente que fueron mal cargados).</p>
+
               <div id="clean-log" class="import-log"><em>Click en "Analizar" para ver qué se borraría.</em></div>
+
               <div class="admin-actions">
-                <button id="btn-analyze-clean" class="btn btn-secondary">🔍 Analizar</button>
-                <button id="btn-do-clean" class="btn btn-danger" disabled>🗑️ Borrar productos viejos</button>
+                <button id="btn-analyze-clean" class="btn btn-secondary">🔍 Analizar sin matchKey</button>
+                <button id="btn-analyze-recent" class="btn btn-warning">⏰ Analizar recientes</button>
+                <button id="btn-do-clean" class="btn btn-danger" disabled>🗑️ Borrar productos</button>
               </div>
+
               <label class="admin-label" style="margin-top:16px;">Escribí <code>BORRAR</code> para confirmar:</label>
               <input type="text" id="clean-confirm" placeholder="BORRAR" autocomplete="off" disabled>
             </div>
@@ -488,12 +492,12 @@
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-  <script type="module" src="js/settings.js?v=12"></script>
-  <script type="module" src="js/auth.js?v=12"></script>
-  <script type="module" src="js/admin.js?v=12"></script>
-  <script type="module" src="js/excel-importer.js?v=12"></script>
-  <script type="module" src="js/maintenance.js?v=12"></script>
-  <script type="module" src="js/precios.js?v=12"></script>
+  <script type="module" src="js/settings.js?v=13"></script>
+  <script type="module" src="js/auth.js?v=13"></script>
+  <script type="module" src="js/admin.js?v=13"></script>
+  <script type="module" src="js/excel-importer.js?v=13"></script>
+  <script type="module" src="js/maintenance.js?v=13"></script>
+  <script type="module" src="js/precios.js?v=13"></script>
 
 </body>
 </html>

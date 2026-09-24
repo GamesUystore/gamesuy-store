@@ -45,7 +45,7 @@
         <span class="search-icon">🔍</span>
         <input type="text" id="search-input" class="search-input"
                placeholder="Buscar juego, suscripción, servicio..."
-               autocomplete="off" spellcheck="false">
+               autocomplete="off" spellcheck="false" name="gamesuy_q">
       </div>
 
       <nav class="categories-nav" id="cat-nav">
@@ -192,15 +192,69 @@
           <button id="btn-logout" class="btn btn-secondary admin-logout">Cerrar sesión</button>
         </div>
 
-        <div class="admin-section">
-          <h3>🚧 Panel en construcción</h3>
-          <p>En el próximo sub-paso vas a poder:</p>
-          <ul>
-            <li>Subir el logo de la tienda</li>
-            <li>Configurar redes sociales</li>
-            <li>Editar el banner de anuncios</li>
-            <li>Configurar cotizaciones ARS→UYU y USD→UYU</li>
-          </ul>
+        <div id="admin-toast" class="admin-toast hidden"></div>
+
+        <div class="admin-grid">
+
+          <!-- LOGO -->
+          <div class="admin-card">
+            <h3>🖼️ Logo de la tienda</h3>
+            <div class="admin-preview">
+              <img id="admin-logo-preview" alt="Preview logo" src="">
+              <span id="admin-logo-preview-fallback" class="admin-preview-fallback">🎮</span>
+            </div>
+            <label class="admin-label">Subir archivo (máx 300 KB)</label>
+            <input type="file" id="admin-logo-file" accept="image/*" class="admin-file">
+            <label class="admin-label">O pegar URL</label>
+            <input type="text" id="admin-logo-url" placeholder="https://...">
+            <div class="admin-actions">
+              <button id="btn-save-logo" class="btn btn-primary">Guardar logo</button>
+              <button id="btn-clear-logo" class="btn btn-secondary">Quitar logo</button>
+            </div>
+          </div>
+
+          <!-- REDES -->
+          <div class="admin-card">
+            <h3>📱 Redes sociales</h3>
+            <label class="admin-label">WhatsApp (URL completa)</label>
+            <input type="text" id="admin-social-wa" placeholder="https://wa.me/59896572226">
+            <label class="admin-label">Instagram</label>
+            <input type="text" id="admin-social-ig" placeholder="https://instagram.com/tu_cuenta">
+            <label class="admin-label">Facebook</label>
+            <input type="text" id="admin-social-fb" placeholder="https://facebook.com/tu_pagina">
+            <label class="admin-label">TikTok</label>
+            <input type="text" id="admin-social-tt" placeholder="https://tiktok.com/@tu_cuenta">
+            <div class="admin-actions">
+              <button id="btn-save-social" class="btn btn-primary">Guardar redes</button>
+            </div>
+          </div>
+
+          <!-- BANNER -->
+          <div class="admin-card admin-card-wide">
+            <h3>📢 Banner de anuncio (página de inicio)</h3>
+
+            <label class="admin-label">Etiqueta pequeña</label>
+            <input type="text" id="admin-banner-label" placeholder="📢 NOVEDAD">
+
+            <label class="admin-label">Título</label>
+            <input type="text" id="admin-banner-title" placeholder="Ej: Nueva colección disponible">
+
+            <label class="admin-label">Texto</label>
+            <textarea id="admin-banner-text" rows="3" placeholder="Descripción del anuncio..."></textarea>
+
+            <label class="admin-label">Imagen (opcional, máx 500 KB)</label>
+            <input type="file" id="admin-banner-file" accept="image/*" class="admin-file">
+            <input type="text" id="admin-banner-img" placeholder="O pegar URL de imagen">
+
+            <label class="admin-label">Link (opcional, si querés que el banner sea clickeable)</label>
+            <input type="text" id="admin-banner-link" placeholder="https://...">
+
+            <div class="admin-actions">
+              <button id="btn-save-banner" class="btn btn-primary">Guardar banner</button>
+              <button id="btn-clear-banner" class="btn btn-secondary">Ocultar banner</button>
+            </div>
+          </div>
+
         </div>
       </div>
     </section>
@@ -248,6 +302,8 @@
     };
 
     document.querySelectorAll('.nav-btn').forEach(btn => {
+      // El botón Admin lo maneja auth.js por separado
+      if (btn.classList.contains('nav-btn-admin')) return;
       btn.addEventListener('click', () => {
         const page = btn.dataset.page;
         if (page) window.switchPage(page);
@@ -264,6 +320,7 @@
 
   <script type="module" src="js/settings.js"></script>
   <script type="module" src="js/auth.js"></script>
+  <script type="module" src="js/admin.js"></script>
 
 </body>
 </html>

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=6">
+  <link rel="stylesheet" href="styles.css?v=7">
 </head>
 <body>
 
@@ -87,17 +87,13 @@
     <section id="page-ofertas" class="page-section">
       <h2 class="section-title section-title-hot">🔥 Ofertas Especiales</h2>
       <p class="section-subtitle">Juegos y suscripciones con descuentos por tiempo limitado.</p>
-      <div id="ofertas-grid" class="product-grid">
-        <p class="empty-message">Próximamente.</p>
-      </div>
+      <div id="ofertas-grid" class="product-grid"><p class="empty-message">Próximamente.</p></div>
     </section>
 
     <section id="page-preventas" class="page-section">
       <h2 class="section-title section-title-new">🚀 Preventas</h2>
       <p class="section-subtitle">Títulos próximos a salir.</p>
-      <div id="preventas-grid" class="product-grid">
-        <p class="empty-message">Próximamente.</p>
-      </div>
+      <div id="preventas-grid" class="product-grid"><p class="empty-message">Próximamente.</p></div>
     </section>
 
     <section id="page-faq" class="page-section">
@@ -154,7 +150,7 @@
           <div class="admin-grid">
             <div class="admin-card admin-card-wide">
               <h3>💰 Gestionar precios</h3>
-              <p class="admin-help">Poné el precio final en pesos uruguayos de cada variante. El sistema calcula la ganancia automáticamente.</p>
+              <p class="admin-help">Poné el precio final en pesos uruguayos de cada variante.</p>
 
               <div class="precios-stats">
                 <span class="stat-badge">📊 Total: <strong id="stat-total">0</strong></span>
@@ -163,7 +159,7 @@
               </div>
 
               <div class="precios-filters">
-                <input type="text" id="precios-search" placeholder="🔍 Buscar juego por título...">
+                <input type="text" id="precios-search" placeholder="🔍 Buscar juego por título..." autocomplete="off">
                 <select id="precios-cat">
                   <option value="all">Todas las categorías</option>
                   <option value="ps5">PS5</option>
@@ -175,8 +171,8 @@
                   <option value="otros">Otros</option>
                 </select>
                 <select id="precios-estado">
-                  <option value="pendientes">Solo pendientes</option>
                   <option value="todos">Todos</option>
+                  <option value="pendientes">Solo pendientes</option>
                   <option value="completos">Solo completos</option>
                 </select>
               </div>
@@ -215,9 +211,7 @@
                 </div>
               </div>
 
-              <div id="import-log" class="import-log">
-                <em>Esperando archivos...</em>
-              </div>
+              <div id="import-log" class="import-log"><em>Esperando archivos...</em></div>
 
               <div class="admin-actions">
                 <button id="btn-import-process" class="btn btn-primary" disabled>📥 Procesar y actualizar catálogo</button>
@@ -297,9 +291,7 @@
             <div class="admin-card admin-card-wide admin-card-danger">
               <h3>🧹 Limpiar productos viejos</h3>
               <p class="admin-help">Borra productos que no tienen <code>matchKey</code>.</p>
-              <div id="clean-log" class="import-log">
-                <em>Click en "Analizar" para ver qué se borraría.</em>
-              </div>
+              <div id="clean-log" class="import-log"><em>Click en "Analizar" para ver qué se borraría.</em></div>
               <div class="admin-actions">
                 <button id="btn-analyze-clean" class="btn btn-secondary">🔍 Analizar</button>
                 <button id="btn-do-clean" class="btn btn-danger" disabled>🗑️ Borrar productos viejos</button>
@@ -315,9 +307,7 @@
 
   </main>
 
-  <footer class="site-footer">
-    <p>© 2026 GamesUy Store — Juegos digitales en Uruguay</p>
-  </footer>
+  <footer class="site-footer"><p>© 2026 GamesUy Store — Juegos digitales en Uruguay</p></footer>
 
   <a href="https://wa.me/59896572226" class="chat-float" target="_blank" rel="noopener">💬</a>
 
@@ -336,15 +326,15 @@
     </div>
   </div>
 
-  <!-- MODAL DE EDICIÓN (PRECIOS + INFO) -->
+  <!-- MODAL EDITAR JUEGO -->
   <div id="price-modal" class="admin-modal hidden">
     <div class="modal-content modal-content-large">
       <button class="modal-close" id="price-modal-close" aria-label="Cerrar">✕</button>
       <h3 class="modal-title" id="price-modal-title">Editar</h3>
 
       <div class="modal-tabs">
-        <button class="modal-tab active" data-mtab="precios">💰 Precios</button>
-        <button class="modal-tab" data-mtab="info">📷 Información</button>
+        <button class="modal-tab active" data-mtab="precios" type="button">💰 Precios</button>
+        <button class="modal-tab" data-mtab="info" type="button">📷 Información</button>
       </div>
 
       <div class="modal-tab-content active" data-mtab-content="precios">
@@ -360,7 +350,7 @@
 
           <div class="info-field">
             <label class="admin-label">Categorías (separadas por coma)</label>
-            <input type="text" id="info-categories" placeholder="ps4, ps5, ps3, steam, psplus, streaming, otros">
+            <input type="text" id="info-categories" placeholder="ps4, ps5">
             <p class="admin-hint">Ejemplo: <strong>ps4, ps5</strong></p>
           </div>
 
@@ -369,12 +359,13 @@
             <div class="upload-group">
               <input type="file" id="info-cover-file" accept="image/*" class="admin-file">
               <span class="upload-or">o</span>
-              <input type="text" id="info-cover-url" placeholder="Pegar URL de imagen..." class="upload-url">
+              <input type="text" id="info-cover-url" placeholder="Pegar URL..." class="upload-url">
             </div>
             <div id="info-cover-preview-wrap" class="upload-preview hidden">
               <img id="info-cover-preview" alt="Portada" class="upload-preview-img">
               <button type="button" class="upload-preview-clear" data-clear="cover">✕ Quitar</button>
             </div>
+            <div id="info-cover-status" class="upload-status"></div>
           </div>
 
           <div class="info-field">
@@ -382,12 +373,13 @@
             <div class="upload-group">
               <input type="file" id="info-gameplay-file" accept="image/*" class="admin-file">
               <span class="upload-or">o</span>
-              <input type="text" id="info-gameplay-url" placeholder="Pegar URL de imagen..." class="upload-url">
+              <input type="text" id="info-gameplay-url" placeholder="Pegar URL..." class="upload-url">
             </div>
             <div id="info-gameplay-preview-wrap" class="upload-preview hidden">
               <img id="info-gameplay-preview" alt="Gameplay" class="upload-preview-img">
               <button type="button" class="upload-preview-clear" data-clear="gameplay">✕ Quitar</button>
             </div>
+            <div id="info-gameplay-status" class="upload-status"></div>
           </div>
 
           <div class="info-field">
@@ -419,7 +411,6 @@
     </div>
   </div>
 
-  <!-- SCRIPT INLINE -->
   <script>
     window.switchPage = function(pageId) {
       document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active-page'));
@@ -459,7 +450,6 @@
       tab.addEventListener('click', () => window.switchTab(tab.dataset.tab));
     });
 
-    // Tabs del modal de edición
     window.switchModalTab = function(tabId) {
       document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
       document.querySelectorAll('.modal-tab-content').forEach(c => c.classList.remove('active'));
@@ -476,12 +466,12 @@
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-  <script type="module" src="js/settings.js?v=6"></script>
-  <script type="module" src="js/auth.js?v=6"></script>
-  <script type="module" src="js/admin.js?v=6"></script>
-  <script type="module" src="js/excel-importer.js?v=6"></script>
-  <script type="module" src="js/maintenance.js?v=6"></script>
-  <script type="module" src="js/precios.js?v=6"></script>
+  <script type="module" src="js/settings.js?v=7"></script>
+  <script type="module" src="js/auth.js?v=7"></script>
+  <script type="module" src="js/admin.js?v=7"></script>
+  <script type="module" src="js/excel-importer.js?v=7"></script>
+  <script type="module" src="js/maintenance.js?v=7"></script>
+  <script type="module" src="js/precios.js?v=7"></script>
 
 </body>
 </html>

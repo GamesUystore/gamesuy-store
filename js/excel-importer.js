@@ -1,6 +1,6 @@
 // ============================================================
 // GAMESUY STORE — Importador de Excel
-// Fase 3.5.7: Ofertas que crean juegos faltantes (Opción B)
+// Fase 3.6: Preventas (PS5, Primaria)
 // ============================================================
 
 import { db } from './firebase-config.js';
@@ -25,7 +25,6 @@ const EXCEL = {
   preventas: null
 };
 
-// Palabras sueltas de idioma/región
 const PALABRAS_IDIOMA = /\b(español|espanol|inglés|ingles|latino|españa|espana|sub|subtitulado|latam)\b/gi;
 
 // ============================================================
@@ -180,6 +179,7 @@ function esFilaEncabezado(titulo) {
   if (/OFERTAS|AVENTURAS DE PRIMAVERA|DESTACADAS HASTA/i.test(t)) return true;
   if (/CUENTA ORIGINAL|CON GARANTIA|STOCKEABLE|CONSULTAR SECUNDARIA/i.test(t)) return true;
   if (/^▬+|^[━═]+$/.test(t)) return true;
+  if (/^PREVENTAS$/i.test(t)) return true;
   return false;
 }
 
@@ -197,6 +197,32 @@ function extraerFechaVencimiento(rows) {
     }
   }
   return null;
+}
+
+/**
+ * Convierte una fecha del Excel a formato YYYY-MM-DD.
+ * Soporta:
+ *  - Excel ya serializado: "2026-11-19 00:00:00"
+ *  - DD/MM/YYYY
+ *  - YYYY-MM-DD
+ */
+function parseFechaExcel(valor) {
+  if (!valor) return '';
+  const s = String(valor).trim();
+
+  // Formato ISO ya: "2026-11-19 00:00:00"
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+
+  // DD/MM/YYYY
+  m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+  if (m) {
+    const d = m[1].padStart(2, '0');
+    const mes = m[2].padStart(2, '0');
+    return `${m[3]}-${mes}-${d}`;
+  }
+
+  return '';
 }
 
 // ============================================================
@@ -481,7 +507,7 @@ async function procesarStock() {
 }
 
 // ============================================================
-// OFERTAS — Ahora CREA juegos faltantes
+// OFERTAS
 // ============================================================
 
 async function procesarOfertas() {
@@ -553,7 +579,6 @@ async function procesarOfertas() {
     const { prod, tipo } = buscarProducto(matchKey, productosMap, productosMapRelajado, productosMapSuperRelajado);
 
     if (prod) {
-      // Juego existe → aplicar oferta
       let modificado = false;
       const nuevasVariantes = (prod.variants || []).map(v => {
         if (v.tipo !== 'primaria') return v;
@@ -586,8 +611,7 @@ async function procesarOfertas() {
         stats[tipo] = (stats[tipo] || 0) + 1;
       }
     } else {
-      // Juego NO existe → CREARLO (Opción B)
-      const categories = [...plataformas]; // ['ps4', 'ps5'] según corresponda
+      const categories = [...plataformas];
 
       const variantesNuevas = plataformas.map(plat => ({
         id: `${plat}_primaria`,
@@ -610,14 +634,8 @@ async function procesarOfertas() {
           title: titulo,
           matchKey,
           categories,
-          coverUrl: '',
-          gameplayUrl: '',
-          youtubeUrl: '',
-          description: '',
-          isPreorder: false,
-          releaseDate: '',
-          visible: true,
-          soloOferta: true, // ← marca para saber que vino solo de Ofertas
+          coverUrl: '', gameplayUrl: '', youtubeUrl: '', description: '',
+          isPreorder: false, releaseDate: '', visible: true, soloOferta: true,
           variants: variantesNuevas,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
@@ -654,12 +672,188 @@ async function procesarOfertas() {
 }
 
 // ============================================================
-// PREVENTAS — Placeholder
+// PREVENTAS
 // ============================================================
 
+/**
+ * Excel de Preventas:
+ *   col 0 (A) → JUEGO
+ *   col 1 (B) → FECHA DE ESTRENO
+ *   col 2 (C) → PRECIO PS5 PRIMARIA (ARS)
+ *   col 3 (D) → USDT (ignorar)
+ *   col 4 (E) → SECUNDARIA PESOS (ARS) - la ignoramos por ahora
+ *   col 5 (F) → USDT SECUNDARIA (ignorar)
+ */
 async function procesarPreventas() {
-  log('preventas-log', '🚧 Procesamiento de preventas — próximamente (Fase 3.6).');
-  alert('El procesamiento de preventas llega en el próximo paso.');
+  const excel = EXCEL.preventas;
+  if (!excel) {
+    log('preventas-log', '⚠ No hay Excel de Preventas cargado.', 'error');
+    return;
+  }
+
+  log('preventas-log', '⏳ Leyendo productos existentes...');
+  const snap = await getDocs(collection(db, 'products'));
+  const productosMap = {};
+  const productosMapRelajado = {};
+  const productosMapSuperRelajado = {};
+
+  snap.docs.forEach(d => {
+    const data = d.data();
+    if (data.matchKey) {
+      productosMap[data.matchKey] = { id: d.id, ...data };
+      const claveRel = crearClaveRelajada(data.matchKey);
+      if (!productosMapRelajado[claveRel]) {
+        productosMapRelajado[claveRel] = { id: d.id, ...data };
+      }
+      const claveSuper = crearClaveSúperRelajada(data.matchKey);
+      if (!productosMapSuperRelajado[claveSuper]) {
+        productosMapSuperRelajado[claveSuper] = { id: d.id, ...data };
+      }
+    }
+  });
+  log('preventas-log', `✔ ${snap.size} productos en Firestore.`);
+
+  // Encontrar la primera fila con datos válidos
+  let inicioIdx = 0;
+  for (let i = 0; i < Math.min(excel.rows.length, 20); i++) {
+    const fila = excel.rows[i];
+    if (!fila) continue;
+    const titulo = String(fila[0] || '').trim();
+    const costo = parseCosto(fila[2]);
+    if (titulo && costo > 0 && !esFilaEncabezado(titulo)) {
+      inicioIdx = i;
+      break;
+    }
+  }
+  log('preventas-log', `📌 Datos desde la fila ${inicioIdx + 1}`);
+
+  const filas = excel.rows.slice(inicioIdx);
+  const stats = { exacto: 0, relajado: 0, 'super-relajado': 0, fuzzy: 0, creados: 0 };
+  let sinCosto = 0, saltadas = 0;
+  const operaciones = [];
+
+  for (const fila of filas) {
+    const tituloRaw = String(fila[0] || '').trim();
+    if (esFilaEncabezado(tituloRaw)) { saltadas++; continue; }
+
+    const fechaEstreno = parseFechaExcel(fila[1]);
+    const costoPS5Primaria = parseCosto(fila[2]);
+
+    if (!costoPS5Primaria) { sinCosto++; continue; }
+
+    // Para preventas, el título viene sin sufijo PS4/PS5, lo limpiamos igual
+    const { titulo } = parsearTituloOferta(tituloRaw);
+    const matchKey = normalizarTitulo(titulo);
+
+    const { prod, tipo } = buscarProducto(matchKey, productosMap, productosMapRelajado, productosMapSuperRelajado);
+
+    if (prod) {
+      // Ya existe → actualizar con info de preventa
+      const variantesActualizadas = (prod.variants || []).map(v => {
+        if (v.id === 'ps5_primaria') {
+          return {
+            ...v,
+            costoARS: costoPS5Primaria,
+            disponible: true,
+            // actualizar fecha como oferta hasta
+          };
+        }
+        return v;
+      });
+
+      // Si NO existía la variante ps5_primaria, la creamos
+      const tienePS5 = (prod.variants || []).some(v => v.id === 'ps5_primaria');
+      if (!tienePS5) {
+        variantesActualizadas.push({
+          id: 'ps5_primaria',
+          label: 'PS5 Primaria',
+          categoria: 'ps5',
+          tipo: 'primaria',
+          costoARS: costoPS5Primaria,
+          disponible: true,
+          gananciaPct: null,
+          precioFinalUYU: null,
+          enOferta: false,
+          ofertaCostoARS: null,
+          ofertaPrecioUYU: null,
+          ofertaHasta: null
+        });
+      }
+
+      const categories = new Set([...(prod.categories || []), 'ps5']);
+
+      operaciones.push({
+        ref: doc(db, 'products', prod.id),
+        data: {
+          variants: variantesActualizadas,
+          categories: [...categories],
+          isPreorder: true,
+          releaseDate: fechaEstreno || prod.releaseDate || '',
+          updatedAt: new Date().toISOString()
+        }
+      });
+      stats[tipo] = (stats[tipo] || 0) + 1;
+    } else {
+      // No existe → crear como preventa
+      const variantesNuevas = [{
+        id: 'ps5_primaria',
+        label: 'PS5 Primaria',
+        categoria: 'ps5',
+        tipo: 'primaria',
+        costoARS: costoPS5Primaria,
+        disponible: true,
+        gananciaPct: null,
+        precioFinalUYU: null,
+        enOferta: false,
+        ofertaCostoARS: null,
+        ofertaPrecioUYU: null,
+        ofertaHasta: null
+      }];
+
+      operaciones.push({
+        ref: doc(collection(db, 'products')),
+        data: {
+          title: titulo,
+          matchKey,
+          categories: ['ps5'],
+          coverUrl: '', gameplayUrl: '', youtubeUrl: '', description: '',
+          isPreorder: true,
+          releaseDate: fechaEstreno || '',
+          visible: true,
+          soloPreventa: true,
+          variants: variantesNuevas,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }
+      });
+      stats.creados++;
+    }
+  }
+
+  log('preventas-log', `⏳ Guardando ${operaciones.length} operaciones...`);
+  await ejecutarBatches(operaciones, 'preventas-log');
+
+  const totalAplicadas =
+    (stats.exacto || 0) +
+    (stats.relajado || 0) +
+    (stats['super-relajado'] || 0) +
+    (stats.fuzzy || 0);
+
+  log('preventas-log', '');
+  log('preventas-log', '═══════════════════════════════════');
+  log('preventas-log', `✅ PREVENTAS PROCESADAS`);
+  log('preventas-log', `   🎯 Exactas:        ${stats.exacto || 0}`);
+  log('preventas-log', `   🎯 Relajadas:      ${stats.relajado || 0}`);
+  log('preventas-log', `   🎯 Súper relajadas: ${stats['super-relajado'] || 0}`);
+  log('preventas-log', `   🎯 Fuzzy:          ${stats.fuzzy || 0}`);
+  log('preventas-log', `   ─────────────────────`);
+  log('preventas-log', `   ✨ Total aplicadas: ${totalAplicadas}`);
+  log('preventas-log', `   🆕 CREADOS NUEVOS:  ${stats.creados}`);
+  log('preventas-log', `   ⏭️  Sin costo:       ${sinCosto}`);
+  log('preventas-log', `   ⏭️  Saltadas:        ${saltadas}`);
+  log('preventas-log', '═══════════════════════════════════');
+
+  alert(`✅ Preventas procesadas\n\nAplicadas: ${totalAplicadas}\nCreados nuevos: ${stats.creados}`);
 }
 
 // ============================================================
@@ -757,4 +951,4 @@ $('btn-clean-ofertas')?.addEventListener('click', async () => {
   finally { btn.disabled = false; btn.textContent = '🧹 Limpiar ofertas vencidas'; }
 });
 
-console.log('[GamesUy] excel-importer.js v14 cargado (crea juegos faltantes)');
+console.log('[GamesUy] excel-importer.js v15 cargado (Preventas)');

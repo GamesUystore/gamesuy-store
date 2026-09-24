@@ -1,6 +1,6 @@
 // ============================================================
 // GAMESUY STORE — Importador de Excel
-// Fase 3.5.4: Parser agresivo + matching relajado
+// Fase 3.5.5: Matching fuzzy (3 niveles)
 // ============================================================
 
 import { db } from './firebase-config.js';
@@ -25,6 +25,9 @@ const EXCEL = {
   preventas: null
 };
 
+// Palabras sueltas que se pueden quitar del título (idioma/región)
+const PALABRAS_IDIOMA = /\b(español|espanol|inglés|ingles|latino|españa|espana|sub|subtitulado|latam)\b/gi;
+
 // ============================================================
 // UTILIDADES
 // ============================================================
@@ -44,11 +47,7 @@ async function leerExcel(file) {
       try {
         const data = new Uint8Array(e.target.result);
         const workbook = XLSX.read(data, {
-          type: 'array',
-          cellText: true,
-          cellDates: false,
-          raw: false,
-          codepage: 65001
+          type: 'array', cellText: true, cellDates: false, raw: false, codepage: 65001
         });
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
@@ -67,7 +66,6 @@ function repararEncodingRoto(str) {
   const tieneHalfwidth = /[\uFF61-\uFF9F]/.test(s);
   const tieneRaros = /[\u3000-\u303F\u4E00-\u9FFF\uFF00-\uFFEF]/.test(s);
   if (!tieneHalfwidth && !tieneRaros) return s;
-
   try {
     const bytes = [];
     for (let i = 0; i < s.length; i++) {
@@ -82,9 +80,7 @@ function repararEncodingRoto(str) {
     const reemplazos = (decoded.match(/\uFFFD/g) || []).length;
     if (reemplazos > s.length * 0.3) return s;
     return decoded;
-  } catch (e) {
-    return s;
-  }
+  } catch (e) { return s; }
 }
 
 function limpiarTituloBase(titulo) {
@@ -110,6 +106,12 @@ function normalizarTitulo(titulo) {
     .toLowerCase();
 }
 
+function quitarAcentos(str) {
+  return String(str || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
 function crearClaveRelajada(str) {
   return String(str || '')
     .toLowerCase()
@@ -118,6 +120,22 @@ function crearClaveRelajada(str) {
     .replace(/[\uFE0E\uFE0F]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+/**
+ * Crea clave "súper relajada": sin acentos, sin ™®©, sin puntuación, sin palabras de idioma.
+ */
+function crearClaveSúperRelajada(str) {
+  let s = String(str || '')
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[™®©]/g, '')
+    .replace(/[:\-–—.,;!?'"()\[\]{}]/g, ' ')
+    .replace(/[\uFE0E\uFE0F]/g, '')
+    .replace(PALABRAS_IDIOMA, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return s;
 }
 
 function parsearTituloOferta(tituloRaw) {
@@ -153,9 +171,7 @@ function parsearTituloOferta(tituloRaw) {
   titulo = titulo.replace(/\s+/g, ' ').trim();
   titulo = titulo.replace(/[“”«»]/g, '"').replace(/[‘’]/g, "'");
 
-  if (plataformas.length === 0) {
-    plataformas.push('ps4', 'ps5');
-  }
+  if (plataformas.length === 0) plataformas.push('ps4', 'ps5');
 
   return { titulo, plataformas };
 }
@@ -186,6 +202,87 @@ function extraerFechaVencimiento(rows) {
     }
   }
   return null;
+}
+
+// ============================================================
+// MATCHING — 3 niveles
+// ============================================================
+
+/**
+ * Búsqueda fuzzy por palabras.
+ * Compara tokens y requiere 85%+ de coincidencia.
+ */
+function buscarFuzzy(matchKey, productosMap) {
+  const palabrasExcel = quitarAcentos(matchKey)
+    .split(/\s+/)
+    .filter(w => w.length >= 3);  // ignorar palabras de 1-2 letras
+
+  if (palabrasExcel.length < 2) return null;
+
+  const palabrasExcelSet = new Set(palabrasExcel);
+
+  let mejorProd = null;
+  let mejorScore = 0;
+
+  for (const [key, prod] of Object.entries(productosMap)) {
+    const palabrasStock = quitarAcentos(key)
+      .split(/\s+/)
+      .filter(w => w.length >= 3);
+
+    if (palabrasStock.length < 2) continue;
+
+    const palabrasStockSet = new Set(palabrasStock);
+
+    // Contar comunes
+    let comunes = 0;
+    for (const w of palabrasExcelSet) {
+      if (palabrasStockSet.has(w)) comunes++;
+    }
+
+    // Al menos 3 palabras comunes
+    if (comunes < 3) continue;
+
+    // Score = comunes / min(cantidad) → exigir 85%
+    const minTokens = Math.min(palabrasExcelSet.size, palabrasStockSet.size);
+    const score = comunes / minTokens;
+
+    if (score >= 0.85 && score > mejorScore) {
+      mejorScore = score;
+      mejorProd = prod;
+    }
+  }
+
+  return mejorProd;
+}
+
+/**
+ * Busca el producto aplicando 3 niveles.
+ */
+function buscarProducto(matchKey, productosMap, productosMapRelajado, productosMapSuperRelajado) {
+  // Nivel 1: Exacto
+  if (productosMap[matchKey]) {
+    return { prod: productosMap[matchKey], tipo: 'exacto' };
+  }
+
+  // Nivel 2: Relajado
+  const claveRel = crearClaveRelajada(matchKey);
+  if (productosMapRelajado[claveRel]) {
+    return { prod: productosMapRelajado[claveRel], tipo: 'relajado' };
+  }
+
+  // Nivel 3: Súper relajado (sin acentos ni idiomas)
+  const claveSuper = crearClaveSúperRelajada(matchKey);
+  if (productosMapSuperRelajado[claveSuper]) {
+    return { prod: productosMapSuperRelajado[claveSuper], tipo: 'super-relajado' };
+  }
+
+  // Nivel 4: Fuzzy por palabras
+  const prodFuzzy = buscarFuzzy(claveSuper, productosMapSuperRelajado);
+  if (prodFuzzy) {
+    return { prod: prodFuzzy, tipo: 'fuzzy' };
+  }
+
+  return { prod: null, tipo: null };
 }
 
 // ============================================================
@@ -452,14 +549,19 @@ async function procesarOfertas() {
   const snap = await getDocs(collection(db, 'products'));
   const productosMap = {};
   const productosMapRelajado = {};
+  const productosMapSuperRelajado = {};
 
   snap.docs.forEach(d => {
     const data = d.data();
     if (data.matchKey) {
       productosMap[data.matchKey] = { id: d.id, ...data };
-      const claveRelajada = crearClaveRelajada(data.matchKey);
-      if (!productosMapRelajado[claveRelajada]) {
-        productosMapRelajado[claveRelajada] = { id: d.id, ...data };
+      const claveRel = crearClaveRelajada(data.matchKey);
+      if (!productosMapRelajado[claveRel]) {
+        productosMapRelajado[claveRel] = { id: d.id, ...data };
+      }
+      const claveSuper = crearClaveSúperRelajada(data.matchKey);
+      if (!productosMapSuperRelajado[claveSuper]) {
+        productosMapSuperRelajado[claveSuper] = { id: d.id, ...data };
       }
     }
   });
@@ -479,7 +581,8 @@ async function procesarOfertas() {
   log('ofertas-log', `📌 Datos desde la fila ${inicioIdx + 1}`);
 
   const filas = excel.rows.slice(inicioIdx);
-  let aplicadas = 0, aplicadasRelajado = 0, noEncontradas = 0, sinPrecio = 0, saltadas = 0;
+  const stats = { exacto: 0, relajado: 0, 'super-relajado': 0, fuzzy: 0 };
+  let noEncontradas = 0, sinPrecio = 0, saltadas = 0;
   const operaciones = [];
   const noEncontrados = [];
 
@@ -493,17 +596,7 @@ async function procesarOfertas() {
     const { titulo, plataformas } = parsearTituloOferta(tituloRaw);
     const matchKey = normalizarTitulo(titulo);
 
-    let prod = productosMap[matchKey];
-    let usadoRelajado = false;
-
-    if (!prod) {
-      const claveRelajada = crearClaveRelajada(matchKey);
-      const prodRelajado = productosMapRelajado[claveRelajada];
-      if (prodRelajado) {
-        prod = prodRelajado;
-        usadoRelajado = true;
-      }
-    }
+    const { prod, tipo } = buscarProducto(matchKey, productosMap, productosMapRelajado, productosMapSuperRelajado);
 
     if (!prod) {
       noEncontradas++;
@@ -540,8 +633,7 @@ async function procesarOfertas() {
         ref: doc(db, 'products', prod.id),
         data: { variants: nuevasVariantes, updatedAt: new Date().toISOString() }
       });
-      if (usadoRelajado) aplicadasRelajado++;
-      else aplicadas++;
+      stats[tipo] = (stats[tipo] || 0) + 1;
     } else {
       noEncontradas++;
       noEncontrados.push(`${titulo} — sin variantes primarias`);
@@ -554,11 +646,13 @@ async function procesarOfertas() {
   log('ofertas-log', '');
   log('ofertas-log', '═══════════════════════════════════');
   log('ofertas-log', `✅ OFERTAS PROCESADAS`);
-  log('ofertas-log', `   🔥 Aplicadas exactas:    ${aplicadas}`);
-  log('ofertas-log', `   🎯 Aplicadas relajadas: ${aplicadasRelajado}`);
-  log('ofertas-log', `   ⚠ No encontradas:       ${noEncontradas}`);
-  log('ofertas-log', `   ⏭️  Sin precio:           ${sinPrecio}`);
-  log('ofertas-log', `   ⏭️  Saltadas:             ${saltadas}`);
+  log('ofertas-log', `   🎯 Exactas:        ${stats.exacto || 0}`);
+  log('ofertas-log', `   🎯 Relajadas:      ${stats.relajado || 0}`);
+  log('ofertas-log', `   🎯 Súper relajadas: ${stats['super-relajado'] || 0}`);
+  log('ofertas-log', `   🎯 Fuzzy:          ${stats.fuzzy || 0}`);
+  log('ofertas-log', `   ⚠ No encontradas:  ${noEncontradas}`);
+  log('ofertas-log', `   ⏭️  Sin precio:      ${sinPrecio}`);
+  log('ofertas-log', `   ⏭️  Saltadas:        ${saltadas}`);
   log('ofertas-log', '═══════════════════════════════════');
 
   if (noEncontrados.length > 0) {
@@ -570,7 +664,8 @@ async function procesarOfertas() {
     }
   }
 
-  alert(`✅ Ofertas procesadas\n\nAplicadas exactas: ${aplicadas}\nAplicadas relajadas: ${aplicadasRelajado}\nNo encontradas: ${noEncontradas}`);
+  const totalAplicadas = (stats.exacto || 0) + (stats.relajado || 0) + (stats['super-relajado'] || 0) + (stats.fuzzy || 0);
+  alert(`✅ Ofertas procesadas\n\nTotal aplicadas: ${totalAplicadas}\nNo encontradas: ${noEncontradas}`);
 }
 
 // ============================================================
@@ -604,13 +699,7 @@ async function limpiarOfertasVencidas() {
       if (v.ofertaHasta >= hoy) return v;
 
       modificado = true;
-      return {
-        ...v,
-        enOferta: false,
-        ofertaCostoARS: null,
-        ofertaPrecioUYU: null,
-        ofertaHasta: null
-      };
+      return { ...v, enOferta: false, ofertaCostoARS: null, ofertaPrecioUYU: null, ofertaHasta: null };
     });
 
     if (modificado) {
@@ -683,4 +772,4 @@ $('btn-clean-ofertas')?.addEventListener('click', async () => {
   finally { btn.disabled = false; btn.textContent = '🧹 Limpiar ofertas vencidas'; }
 });
 
-console.log('[GamesUy] excel-importer.js v12 cargado (matching relajado)');
+console.log('[GamesUy] excel-importer.js v13 cargado (fuzzy matching)');

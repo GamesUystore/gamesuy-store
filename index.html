@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GamesUy Store | Tienda Digital Gamer</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Estilos -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- ============================================================
+       HEADER — Logo, redes, nav, buscador, categorías
+       ============================================================ -->
+  <header class="site-header">
+    <div class="header-inner">
+
+      <!-- LOGO + BRAND -->
+      <div class="brand">
+        <div class="brand-logo-wrap">
+          <img id="store-logo" src="" alt="GamesUy Store" class="brand-logo"
+               onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+          <div class="brand-logo-fallback">🎮</div>
+        </div>
+        <div class="brand-text">
+          <h1 class="brand-title">GamesUy Store</h1>
+          <p class="brand-tagline">Juegos Digitales &amp; Suscripciones en Uruguay</p>
+        </div>
+      </div>
+
+      <!-- REDES SOCIALES (editables desde admin) -->
+      <div class="social-bar" id="social-bar">
+        <a href="#" class="social-link" target="_blank" data-net="wa">💬 WhatsApp</a>
+        <a href="#" class="social-link" target="_blank" data-net="ig">📸 Instagram</a>
+        <a href="#" class="social-link" target="_blank" data-net="fb">📘 Facebook</a>
+        <a href="#" class="social-link" target="_blank" data-net="tt">🎵 TikTok</a>
+      </div>
+
+      <!-- NAV PRINCIPAL -->
+      <nav class="top-nav" id="top-nav">
+        <button class="nav-btn active" data-page="catalogo">Catálogo</button>
+        <button class="nav-btn nav-btn-hot" data-page="ofertas">🔥 Ofertas</button>
+        <button class="nav-btn nav-btn-new" data-page="preventas">🚀 Preventas</button>
+        <button class="nav-btn" data-page="faq">Preguntas</button>
+        <button class="nav-btn" data-page="terminos">Términos</button>
+        <button class="nav-btn" data-page="contacto">Contacto</button>
+        <button class="nav-btn nav-btn-admin" data-page="admin">[ Admin ]</button>
+      </nav>
+
+      <!-- BUSCADOR -->
+      <div class="search-bar">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="search-input" class="search-input"
+               placeholder="Buscar juego, suscripción, servicio..."
+               autocomplete="off" spellcheck="false">
+      </div>
+
+      <!-- CATEGORÍAS -->
+      <nav class="categories-nav" id="cat-nav">
+        <button class="cat-btn active" data-cat="all">Todos</button>
+        <button class="cat-btn" data-cat="ps5">PS5</button>
+        <button class="cat-btn" data-cat="ps4">PS4</button>
+        <button class="cat-btn" data-cat="ps3">PS3</button>
+        <button class="cat-btn" data-cat="steam">Steam</button>
+        <button class="cat-btn" data-cat="psplus">PS Plus</button>
+        <button class="cat-btn" data-cat="streaming">Streaming</button>
+        <button class="cat-btn" data-cat="otros">Otros</button>
+      </nav>
+
+    </div>
+  </header>
+
+  <!-- ============================================================
+       MAIN
+       ============================================================ -->
+  <main class="container">
+
+    <!-- ========== PÁGINA CATÁLOGO ========== -->
+    <section id="page-catalogo" class="page-section active-page">
+
+      <!-- Banner de anuncios (editable desde admin: texto, imagen, link) -->
+      <div class="announcement-banner" id="announcement-banner">
+        <div class="announcement-glow"></div>
+        <div class="announcement-content">
+          <span class="announcement-label">📢 NOVEDAD</span>
+          <h2 class="announcement-title">Bienvenido a GamesUy Store</h2>
+          <p class="announcement-text">
+            Este es el espacio editable desde el panel admin. Podés poner ofertas, noticias,
+            avisos, fotos o cualquier contenido que quieras destacar en el inicio.
+          </p>
+        </div>
+      </div>
+
+      <!-- Grid de productos -->
+      <div class="grid-section">
+        <div class="grid-header">
+          <h2 class="section-title">Catálogo</h2>
+          <span class="results-count" id="results-count">Mostrando todos los productos</span>
+        </div>
+
+        <div id="product-grid" class="product-grid">
+          <!-- Placeholder de ejemplo (se borra cuando conectemos Firestore) -->
+          <article class="product-card">
+            <div class="card-badges"><span class="badge badge-ps5">PS5</span></div>
+            <div class="card-image" style="background-image:linear-gradient(135deg,#1a1f3a,#0c0e17);">
+              <span class="card-image-placeholder">🎮</span>
+            </div>
+            <h3 class="card-title">Juego de ejemplo</h3>
+            <div class="card-variant-selectors">
+              <select class="card-select"><option>PS5</option></select>
+              <select class="card-select"><option>Primaria</option></select>
+              <select class="card-select"><option>UYU</option></select>
+            </div>
+            <div class="card-price">$ 3.550 <span class="card-price-usd">≈ $89.75 USD</span></div>
+            <div class="card-stock stock-ok">Disponible</div>
+            <div class="card-payments">💳 Prex / Mercado Pago / BROU</div>
+            <a href="#" class="btn btn-buy">Comprar por WhatsApp</a>
+            <button class="btn btn-secondary">🎬 Trailer</button>
+          </article>
+
+          <article class="product-card">
+            <div class="card-badges"><span class="badge badge-ps4">PS4</span><span class="badge badge-ps5">PS5</span></div>
+            <div class="card-image" style="background-image:linear-gradient(135deg,#2a1030,#0c0e17);">
+              <span class="card-image-placeholder">🎮</span>
+            </div>
+            <h3 class="card-title">Otro juego de ejemplo</h3>
+            <div class="card-variant-selectors">
+              <select class="card-select"><option>PS5</option></select>
+              <select class="card-select"><option>Primaria</option></select>
+              <select class="card-select"><option>UYU</option></select>
+            </div>
+            <div class="card-price">$ 2.100 <span class="card-price-usd">≈ $53.16 USD</span></div>
+            <div class="card-stock stock-ok">Disponible</div>
+            <div class="card-payments">💳 Prex / Mercado Pago / BROU</div>
+            <a href="#" class="btn btn-buy">Comprar por WhatsApp</a>
+            <button class="btn btn-secondary">🎬 Trailer</button>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== PÁGINA OFERTAS ========== -->
+    <section id="page-ofertas" class="page-section">
+      <h2 class="section-title section-title-hot">🔥 Ofertas Especiales</h2>
+      <p class="section-subtitle">Juegos y suscripciones con descuentos por tiempo limitado.</p>
+      <div id="ofertas-grid" class="product-grid">
+        <p class="empty-message">Próximamente: ofertas desde Firestore.</p>
+      </div>
+    </section>
+
+    <!-- ========== PÁGINA PREVENTAS ========== -->
+    <section id="page-preventas" class="page-section">
+      <h2 class="section-title section-title-new">🚀 Preventas</h2>
+      <p class="section-subtitle">Títulos próximos a salir. Reservá tu copia antes del lanzamiento.</p>
+      <div id="preventas-grid" class="product-grid">
+        <p class="empty-message">Próximamente: preventas desde Firestore.</p>
+      </div>
+    </section>
+
+    <!-- ========== PÁGINA FAQ ========== -->
+    <section id="page-faq" class="page-section">
+      <h2 class="section-title">Preguntas Frecuentes</h2>
+      <div id="faq-list" class="faq-list">
+        <p class="empty-message">Cargando preguntas...</p>
+      </div>
+    </section>
+
+    <!-- ========== PÁGINA TÉRMINOS ========== -->
+    <section id="page-terminos" class="page-section">
+      <h2 class="section-title">Términos y Condiciones</h2>
+      <div id="terminos-text" class="terms-text">
+        <p class="empty-message">Cargando términos...</p>
+      </div>
+    </section>
+
+    <!-- ========== PÁGINA CONTACTO ========== -->
+    <section id="page-contacto" class="page-section">
+      <h2 class="section-title">Contacto</h2>
+      <form action="https://formsubmit.co/thedkshopone@gmail.com" method="POST" class="contact-form">
+        <input type="hidden" name="_captcha" value="false">
+        <label>Tu nombre</label>
+        <input type="text" name="nombre" placeholder="Nombre completo" required>
+        <label>Tu correo</label>
+        <input type="email" name="email" placeholder="tu@correo.com" required>
+        <label>Mensaje</label>
+        <textarea name="mensaje" rows="4" placeholder="¿En qué te podemos ayudar?" required></textarea>
+        <button type="submit" class="btn btn-primary">Enviar mensaje</button>
+      </form>
+    </section>
+
+    <!-- ========== PÁGINA ADMIN (placeholder) ========== -->
+    <section id="page-admin" class="page-section">
+      <h2 class="section-title section-title-admin">⚙️ Panel de Administración</h2>
+      <p class="section-subtitle">Esta sección se conecta en el sub-paso 1.3.</p>
+    </section>
+
+  </main>
+
+  <!-- ============================================================
+       FOOTER
+       ============================================================ -->
+  <footer class="site-footer">
+    <p>© 2026 GamesUy Store — Juegos digitales en Uruguay</p>
+  </footer>
+
+  <!-- WhatsApp flotante -->
+  <a href="https://wa.me/59896572226" class="chat-float" target="_blank" rel="noopener">
+    💬
+  </a>
+
+</body>
+</html>

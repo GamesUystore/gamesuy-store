@@ -1,6 +1,6 @@
 // ============================================================
 // GAMESUY STORE — Importador de Excel
-// Fase 3.5.5: Matching fuzzy (3 niveles)
+// Fase 3.5.7: Ofertas que crean juegos faltantes (Opción B)
 // ============================================================
 
 import { db } from './firebase-config.js';
@@ -25,7 +25,7 @@ const EXCEL = {
   preventas: null
 };
 
-// Palabras sueltas que se pueden quitar del título (idioma/región)
+// Palabras sueltas de idioma/región
 const PALABRAS_IDIOMA = /\b(español|espanol|inglés|ingles|latino|españa|espana|sub|subtitulado|latam)\b/gi;
 
 // ============================================================
@@ -107,9 +107,7 @@ function normalizarTitulo(titulo) {
 }
 
 function quitarAcentos(str) {
-  return String(str || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
+  return String(str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
 function crearClaveRelajada(str) {
@@ -122,9 +120,6 @@ function crearClaveRelajada(str) {
     .trim();
 }
 
-/**
- * Crea clave "súper relajada": sin acentos, sin ™®©, sin puntuación, sin palabras de idioma.
- */
 function crearClaveSúperRelajada(str) {
   let s = String(str || '')
     .toLowerCase()
@@ -205,83 +200,43 @@ function extraerFechaVencimiento(rows) {
 }
 
 // ============================================================
-// MATCHING — 3 niveles
+// MATCHING
 // ============================================================
 
-/**
- * Búsqueda fuzzy por palabras.
- * Compara tokens y requiere 85%+ de coincidencia.
- */
 function buscarFuzzy(matchKey, productosMap) {
-  const palabrasExcel = quitarAcentos(matchKey)
-    .split(/\s+/)
-    .filter(w => w.length >= 3);  // ignorar palabras de 1-2 letras
-
+  const palabrasExcel = quitarAcentos(matchKey).split(/\s+/).filter(w => w.length >= 3);
   if (palabrasExcel.length < 2) return null;
-
   const palabrasExcelSet = new Set(palabrasExcel);
-
   let mejorProd = null;
   let mejorScore = 0;
 
   for (const [key, prod] of Object.entries(productosMap)) {
-    const palabrasStock = quitarAcentos(key)
-      .split(/\s+/)
-      .filter(w => w.length >= 3);
-
+    const palabrasStock = quitarAcentos(key).split(/\s+/).filter(w => w.length >= 3);
     if (palabrasStock.length < 2) continue;
-
     const palabrasStockSet = new Set(palabrasStock);
-
-    // Contar comunes
     let comunes = 0;
     for (const w of palabrasExcelSet) {
       if (palabrasStockSet.has(w)) comunes++;
     }
-
-    // Al menos 3 palabras comunes
     if (comunes < 3) continue;
-
-    // Score = comunes / min(cantidad) → exigir 85%
     const minTokens = Math.min(palabrasExcelSet.size, palabrasStockSet.size);
     const score = comunes / minTokens;
-
     if (score >= 0.85 && score > mejorScore) {
       mejorScore = score;
       mejorProd = prod;
     }
   }
-
   return mejorProd;
 }
 
-/**
- * Busca el producto aplicando 3 niveles.
- */
 function buscarProducto(matchKey, productosMap, productosMapRelajado, productosMapSuperRelajado) {
-  // Nivel 1: Exacto
-  if (productosMap[matchKey]) {
-    return { prod: productosMap[matchKey], tipo: 'exacto' };
-  }
-
-  // Nivel 2: Relajado
+  if (productosMap[matchKey]) return { prod: productosMap[matchKey], tipo: 'exacto' };
   const claveRel = crearClaveRelajada(matchKey);
-  if (productosMapRelajado[claveRel]) {
-    return { prod: productosMapRelajado[claveRel], tipo: 'relajado' };
-  }
-
-  // Nivel 3: Súper relajado (sin acentos ni idiomas)
+  if (productosMapRelajado[claveRel]) return { prod: productosMapRelajado[claveRel], tipo: 'relajado' };
   const claveSuper = crearClaveSúperRelajada(matchKey);
-  if (productosMapSuperRelajado[claveSuper]) {
-    return { prod: productosMapSuperRelajado[claveSuper], tipo: 'super-relajado' };
-  }
-
-  // Nivel 4: Fuzzy por palabras
+  if (productosMapSuperRelajado[claveSuper]) return { prod: productosMapSuperRelajado[claveSuper], tipo: 'super-relajado' };
   const prodFuzzy = buscarFuzzy(claveSuper, productosMapSuperRelajado);
-  if (prodFuzzy) {
-    return { prod: prodFuzzy, tipo: 'fuzzy' };
-  }
-
+  if (prodFuzzy) return { prod: prodFuzzy, tipo: 'fuzzy' };
   return { prod: null, tipo: null };
 }
 
@@ -526,7 +481,7 @@ async function procesarStock() {
 }
 
 // ============================================================
-// OFERTAS
+// OFERTAS — Ahora CREA juegos faltantes
 // ============================================================
 
 async function procesarOfertas() {
@@ -581,10 +536,9 @@ async function procesarOfertas() {
   log('ofertas-log', `📌 Datos desde la fila ${inicioIdx + 1}`);
 
   const filas = excel.rows.slice(inicioIdx);
-  const stats = { exacto: 0, relajado: 0, 'super-relajado': 0, fuzzy: 0 };
-  let noEncontradas = 0, sinPrecio = 0, saltadas = 0;
+  const stats = { exacto: 0, relajado: 0, 'super-relajado': 0, fuzzy: 0, creados: 0 };
+  let sinPrecio = 0, saltadas = 0;
   const operaciones = [];
-  const noEncontrados = [];
 
   for (const fila of filas) {
     const tituloRaw = String(fila[0] || '').trim();
@@ -598,50 +552,89 @@ async function procesarOfertas() {
 
     const { prod, tipo } = buscarProducto(matchKey, productosMap, productosMapRelajado, productosMapSuperRelajado);
 
-    if (!prod) {
-      noEncontradas++;
-      noEncontrados.push(`${titulo} [${plataformas.join('/')}]`);
-      continue;
-    }
+    if (prod) {
+      // Juego existe → aplicar oferta
+      let modificado = false;
+      const nuevasVariantes = (prod.variants || []).map(v => {
+        if (v.tipo !== 'primaria') return v;
+        if (!plataformas.includes(v.categoria)) return v;
 
-    let modificado = false;
-    const nuevasVariantes = (prod.variants || []).map(v => {
-      if (v.tipo !== 'primaria') return v;
-      if (!plataformas.includes(v.categoria)) return v;
+        const precioActual = Number(v.precioFinalUYU) || 0;
+        const costoActual = Number(v.costoARS) || 0;
 
-      const precioActual = Number(v.precioFinalUYU) || 0;
-      const costoActual = Number(v.costoARS) || 0;
+        let ofertaPrecioUYU = 0;
+        if (precioActual > 0 && costoActual > 0) {
+          const variacion = (costoOfertaARS / costoActual) - 1;
+          ofertaPrecioUYU = roundUYU(precioActual * (1 + variacion));
+        }
 
-      let ofertaPrecioUYU = 0;
-      if (precioActual > 0 && costoActual > 0) {
-        const variacion = (costoOfertaARS / costoActual) - 1;
-        ofertaPrecioUYU = roundUYU(precioActual * (1 + variacion));
+        modificado = true;
+        return {
+          ...v,
+          enOferta: true,
+          ofertaCostoARS: costoOfertaARS,
+          ofertaPrecioUYU: ofertaPrecioUYU,
+          ofertaHasta: fechaHasta
+        };
+      });
+
+      if (modificado) {
+        operaciones.push({
+          ref: doc(db, 'products', prod.id),
+          data: { variants: nuevasVariantes, updatedAt: new Date().toISOString() }
+        });
+        stats[tipo] = (stats[tipo] || 0) + 1;
       }
+    } else {
+      // Juego NO existe → CREARLO (Opción B)
+      const categories = [...plataformas]; // ['ps4', 'ps5'] según corresponda
 
-      modificado = true;
-      return {
-        ...v,
+      const variantesNuevas = plataformas.map(plat => ({
+        id: `${plat}_primaria`,
+        label: `${plat.toUpperCase()} Primaria`,
+        categoria: plat,
+        tipo: 'primaria',
+        costoARS: costoOfertaARS,
+        disponible: true,
+        gananciaPct: null,
+        precioFinalUYU: null,
         enOferta: true,
         ofertaCostoARS: costoOfertaARS,
-        ofertaPrecioUYU: ofertaPrecioUYU,
+        ofertaPrecioUYU: 0,
         ofertaHasta: fechaHasta
-      };
-    });
+      }));
 
-    if (modificado) {
       operaciones.push({
-        ref: doc(db, 'products', prod.id),
-        data: { variants: nuevasVariantes, updatedAt: new Date().toISOString() }
+        ref: doc(collection(db, 'products')),
+        data: {
+          title: titulo,
+          matchKey,
+          categories,
+          coverUrl: '',
+          gameplayUrl: '',
+          youtubeUrl: '',
+          description: '',
+          isPreorder: false,
+          releaseDate: '',
+          visible: true,
+          soloOferta: true, // ← marca para saber que vino solo de Ofertas
+          variants: variantesNuevas,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }
       });
-      stats[tipo] = (stats[tipo] || 0) + 1;
-    } else {
-      noEncontradas++;
-      noEncontrados.push(`${titulo} — sin variantes primarias`);
+      stats.creados++;
     }
   }
 
   log('ofertas-log', `⏳ Guardando ${operaciones.length} operaciones...`);
   await ejecutarBatches(operaciones, 'ofertas-log');
+
+  const totalAplicadas =
+    (stats.exacto || 0) +
+    (stats.relajado || 0) +
+    (stats['super-relajado'] || 0) +
+    (stats.fuzzy || 0);
 
   log('ofertas-log', '');
   log('ofertas-log', '═══════════════════════════════════');
@@ -650,22 +643,14 @@ async function procesarOfertas() {
   log('ofertas-log', `   🎯 Relajadas:      ${stats.relajado || 0}`);
   log('ofertas-log', `   🎯 Súper relajadas: ${stats['super-relajado'] || 0}`);
   log('ofertas-log', `   🎯 Fuzzy:          ${stats.fuzzy || 0}`);
-  log('ofertas-log', `   ⚠ No encontradas:  ${noEncontradas}`);
+  log('ofertas-log', `   ─────────────────────`);
+  log('ofertas-log', `   ✨ Total aplicadas: ${totalAplicadas}`);
+  log('ofertas-log', `   🆕 CREADOS NUEVOS:  ${stats.creados}`);
   log('ofertas-log', `   ⏭️  Sin precio:      ${sinPrecio}`);
   log('ofertas-log', `   ⏭️  Saltadas:        ${saltadas}`);
   log('ofertas-log', '═══════════════════════════════════');
 
-  if (noEncontrados.length > 0) {
-    log('ofertas-log', '');
-    log('ofertas-log', `<b>Primeras 30 no encontradas:</b>`);
-    noEncontrados.slice(0, 30).forEach(t => log('ofertas-log', `• ${t}`));
-    if (noEncontrados.length > 30) {
-      log('ofertas-log', `... y ${noEncontrados.length - 30} más.`);
-    }
-  }
-
-  const totalAplicadas = (stats.exacto || 0) + (stats.relajado || 0) + (stats['super-relajado'] || 0) + (stats.fuzzy || 0);
-  alert(`✅ Ofertas procesadas\n\nTotal aplicadas: ${totalAplicadas}\nNo encontradas: ${noEncontradas}`);
+  alert(`✅ Ofertas procesadas\n\nAplicadas: ${totalAplicadas}\nCreados nuevos: ${stats.creados}`);
 }
 
 // ============================================================
@@ -772,4 +757,4 @@ $('btn-clean-ofertas')?.addEventListener('click', async () => {
   finally { btn.disabled = false; btn.textContent = '🧹 Limpiar ofertas vencidas'; }
 });
 
-console.log('[GamesUy] excel-importer.js v13 cargado (fuzzy matching)');
+console.log('[GamesUy] excel-importer.js v14 cargado (crea juegos faltantes)');

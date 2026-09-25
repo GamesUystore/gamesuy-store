@@ -1,6 +1,6 @@
 // ============================================================
 // GAMESUY STORE — Catálogo público + Ofertas
-// Fase 5: pestaña Ofertas visible
+// Fase 5.1: Oferta sin tachado cuando no hay precio normal
 // ============================================================
 
 import { db } from './firebase-config.js';
@@ -13,22 +13,17 @@ let productos = [];
 let cotizaciones = { arsAUYU: 0.055, usdAUYU: 39.50 };
 let pagosTexto = 'Prex / Mercado Pago / BROU';
 
-// Catálogo
 let filtroSearch = '';
 let filtroCat = 'all';
 let pagina = 1;
 const POR_PAGINA = 24;
 
-// Ofertas
 let ofertasPagina = 1;
 let ofertasSearch = '';
 let ofertasCat = 'all';
 
 let countdownInterval = null;
 
-// ============================================================
-// CARGA DE DATOS
-// ============================================================
 onSnapshot(doc(db, 'settings', 'cotizaciones'), (snap) => {
   if (!snap.exists()) return;
   const c = snap.data();
@@ -51,9 +46,6 @@ onSnapshot(collection(db, 'products'), (snap) => {
   renderOfertas();
 });
 
-// ============================================================
-// HELPERS
-// ============================================================
 function tienePrecioNormal(v) { return Number(v?.precioFinalUYU) > 0; }
 function tienePrecioOferta(v) { return Number(v?.ofertaPrecioUYU) > 0; }
 function tieneCostoNormal(v) { return Number(v?.costoARS) > 0; }
@@ -84,7 +76,6 @@ function productoVisible(p) {
   return (p.variants || []).some(varianteVendible);
 }
 
-// Un producto está en "ofertas" si tiene al menos una variante con oferta vigente
 function productoTieneOferta(p) {
   if (p.visible === false) return false;
   return (p.variants || []).some(v => ofertaVigente(v));
@@ -106,9 +97,6 @@ function formatearFecha(dateStr) {
   return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : dateStr;
 }
 
-// ============================================================
-// FILTROS
-// ============================================================
 function filtrarProductos() {
   let lista = productos.filter(productoVisible);
   if (filtroCat !== 'all') lista = lista.filter(p => (p.categories || []).includes(filtroCat));
@@ -127,7 +115,6 @@ function filtrarOfertas() {
     const q = ofertasSearch.toLowerCase().trim();
     lista = lista.filter(p => String(p.title || '').toLowerCase().includes(q));
   }
-  // Ordenar por fecha de vencimiento más próxima
   lista.sort((a, b) => {
     const fa = (a.variants || []).map(v => v.ofertaHasta).filter(Boolean).sort()[0] || '9999';
     const fb = (b.variants || []).map(v => v.ofertaHasta).filter(Boolean).sort()[0] || '9999';
@@ -136,9 +123,6 @@ function filtrarOfertas() {
   return lista;
 }
 
-// ============================================================
-// RENDER CATÁLOGO
-// ============================================================
 function render() {
   const grid = $('product-grid');
   const count = $('results-count');
@@ -170,9 +154,6 @@ function render() {
   renderPaginacion('catalog-pagination', pagina, totalPaginas, (p) => { pagina = p; render(); });
 }
 
-// ============================================================
-// RENDER OFERTAS
-// ============================================================
 function renderOfertas() {
   const grid = $('ofertas-grid');
   const count = $('ofertas-count');
@@ -204,9 +185,6 @@ function renderOfertas() {
   renderPaginacion('ofertas-pagination', ofertasPagina, totalPaginas, (p) => { ofertasPagina = p; renderOfertas(); });
 }
 
-// ============================================================
-// ACTIVAR CARDS (listeners)
-// ============================================================
 function activarCards(lista, prefijo) {
   lista.forEach(p => {
     const cardId = p.id;
@@ -221,9 +199,6 @@ function activarCards(lista, prefijo) {
   });
 }
 
-// ============================================================
-// PAGINACIÓN
-// ============================================================
 function renderPaginacion(contId, actual, total, onPage) {
   const cont = document.getElementById(contId);
   if (!cont) return;
@@ -241,9 +216,6 @@ function renderPaginacion(contId, actual, total, onPage) {
   });
 }
 
-// ============================================================
-// CARD (compartida entre catálogo y ofertas)
-// ============================================================
 function renderCard(p, prefijo = 'cat') {
   const cardId = p.id;
   const cats = p.categories || [];
@@ -258,7 +230,6 @@ function renderCard(p, prefijo = 'cat') {
     ? `<div class="card-preorder-badge">🚀 PREVENTA${p.releaseDate ? ` · ${formatearFecha(p.releaseDate)}` : ''}</div>`
     : '';
 
-  // En modo oferta: solo mostrar consolas con oferta activa
   const esModoOferta = prefijo === 'oferta';
   const consolasDisponibles = cats.filter(c => {
     return (p.variants || []).some(v => {
@@ -305,9 +276,6 @@ function renderCard(p, prefijo = 'cat') {
   `;
 }
 
-// ============================================================
-// SELECTORES DE CUENTA
-// ============================================================
 function actualizarSelectoresCuenta(p, cardId, prefijo) {
   const selConsole = document.getElementById(`sel-console-${prefijo}-${cardId}`);
   const selAccount = document.getElementById(`sel-account-${prefijo}-${cardId}`);
@@ -332,9 +300,6 @@ function actualizarSelectoresCuenta(p, cardId, prefijo) {
   if (tipos.length === 0) selAccount.innerHTML = '<option value="">—</option>';
 }
 
-// ============================================================
-// PRECIO
-// ============================================================
 function actualizarPrecio(p, cardId, prefijo) {
   const priceWrap = document.getElementById(`price-wrap-${prefijo}-${cardId}`);
   const stockWrap = document.getElementById(`stock-wrap-${prefijo}-${cardId}`);
@@ -353,7 +318,6 @@ function actualizarPrecio(p, cardId, prefijo) {
   const moneda = selCurrency.value;
   const variante = (p.variants || []).find(v => v.categoria === cat && v.tipo === acc);
 
-  // Sin variante → AGOTADO
   if (!variante) {
     priceWrap.innerHTML = `<div class="card-price card-price-empty">AGOTADO</div>`;
     if (stockWrap) stockWrap.innerHTML = `<span class="stock-badge stock-out">Sin stock</span>`;
@@ -371,7 +335,8 @@ function actualizarPrecio(p, cardId, prefijo) {
   const oferta = ofertaVigente(variante);
   const tieneNormal = Number(variante.costoARS) > 0 && Number(variante.precioFinalUYU) > 0;
 
-  if (oferta) {
+  // CASO 1 — Hay oferta Y hay precio normal → mostramos tachado + oferta
+  if (oferta && tieneNormal) {
     const precioMostrar = moneda === 'USD'
       ? formatUSD(calcPrecioUSD(oferta.precio, cotizaciones.usdAUYU))
       : formatUYU(oferta.precio);
@@ -383,7 +348,7 @@ function actualizarPrecio(p, cardId, prefijo) {
       : '≈ ' + formatUSD(calcPrecioUSD(oferta.precio, cotizaciones.usdAUYU));
 
     priceWrap.innerHTML = `
-      ${oferta.original > 0 ? `<div class="card-price-original">${precioOriginalMostrar}</div>` : ''}
+      <div class="card-price-original">${precioOriginalMostrar}</div>
       <div class="card-price card-price-offer">${precioMostrar}</div>
       <div class="card-price-usd">${precioSecundario}</div>
     `;
@@ -405,6 +370,39 @@ function actualizarPrecio(p, cardId, prefijo) {
     return;
   }
 
+  // CASO 2 — Hay oferta pero NO hay precio normal → mostramos con etiqueta "Precio especial"
+  if (oferta && !tieneNormal) {
+    const precioMostrar = moneda === 'USD'
+      ? formatUSD(calcPrecioUSD(oferta.precio, cotizaciones.usdAUYU))
+      : formatUYU(oferta.precio);
+    const precioSecundario = moneda === 'USD'
+      ? formatUYU(oferta.precio)
+      : '≈ ' + formatUSD(calcPrecioUSD(oferta.precio, cotizaciones.usdAUYU));
+
+    priceWrap.innerHTML = `
+      <div class="card-price-tag">PRECIO ESPECIAL</div>
+      <div class="card-price card-price-offer">${precioMostrar}</div>
+      <div class="card-price-usd">${precioSecundario}</div>
+    `;
+    if (offerWrap) offerWrap.innerHTML = `<div class="offer-banner-tag">🔥 OFERTA ESPECIAL</div>`;
+    if (stockWrap) stockWrap.innerHTML = `<span class="stock-badge stock-ok">✓ Disponible</span>`;
+    if (countdown) {
+      countdown.dataset.end = oferta.hasta + 'T23:59:59';
+      countdown.style.display = '';
+      actualizarCountdown(countdown);
+    }
+    if (waBtn) {
+      const tipoLabel = acc === 'secundaria' ? 'Secundaria' : 'Primaria';
+      const msg = `Hola GamesUy Store! Quiero comprar *${p.title}* (${cat.toUpperCase()} ${tipoLabel}) en oferta por ${precioMostrar}`;
+      waBtn.href = `https://wa.me/59896572226?text=${encodeURIComponent(msg)}`;
+      waBtn.innerText = '💬 Comprar por WhatsApp';
+      waBtn.classList.add('btn-buy');
+      waBtn.classList.remove('btn-secondary');
+    }
+    return;
+  }
+
+  // CASO 3 — Sin oferta, con precio normal
   if (tieneNormal) {
     const precioMostrar = moneda === 'USD'
       ? formatUSD(calcPrecioUSD(variante.precioFinalUYU, cotizaciones.usdAUYU))
@@ -431,7 +429,7 @@ function actualizarPrecio(p, cardId, prefijo) {
     return;
   }
 
-  // Sin precio ni oferta → AGOTADO
+  // CASO 4 — Sin precio ni oferta → AGOTADO
   priceWrap.innerHTML = `<div class="card-price card-price-empty">AGOTADO</div>`;
   if (stockWrap) stockWrap.innerHTML = `<span class="stock-badge stock-out">Sin stock</span>`;
   if (offerWrap) offerWrap.innerHTML = '';
@@ -444,9 +442,6 @@ function actualizarPrecio(p, cardId, prefijo) {
   }
 }
 
-// ============================================================
-// COUNTDOWN
-// ============================================================
 function actualizarCountdown(el) {
   if (!el || !el.dataset.end) return;
   const end = new Date(el.dataset.end).getTime();
@@ -465,9 +460,6 @@ if (!countdownInterval) {
   }, 1000);
 }
 
-// ============================================================
-// TRAILER
-// ============================================================
 window.abrirTrailer = function(cardId) {
   const p = productos.find(x => x.id === cardId);
   if (!p) return;
@@ -495,15 +487,9 @@ function getYouTubeEmbed(url) {
   return (m && m[2].length === 11) ? `https://www.youtube.com/embed/${m[2]}` : null;
 }
 
-// ============================================================
-// LISTENERS GENERALES
-// ============================================================
-
-// Búsqueda catálogo
 const searchInput = $('search-input');
 if (searchInput) {
   searchInput.addEventListener('input', (e) => {
-    // Detectar si estamos en la página de ofertas
     const pageOfertas = $('page-ofertas');
     const enOfertas = pageOfertas && pageOfertas.classList.contains('active-page');
     if (enOfertas) {
@@ -518,17 +504,13 @@ if (searchInput) {
   });
 }
 
-// Categorías catálogo
 document.querySelectorAll('#cat-nav .cat-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('#cat-nav .cat-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     const cat = btn.dataset.cat || 'all';
-
-    // Aplicar según la página activa
     const pageOfertas = $('page-ofertas');
     const enOfertas = pageOfertas && pageOfertas.classList.contains('active-page');
-
     if (enOfertas) {
       ofertasCat = cat;
       ofertasPagina = 1;
@@ -541,12 +523,9 @@ document.querySelectorAll('#cat-nav .cat-btn').forEach(btn => {
   });
 });
 
-// Detectar cambio de página para re-renderizar ofertas
 const originalSwitchPage = window.switchPage;
 window.switchPage = function(pageId) {
   if (originalSwitchPage) originalSwitchPage(pageId);
-
-  // Si vamos a ofertas → sincronizar search + categorías
   if (pageId === 'ofertas') {
     const si = $('search-input');
     if (si) ofertasSearch = si.value;
@@ -555,7 +534,6 @@ window.switchPage = function(pageId) {
     ofertasPagina = 1;
     setTimeout(() => renderOfertas(), 50);
   }
-  // Si vamos a catálogo → sincronizar
   if (pageId === 'catalogo') {
     const si = $('search-input');
     if (si) filtroSearch = si.value;
@@ -566,7 +544,6 @@ window.switchPage = function(pageId) {
   }
 };
 
-// Cerrar trailer
 document.getElementById('trailer-close')?.addEventListener('click', () => {
   document.getElementById('trailer-modal')?.classList.add('hidden');
 });
@@ -574,4 +551,4 @@ document.getElementById('trailer-modal')?.addEventListener('click', (e) => {
   if (e.target.id === 'trailer-modal') document.getElementById('trailer-modal')?.classList.add('hidden');
 });
 
-console.log('[GamesUy] store.js v5 cargado (catálogo + ofertas)');
+console.log('[GamesUy] store.js v5.1 cargado');

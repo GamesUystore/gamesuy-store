@@ -1,6 +1,6 @@
 // ============================================================
 // GAMESUY STORE — Catálogo público + Ofertas + Preventas
-// Fase 6: Preventas visibles
+// Fase 6.1: Preventas separadas + auto-activación al estreno
 // ============================================================
 
 import { db } from './firebase-config.js';
@@ -13,7 +13,6 @@ let productos = [];
 let cotizaciones = { arsAUYU: 0.055, usdAUYU: 39.50 };
 let pagosTexto = 'Prex / Mercado Pago / BROU';
 
-// Estado por sección
 let catState = { search: '', cat: 'all', pagina: 1 };
 let ofState = { search: '', cat: 'all', pagina: 1 };
 let preState = { search: '', cat: 'all', pagina: 1 };
@@ -63,6 +62,19 @@ function ofertaVigente(v) {
   };
 }
 
+/**
+ * Devuelve true si el producto está en preventa ACTIVA.
+ * Preventa activa = isPreorder: true Y (sin fecha o fecha futura).
+ * Si la fecha ya pasó → ya no es preventa (salió a la venta).
+ */
+function esPreventaActiva(p) {
+  if (p.visible === false) return false;
+  if (p.isPreorder !== true) return false;
+  if (!p.releaseDate) return true; // sin fecha → sigue siendo preventa
+  const hoy = new Date().toISOString().split('T')[0];
+  return p.releaseDate > hoy; // fecha futura → preventa activa
+}
+
 function varianteVendible(v) {
   if (v.disponible === false) return false;
   return ofertaVigente(v) !== null || (tieneCostoNormal(v) && tienePrecioNormal(v));
@@ -70,7 +82,9 @@ function varianteVendible(v) {
 
 function productoVisible(p) {
   if (p.visible === false) return false;
-  if (p.isPreorder) return true; // preventas siempre visibles si están publicadas
+  // Preventas activas NO van al catálogo general
+  if (esPreventaActiva(p)) return false;
+  // Juegos solo-oferta (no están en Stock)
   if (p.soloOferta && !p.soloPreventa) {
     return (p.variants || []).some(v => ofertaVigente(v));
   }
@@ -79,13 +93,13 @@ function productoVisible(p) {
 
 function productoTieneOferta(p) {
   if (p.visible === false) return false;
-  if (p.isPreorder) return false; // no mostrar en ofertas normales
+  // Preventas activas NO van a ofertas
+  if (esPreventaActiva(p)) return false;
   return (p.variants || []).some(v => ofertaVigente(v));
 }
 
 function productoEsPreventa(p) {
-  if (p.visible === false) return false;
-  return p.isPreorder === true;
+  return esPreventaActiva(p);
 }
 
 function escapeHtml(str) {
@@ -140,7 +154,6 @@ function filtrarPreventas() {
     const q = preState.search.toLowerCase().trim();
     lista = lista.filter(p => String(p.title || '').toLowerCase().includes(q));
   }
-  // Ordenar por fecha de estreno más próxima
   lista.sort((a, b) => {
     const fa = a.releaseDate || '9999';
     const fb = b.releaseDate || '9999';
@@ -310,7 +323,7 @@ function renderCard(p, prefijo = 'cat') {
     ? `<div class="card-image"><img src="${safeUrl(p.coverUrl)}" alt="${escapeHtml(p.title || '')}" class="card-image-img" loading="lazy"></div>`
     : `<div class="card-image card-image-empty"><span class="card-image-placeholder">🎮</span></div>`;
 
-  const esPreventa = prefijo === 'preventa' || p.isPreorder;
+  const esPreventa = prefijo === 'preventa';
   const preorderBadge = esPreventa
     ? `<div class="card-preorder-badge">🚀 PREVENTA${p.releaseDate ? ` · Estreno: ${formatearFecha(p.releaseDate)}` : ''}</div>`
     : '';
@@ -320,7 +333,7 @@ function renderCard(p, prefijo = 'cat') {
     return (p.variants || []).some(v => {
       if (v.categoria !== c) return false;
       if (esModoOferta) return ofertaVigente(v) !== null;
-      return tieneCostoNormal(v) || tieneCostoOferta(v) || p.isPreorder;
+      return tieneCostoNormal(v) || tieneCostoOferta(v) || esPreventa;
     });
   });
 
@@ -425,6 +438,53 @@ function actualizarPrecio(p, cardId, prefijo) {
 
   const oferta = ofertaVigente(variante);
   const tieneNormal = Number(variante.costoARS) > 0 && Number(variante.precioFinalUYU) > 0;
+  const esPreventa = prefijo === 'preventa';
+
+  // ========================================
+  // MODO PREVENTA
+  // ========================================
+  if (esPreventa) {
+    // Si tiene precio normal cargado
+    if (tieneNormal) {
+      const precioMostrar = moneda === 'USD'
+        ? formatUSD(calcPrecioUSD(variante.precioFinalUYU, cotizaciones.usdAUYU))
+        : formatUYU(variante.precioFinalUYU);
+      const precioSecundario = moneda === 'USD'
+        ? formatUYU(variante.precioFinalUYU)
+        : '≈ ' + formatUSD(calcPrecioUSD(variante.precioFinalUYU, cotizaciones.usdAUYU));
+
+      priceWrap.innerHTML = `
+        <div class="card-price-tag">PRECIO DE RESERVA</div>
+        <div class="card-price">${precioMostrar}</div>
+        <div class="card-price-usd">${precioSecundario}</div>
+      `;
+    } else {
+      // Sin precio → "A CONFIRMAR"
+      priceWrap.innerHTML = `
+        <div class="card-price-tag">PRECIO</div>
+        <div class="card-price card-price-preorder">🔒 A CONFIRMAR</div>
+      `;
+    }
+    if (stockWrap) stockWrap.innerHTML = `<span class="stock-badge stock-preorder">🚀 Preventa</span>`;
+    if (offerWrap) offerWrap.innerHTML = '';
+    if (countdown) { countdown.textContent = ''; countdown.style.display = 'none'; }
+    if (waBtn) {
+      const tipoLabel = acc === 'secundaria' ? 'Secundaria' : 'Primaria';
+      const catLabel = cat.toUpperCase();
+      const fecha = p.releaseDate ? ` (estreno: ${formatearFecha(p.releaseDate)})` : '';
+      const precioMsg = tieneNormal ? ` por ${priceWrap.querySelector('.card-price').innerText}` : '';
+      const msg = `Hola GamesUy Store! Quiero RESERVAR *${p.title}* (${catLabel} ${tipoLabel})${fecha}${precioMsg}`;
+      waBtn.href = `https://wa.me/59896572226?text=${encodeURIComponent(msg)}`;
+      waBtn.innerText = '🚀 Reservar Preventa';
+      waBtn.classList.add('btn-preorder');
+      waBtn.classList.remove('btn-buy', 'btn-secondary');
+    }
+    return;
+  }
+
+  // ========================================
+  // MODO NORMAL (catálogo / ofertas)
+  // ========================================
 
   // CASO 1 — Oferta + precio normal → tachado + oferta
   if (oferta && tieneNormal) {
@@ -456,7 +516,7 @@ function actualizarPrecio(p, cardId, prefijo) {
       waBtn.href = `https://wa.me/59896572226?text=${encodeURIComponent(msg)}`;
       waBtn.innerText = '💬 Comprar por WhatsApp';
       waBtn.classList.add('btn-buy');
-      waBtn.classList.remove('btn-secondary');
+      waBtn.classList.remove('btn-secondary', 'btn-preorder');
     }
     return;
   }
@@ -488,7 +548,7 @@ function actualizarPrecio(p, cardId, prefijo) {
       waBtn.href = `https://wa.me/59896572226?text=${encodeURIComponent(msg)}`;
       waBtn.innerText = '💬 Comprar por WhatsApp';
       waBtn.classList.add('btn-buy');
-      waBtn.classList.remove('btn-secondary');
+      waBtn.classList.remove('btn-secondary', 'btn-preorder');
     }
     return;
   }
@@ -515,32 +575,12 @@ function actualizarPrecio(p, cardId, prefijo) {
       waBtn.href = `https://wa.me/59896572226?text=${encodeURIComponent(msg)}`;
       waBtn.innerText = '💬 Comprar por WhatsApp';
       waBtn.classList.add('btn-buy');
-      waBtn.classList.remove('btn-secondary');
+      waBtn.classList.remove('btn-secondary', 'btn-preorder');
     }
     return;
   }
 
-  // CASO 4 — Sin precio ni oferta
-  // Si es preventa → "RESERVAR" en vez de "AGOTADO"
-  if (p.isPreorder) {
-    priceWrap.innerHTML = `<div class="card-price card-price-preorder">🔒 PRECIO A CONFIRMAR</div>`;
-    if (stockWrap) stockWrap.innerHTML = `<span class="stock-badge stock-preorder">🚀 Preventa</span>`;
-    if (offerWrap) offerWrap.innerHTML = '';
-    if (countdown) { countdown.textContent = ''; countdown.style.display = 'none'; }
-    if (waBtn) {
-      const tipoLabel = acc === 'secundaria' ? 'Secundaria' : 'Primaria';
-      const catLabel = cat.toUpperCase();
-      const fecha = p.releaseDate ? ` (estreno: ${formatearFecha(p.releaseDate)})` : '';
-      const msg = `Hola GamesUy Store! Quiero RESERVAR *${p.title}* (${catLabel} ${tipoLabel})${fecha}`;
-      waBtn.href = `https://wa.me/59896572226?text=${encodeURIComponent(msg)}`;
-      waBtn.innerText = '🚀 Reservar Preventa';
-      waBtn.classList.add('btn-preorder');
-      waBtn.classList.remove('btn-buy', 'btn-secondary');
-    }
-    return;
-  }
-
-  // Sin precio, sin oferta, sin preventa → AGOTADO
+  // CASO 4 — Sin precio ni oferta → AGOTADO
   priceWrap.innerHTML = `<div class="card-price card-price-empty">AGOTADO</div>`;
   if (stockWrap) stockWrap.innerHTML = `<span class="stock-badge stock-out">Sin stock</span>`;
   if (offerWrap) offerWrap.innerHTML = '';
@@ -548,7 +588,7 @@ function actualizarPrecio(p, cardId, prefijo) {
   if (waBtn) {
     waBtn.href = `https://wa.me/59896572226?text=${encodeURIComponent(`Hola GamesUy Store! Quiero reservar *${p.title}* cuando vuelva a estar disponible.`)}`;
     waBtn.innerText = '🔔 Reservar por WhatsApp';
-    waBtn.classList.remove('btn-buy');
+    waBtn.classList.remove('btn-buy', 'btn-preorder');
     waBtn.classList.add('btn-secondary');
   }
 }
@@ -676,4 +716,4 @@ document.getElementById('trailer-modal')?.addEventListener('click', (e) => {
   if (e.target.id === 'trailer-modal') document.getElementById('trailer-modal')?.classList.add('hidden');
 });
 
-console.log('[GamesUy] store.js v6 cargado (catálogo + ofertas + preventas)');
+console.log('[GamesUy] store.js v6.1 cargado (preventas auto)');

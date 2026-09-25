@@ -1,6 +1,6 @@
 // ============================================================
-// GAMESUY STORE — Catálogo público + Ofertas
-// Fase 5.1: Oferta sin tachado cuando no hay precio normal
+// GAMESUY STORE — Catálogo público + Ofertas + Preventas
+// Fase 6: Preventas visibles
 // ============================================================
 
 import { db } from './firebase-config.js';
@@ -13,39 +13,39 @@ let productos = [];
 let cotizaciones = { arsAUYU: 0.055, usdAUYU: 39.50 };
 let pagosTexto = 'Prex / Mercado Pago / BROU';
 
-let filtroSearch = '';
-let filtroCat = 'all';
-let pagina = 1;
+// Estado por sección
+let catState = { search: '', cat: 'all', pagina: 1 };
+let ofState = { search: '', cat: 'all', pagina: 1 };
+let preState = { search: '', cat: 'all', pagina: 1 };
 const POR_PAGINA = 24;
-
-let ofertasPagina = 1;
-let ofertasSearch = '';
-let ofertasCat = 'all';
 
 let countdownInterval = null;
 
+// ============================================================
+// CARGA DE DATOS
+// ============================================================
 onSnapshot(doc(db, 'settings', 'cotizaciones'), (snap) => {
   if (!snap.exists()) return;
   const c = snap.data();
   cotizaciones.arsAUYU = Number(c.arsAUYU) || 0.055;
   cotizaciones.usdAUYU = Number(c.usdAUYU) || 39.50;
-  render();
-  renderOfertas();
+  renderAll();
 });
 
 onSnapshot(doc(db, 'settings', 'payments'), (snap) => {
   pagosTexto = (snap.exists() && snap.data().text) ? snap.data().text : 'Prex / Mercado Pago / BROU';
-  render();
-  renderOfertas();
+  renderAll();
 });
 
 onSnapshot(collection(db, 'products'), (snap) => {
   productos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   console.log('[GamesUy] Catálogo:', productos.length, 'productos');
-  render();
-  renderOfertas();
+  renderAll();
 });
 
+// ============================================================
+// HELPERS
+// ============================================================
 function tienePrecioNormal(v) { return Number(v?.precioFinalUYU) > 0; }
 function tienePrecioOferta(v) { return Number(v?.ofertaPrecioUYU) > 0; }
 function tieneCostoNormal(v) { return Number(v?.costoARS) > 0; }
@@ -70,6 +70,7 @@ function varianteVendible(v) {
 
 function productoVisible(p) {
   if (p.visible === false) return false;
+  if (p.isPreorder) return true; // preventas siempre visibles si están publicadas
   if (p.soloOferta && !p.soloPreventa) {
     return (p.variants || []).some(v => ofertaVigente(v));
   }
@@ -78,7 +79,13 @@ function productoVisible(p) {
 
 function productoTieneOferta(p) {
   if (p.visible === false) return false;
+  if (p.isPreorder) return false; // no mostrar en ofertas normales
   return (p.variants || []).some(v => ofertaVigente(v));
+}
+
+function productoEsPreventa(p) {
+  if (p.visible === false) return false;
+  return p.isPreorder === true;
 }
 
 function escapeHtml(str) {
@@ -97,11 +104,14 @@ function formatearFecha(dateStr) {
   return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : dateStr;
 }
 
+// ============================================================
+// FILTROS
+// ============================================================
 function filtrarProductos() {
   let lista = productos.filter(productoVisible);
-  if (filtroCat !== 'all') lista = lista.filter(p => (p.categories || []).includes(filtroCat));
-  if (filtroSearch) {
-    const q = filtroSearch.toLowerCase().trim();
+  if (catState.cat !== 'all') lista = lista.filter(p => (p.categories || []).includes(catState.cat));
+  if (catState.search) {
+    const q = catState.search.toLowerCase().trim();
     lista = lista.filter(p => String(p.title || '').toLowerCase().includes(q));
   }
   lista.sort((a, b) => String(a.title || '').localeCompare(String(b.title || ''), 'es'));
@@ -110,9 +120,9 @@ function filtrarProductos() {
 
 function filtrarOfertas() {
   let lista = productos.filter(productoTieneOferta);
-  if (ofertasCat !== 'all') lista = lista.filter(p => (p.categories || []).includes(ofertasCat));
-  if (ofertasSearch) {
-    const q = ofertasSearch.toLowerCase().trim();
+  if (ofState.cat !== 'all') lista = lista.filter(p => (p.categories || []).includes(ofState.cat));
+  if (ofState.search) {
+    const q = ofState.search.toLowerCase().trim();
     lista = lista.filter(p => String(p.title || '').toLowerCase().includes(q));
   }
   lista.sort((a, b) => {
@@ -123,15 +133,43 @@ function filtrarOfertas() {
   return lista;
 }
 
-function render() {
+function filtrarPreventas() {
+  let lista = productos.filter(productoEsPreventa);
+  if (preState.cat !== 'all') lista = lista.filter(p => (p.categories || []).includes(preState.cat));
+  if (preState.search) {
+    const q = preState.search.toLowerCase().trim();
+    lista = lista.filter(p => String(p.title || '').toLowerCase().includes(q));
+  }
+  // Ordenar por fecha de estreno más próxima
+  lista.sort((a, b) => {
+    const fa = a.releaseDate || '9999';
+    const fb = b.releaseDate || '9999';
+    return fa.localeCompare(fb);
+  });
+  return lista;
+}
+
+// ============================================================
+// RENDER GLOBAL
+// ============================================================
+function renderAll() {
+  renderCatalogo();
+  renderOfertas();
+  renderPreventas();
+}
+
+// ============================================================
+// RENDER CATÁLOGO
+// ============================================================
+function renderCatalogo() {
   const grid = $('product-grid');
   const count = $('results-count');
   if (!grid) return;
 
   const filtrados = filtrarProductos();
   const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA));
-  if (pagina > totalPaginas) pagina = totalPaginas;
-  const inicio = (pagina - 1) * POR_PAGINA;
+  if (catState.pagina > totalPaginas) catState.pagina = totalPaginas;
+  const inicio = (catState.pagina - 1) * POR_PAGINA;
   const enPagina = filtrados.slice(inicio, inicio + POR_PAGINA);
 
   if (count) count.textContent = filtrados.length === 0
@@ -145,15 +183,18 @@ function render() {
         <p>No hay juegos con precio cargado por ahora.</p>
         <p class="catalog-empty-sub">Volvé pronto — estamos actualizando el catálogo.</p>
       </div>`;
-    renderPaginacion('catalog-pagination', 0, 0, (p) => { pagina = p; render(); });
+    renderPaginacion('catalog-pagination', 0, 0, (p) => { catState.pagina = p; renderCatalogo(); });
     return;
   }
 
   grid.innerHTML = enPagina.map(p => renderCard(p, 'cat')).join('');
   activarCards(enPagina, 'cat');
-  renderPaginacion('catalog-pagination', pagina, totalPaginas, (p) => { pagina = p; render(); });
+  renderPaginacion('catalog-pagination', catState.pagina, totalPaginas, (p) => { catState.pagina = p; renderCatalogo(); });
 }
 
+// ============================================================
+// RENDER OFERTAS
+// ============================================================
 function renderOfertas() {
   const grid = $('ofertas-grid');
   const count = $('ofertas-count');
@@ -161,8 +202,8 @@ function renderOfertas() {
 
   const filtrados = filtrarOfertas();
   const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA));
-  if (ofertasPagina > totalPaginas) ofertasPagina = totalPaginas;
-  const inicio = (ofertasPagina - 1) * POR_PAGINA;
+  if (ofState.pagina > totalPaginas) ofState.pagina = totalPaginas;
+  const inicio = (ofState.pagina - 1) * POR_PAGINA;
   const enPagina = filtrados.slice(inicio, inicio + POR_PAGINA);
 
   if (count) count.textContent = filtrados.length === 0
@@ -176,15 +217,52 @@ function renderOfertas() {
         <p>No hay ofertas activas en este momento.</p>
         <p class="catalog-empty-sub">Volvé pronto — renovamos las ofertas cada 15 días.</p>
       </div>`;
-    renderPaginacion('ofertas-pagination', 0, 0, (p) => { ofertasPagina = p; renderOfertas(); });
+    renderPaginacion('ofertas-pagination', 0, 0, (p) => { ofState.pagina = p; renderOfertas(); });
     return;
   }
 
   grid.innerHTML = enPagina.map(p => renderCard(p, 'oferta')).join('');
   activarCards(enPagina, 'oferta');
-  renderPaginacion('ofertas-pagination', ofertasPagina, totalPaginas, (p) => { ofertasPagina = p; renderOfertas(); });
+  renderPaginacion('ofertas-pagination', ofState.pagina, totalPaginas, (p) => { ofState.pagina = p; renderOfertas(); });
 }
 
+// ============================================================
+// RENDER PREVENTAS
+// ============================================================
+function renderPreventas() {
+  const grid = $('preventas-grid');
+  const count = $('preventas-count');
+  if (!grid) return;
+
+  const filtrados = filtrarPreventas();
+  const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA));
+  if (preState.pagina > totalPaginas) preState.pagina = totalPaginas;
+  const inicio = (preState.pagina - 1) * POR_PAGINA;
+  const enPagina = filtrados.slice(inicio, inicio + POR_PAGINA);
+
+  if (count) count.textContent = filtrados.length === 0
+    ? 'Sin preventas disponibles'
+    : `${filtrados.length} preventa${filtrados.length !== 1 ? 's' : ''} disponible${filtrados.length !== 1 ? 's' : ''}`;
+
+  if (enPagina.length === 0) {
+    grid.innerHTML = `
+      <div class="catalog-empty">
+        <span class="catalog-empty-icon">🚀</span>
+        <p>No hay preventas publicadas en este momento.</p>
+        <p class="catalog-empty-sub">Volvé pronto — actualizamos las preventas cada mes.</p>
+      </div>`;
+    renderPaginacion('preventas-pagination', 0, 0, (p) => { preState.pagina = p; renderPreventas(); });
+    return;
+  }
+
+  grid.innerHTML = enPagina.map(p => renderCard(p, 'preventa')).join('');
+  activarCards(enPagina, 'preventa');
+  renderPaginacion('preventas-pagination', preState.pagina, totalPaginas, (p) => { preState.pagina = p; renderPreventas(); });
+}
+
+// ============================================================
+// ACTIVAR CARDS
+// ============================================================
 function activarCards(lista, prefijo) {
   lista.forEach(p => {
     const cardId = p.id;
@@ -199,6 +277,9 @@ function activarCards(lista, prefijo) {
   });
 }
 
+// ============================================================
+// PAGINACIÓN
+// ============================================================
 function renderPaginacion(contId, actual, total, onPage) {
   const cont = document.getElementById(contId);
   if (!cont) return;
@@ -216,6 +297,9 @@ function renderPaginacion(contId, actual, total, onPage) {
   });
 }
 
+// ============================================================
+// CARD
+// ============================================================
 function renderCard(p, prefijo = 'cat') {
   const cardId = p.id;
   const cats = p.categories || [];
@@ -226,8 +310,9 @@ function renderCard(p, prefijo = 'cat') {
     ? `<div class="card-image"><img src="${safeUrl(p.coverUrl)}" alt="${escapeHtml(p.title || '')}" class="card-image-img" loading="lazy"></div>`
     : `<div class="card-image card-image-empty"><span class="card-image-placeholder">🎮</span></div>`;
 
-  const preorderBadge = p.isPreorder
-    ? `<div class="card-preorder-badge">🚀 PREVENTA${p.releaseDate ? ` · ${formatearFecha(p.releaseDate)}` : ''}</div>`
+  const esPreventa = prefijo === 'preventa' || p.isPreorder;
+  const preorderBadge = esPreventa
+    ? `<div class="card-preorder-badge">🚀 PREVENTA${p.releaseDate ? ` · Estreno: ${formatearFecha(p.releaseDate)}` : ''}</div>`
     : '';
 
   const esModoOferta = prefijo === 'oferta';
@@ -235,7 +320,7 @@ function renderCard(p, prefijo = 'cat') {
     return (p.variants || []).some(v => {
       if (v.categoria !== c) return false;
       if (esModoOferta) return ofertaVigente(v) !== null;
-      return tieneCostoNormal(v) || tieneCostoOferta(v);
+      return tieneCostoNormal(v) || tieneCostoOferta(v) || p.isPreorder;
     });
   });
 
@@ -276,6 +361,9 @@ function renderCard(p, prefijo = 'cat') {
   `;
 }
 
+// ============================================================
+// SELECTORES DE CUENTA
+// ============================================================
 function actualizarSelectoresCuenta(p, cardId, prefijo) {
   const selConsole = document.getElementById(`sel-console-${prefijo}-${cardId}`);
   const selAccount = document.getElementById(`sel-account-${prefijo}-${cardId}`);
@@ -300,6 +388,9 @@ function actualizarSelectoresCuenta(p, cardId, prefijo) {
   if (tipos.length === 0) selAccount.innerHTML = '<option value="">—</option>';
 }
 
+// ============================================================
+// PRECIO
+// ============================================================
 function actualizarPrecio(p, cardId, prefijo) {
   const priceWrap = document.getElementById(`price-wrap-${prefijo}-${cardId}`);
   const stockWrap = document.getElementById(`stock-wrap-${prefijo}-${cardId}`);
@@ -335,7 +426,7 @@ function actualizarPrecio(p, cardId, prefijo) {
   const oferta = ofertaVigente(variante);
   const tieneNormal = Number(variante.costoARS) > 0 && Number(variante.precioFinalUYU) > 0;
 
-  // CASO 1 — Hay oferta Y hay precio normal → mostramos tachado + oferta
+  // CASO 1 — Oferta + precio normal → tachado + oferta
   if (oferta && tieneNormal) {
     const precioMostrar = moneda === 'USD'
       ? formatUSD(calcPrecioUSD(oferta.precio, cotizaciones.usdAUYU))
@@ -370,7 +461,7 @@ function actualizarPrecio(p, cardId, prefijo) {
     return;
   }
 
-  // CASO 2 — Hay oferta pero NO hay precio normal → mostramos con etiqueta "Precio especial"
+  // CASO 2 — Oferta sin precio normal → "PRECIO ESPECIAL"
   if (oferta && !tieneNormal) {
     const precioMostrar = moneda === 'USD'
       ? formatUSD(calcPrecioUSD(oferta.precio, cotizaciones.usdAUYU))
@@ -429,7 +520,27 @@ function actualizarPrecio(p, cardId, prefijo) {
     return;
   }
 
-  // CASO 4 — Sin precio ni oferta → AGOTADO
+  // CASO 4 — Sin precio ni oferta
+  // Si es preventa → "RESERVAR" en vez de "AGOTADO"
+  if (p.isPreorder) {
+    priceWrap.innerHTML = `<div class="card-price card-price-preorder">🔒 PRECIO A CONFIRMAR</div>`;
+    if (stockWrap) stockWrap.innerHTML = `<span class="stock-badge stock-preorder">🚀 Preventa</span>`;
+    if (offerWrap) offerWrap.innerHTML = '';
+    if (countdown) { countdown.textContent = ''; countdown.style.display = 'none'; }
+    if (waBtn) {
+      const tipoLabel = acc === 'secundaria' ? 'Secundaria' : 'Primaria';
+      const catLabel = cat.toUpperCase();
+      const fecha = p.releaseDate ? ` (estreno: ${formatearFecha(p.releaseDate)})` : '';
+      const msg = `Hola GamesUy Store! Quiero RESERVAR *${p.title}* (${catLabel} ${tipoLabel})${fecha}`;
+      waBtn.href = `https://wa.me/59896572226?text=${encodeURIComponent(msg)}`;
+      waBtn.innerText = '🚀 Reservar Preventa';
+      waBtn.classList.add('btn-preorder');
+      waBtn.classList.remove('btn-buy', 'btn-secondary');
+    }
+    return;
+  }
+
+  // Sin precio, sin oferta, sin preventa → AGOTADO
   priceWrap.innerHTML = `<div class="card-price card-price-empty">AGOTADO</div>`;
   if (stockWrap) stockWrap.innerHTML = `<span class="stock-badge stock-out">Sin stock</span>`;
   if (offerWrap) offerWrap.innerHTML = '';
@@ -442,6 +553,9 @@ function actualizarPrecio(p, cardId, prefijo) {
   }
 }
 
+// ============================================================
+// COUNTDOWN
+// ============================================================
 function actualizarCountdown(el) {
   if (!el || !el.dataset.end) return;
   const end = new Date(el.dataset.end).getTime();
@@ -460,6 +574,9 @@ if (!countdownInterval) {
   }, 1000);
 }
 
+// ============================================================
+// TRAILER
+// ============================================================
 window.abrirTrailer = function(cardId) {
   const p = productos.find(x => x.id === cardId);
   if (!p) return;
@@ -487,19 +604,21 @@ function getYouTubeEmbed(url) {
   return (m && m[2].length === 11) ? `https://www.youtube.com/embed/${m[2]}` : null;
 }
 
+// ============================================================
+// LISTENERS DE BÚSQUEDA Y CATEGORÍAS
+// ============================================================
 const searchInput = $('search-input');
 if (searchInput) {
   searchInput.addEventListener('input', (e) => {
-    const pageOfertas = $('page-ofertas');
-    const enOfertas = pageOfertas && pageOfertas.classList.contains('active-page');
+    const val = e.target.value;
+    const enOfertas = $('page-ofertas')?.classList.contains('active-page');
+    const enPreventas = $('page-preventas')?.classList.contains('active-page');
     if (enOfertas) {
-      ofertasSearch = e.target.value;
-      ofertasPagina = 1;
-      renderOfertas();
+      ofState.search = val; ofState.pagina = 1; renderOfertas();
+    } else if (enPreventas) {
+      preState.search = val; preState.pagina = 1; renderPreventas();
     } else {
-      filtroSearch = e.target.value;
-      pagina = 1;
-      render();
+      catState.search = val; catState.pagina = 1; renderCatalogo();
     }
   });
 }
@@ -509,41 +628,47 @@ document.querySelectorAll('#cat-nav .cat-btn').forEach(btn => {
     document.querySelectorAll('#cat-nav .cat-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     const cat = btn.dataset.cat || 'all';
-    const pageOfertas = $('page-ofertas');
-    const enOfertas = pageOfertas && pageOfertas.classList.contains('active-page');
+    const enOfertas = $('page-ofertas')?.classList.contains('active-page');
+    const enPreventas = $('page-preventas')?.classList.contains('active-page');
     if (enOfertas) {
-      ofertasCat = cat;
-      ofertasPagina = 1;
-      renderOfertas();
+      ofState.cat = cat; ofState.pagina = 1; renderOfertas();
+    } else if (enPreventas) {
+      preState.cat = cat; preState.pagina = 1; renderPreventas();
     } else {
-      filtroCat = cat;
-      pagina = 1;
-      render();
+      catState.cat = cat; catState.pagina = 1; renderCatalogo();
     }
   });
 });
 
+// Detectar cambio de página
 const originalSwitchPage = window.switchPage;
 window.switchPage = function(pageId) {
   if (originalSwitchPage) originalSwitchPage(pageId);
+  const si = $('search-input');
+  const catActiva = document.querySelector('#cat-nav .cat-btn.active');
+  const cat = catActiva ? (catActiva.dataset.cat || 'all') : 'all';
+
   if (pageId === 'ofertas') {
-    const si = $('search-input');
-    if (si) ofertasSearch = si.value;
-    const catActiva = document.querySelector('#cat-nav .cat-btn.active');
-    if (catActiva) ofertasCat = catActiva.dataset.cat || 'all';
-    ofertasPagina = 1;
+    if (si) ofState.search = si.value;
+    ofState.cat = cat;
+    ofState.pagina = 1;
     setTimeout(() => renderOfertas(), 50);
   }
+  if (pageId === 'preventas') {
+    if (si) preState.search = si.value;
+    preState.cat = cat;
+    preState.pagina = 1;
+    setTimeout(() => renderPreventas(), 50);
+  }
   if (pageId === 'catalogo') {
-    const si = $('search-input');
-    if (si) filtroSearch = si.value;
-    const catActiva = document.querySelector('#cat-nav .cat-btn.active');
-    if (catActiva) filtroCat = catActiva.dataset.cat || 'all';
-    pagina = 1;
-    setTimeout(() => render(), 50);
+    if (si) catState.search = si.value;
+    catState.cat = cat;
+    catState.pagina = 1;
+    setTimeout(() => renderCatalogo(), 50);
   }
 };
 
+// Cerrar trailer
 document.getElementById('trailer-close')?.addEventListener('click', () => {
   document.getElementById('trailer-modal')?.classList.add('hidden');
 });
@@ -551,4 +676,4 @@ document.getElementById('trailer-modal')?.addEventListener('click', (e) => {
   if (e.target.id === 'trailer-modal') document.getElementById('trailer-modal')?.classList.add('hidden');
 });
 
-console.log('[GamesUy] store.js v5.1 cargado');
+console.log('[GamesUy] store.js v6 cargado (catálogo + ofertas + preventas)');

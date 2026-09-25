@@ -8,13 +8,12 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=18">
+  <link rel="stylesheet" href="styles.css?v=19">
 </head>
 <body>
 
   <header class="site-header">
     <div class="header-inner">
-
       <div class="brand">
         <div class="brand-logo-wrap">
           <img id="store-logo" src="" alt="" class="brand-logo"
@@ -58,12 +57,10 @@
         <button class="cat-btn" data-cat="streaming">Streaming</button>
         <button class="cat-btn" data-cat="otros">Otros</button>
       </nav>
-
     </div>
   </header>
 
   <main class="container">
-
     <section id="page-catalogo" class="page-section active-page">
       <div class="announcement-banner" id="announcement-banner">
         <div class="announcement-glow"></div>
@@ -78,9 +75,7 @@
           <h2 class="section-title">Catálogo</h2>
           <span class="results-count" id="results-count">Cargando...</span>
         </div>
-        <div id="product-grid" class="product-grid">
-          <p class="empty-message">Cargando catálogo...</p>
-        </div>
+        <div id="product-grid" class="product-grid"><p class="empty-message">Cargando catálogo...</p></div>
         <div id="catalog-pagination" class="catalog-pagination"></div>
       </div>
     </section>
@@ -151,7 +146,7 @@
           <div class="admin-grid">
             <div class="admin-card admin-card-wide">
               <h3>💰 Gestionar precios</h3>
-              <p class="admin-help">Poné el precio final en pesos uruguayos de cada variante. Si el juego está en oferta, podés poner dos precios: normal y de oferta.</p>
+              <p class="admin-help">Poné el precio final en pesos uruguayos de cada variante. Los juegos con oferta activa muestran 2 inputs (normal + oferta).</p>
 
               <div class="precios-stats">
                 <span class="stat-badge">📊 Total: <strong id="stat-total">0</strong></span>
@@ -173,8 +168,10 @@
                 </select>
                 <select id="precios-estado">
                   <option value="todos">Todos</option>
-                  <option value="pendientes">Solo pendientes</option>
-                  <option value="completos">Solo completos</option>
+                  <option value="con-stock">🟢 Con stock</option>
+                  <option value="sin-stock">⚫ Sin stock</option>
+                  <option value="pendientes">⏳ Pendientes</option>
+                  <option value="completos">✅ Completos</option>
                 </select>
               </div>
 
@@ -193,15 +190,11 @@
 
         <div class="admin-tab-content" data-tab-content="excel">
           <div class="admin-grid">
-
             <div class="admin-card admin-card-wide">
               <h3>📥 1. Importar STOCK (mensual)</h3>
-              <p class="admin-help">Este Excel trae todos los juegos con sus costos. Se usa una vez por mes para crear/actualizar el catálogo.</p>
-
+              <p class="admin-help">Este Excel trae todos los juegos con sus costos. Los juegos SIN STOCK se crean igual, pero quedan marcados.</p>
               <input type="file" id="excel-stock" accept=".xlsx,.xls" class="admin-file">
-
               <div id="stock-log" class="import-log"><em>Esperando archivo...</em></div>
-
               <div class="admin-actions">
                 <button id="btn-process-stock" class="btn btn-primary" disabled>📥 Procesar Stock</button>
               </div>
@@ -209,18 +202,14 @@
 
             <div class="admin-card admin-card-wide">
               <h3>🔥 2. Importar OFERTAS (cada 15 días)</h3>
-              <p class="admin-help">Este Excel trae las ofertas vigentes (solo Primaria). Ingresá la fecha hasta la cual estarán vigentes.</p>
-
+              <p class="admin-help">El Excel trae ofertas vigentes (solo Primaria). Se crean las 4 variantes automáticamente.</p>
               <div class="oferta-fecha-row">
                 <label class="admin-label">📅 Válidas hasta:</label>
                 <input type="date" id="oferta-fecha-hasta">
-                <p class="admin-hint">Las ofertas se limpian automáticamente cuando vence esta fecha.</p>
+                <p class="admin-hint">Las ofertas se limpian automáticamente al vencer.</p>
               </div>
-
               <input type="file" id="excel-ofertas" accept=".xlsx,.xls" class="admin-file">
-
               <div id="ofertas-log" class="import-log"><em>Esperando archivo...</em></div>
-
               <div class="admin-actions">
                 <button id="btn-process-ofertas" class="btn btn-primary" disabled>🔥 Procesar Ofertas</button>
                 <button id="btn-clean-ofertas" class="btn btn-secondary">🧹 Limpiar ofertas vencidas</button>
@@ -230,16 +219,12 @@
             <div class="admin-card admin-card-wide">
               <h3>🚀 3. Importar PREVENTAS</h3>
               <p class="admin-help">Este Excel trae los juegos próximos a salir (PS5, solo Primaria).</p>
-
               <input type="file" id="excel-preventas" accept=".xlsx,.xls" class="admin-file">
-
               <div id="preventas-log" class="import-log"><em>Esperando archivo...</em></div>
-
               <div class="admin-actions">
                 <button id="btn-process-preventas" class="btn btn-primary" disabled>🚀 Procesar Preventas</button>
               </div>
             </div>
-
           </div>
         </div>
 
@@ -313,29 +298,23 @@
           <div class="admin-grid">
             <div class="admin-card admin-card-wide admin-card-danger">
               <h3>🧹 Limpiar productos</h3>
-              <p class="admin-help">Dos formas de limpiar: por falta de <code>matchKey</code> (productos viejos de intentos anteriores) o por fecha (productos creados recientemente que fueron mal cargados).</p>
-
-              <div id="clean-log" class="import-log"><em>Click en "Analizar" para ver qué se borraría.</em></div>
-
+              <p class="admin-help">Por falta de <code>matchKey</code> o por fecha.</p>
+              <div id="clean-log" class="import-log"><em>Click en "Analizar".</em></div>
               <div class="admin-actions">
                 <button id="btn-analyze-clean" class="btn btn-secondary">🔍 Analizar sin matchKey</button>
                 <button id="btn-analyze-recent" class="btn btn-warning">⏰ Analizar recientes</button>
                 <button id="btn-do-clean" class="btn btn-danger" disabled>🗑️ Borrar productos</button>
               </div>
-
               <label class="admin-label" style="margin-top:16px;">Escribí <code>BORRAR</code> para confirmar:</label>
               <input type="text" id="clean-confirm" placeholder="BORRAR" autocomplete="off" disabled>
             </div>
           </div>
         </div>
-
       </div>
     </section>
-
   </main>
 
   <footer class="site-footer"><p>© 2026 GamesUy Store — Juegos digitales en Uruguay</p></footer>
-
   <a href="https://wa.me/59896572226" class="chat-float" target="_blank" rel="noopener">💬</a>
 
   <!-- MODAL LOGIN -->
@@ -374,13 +353,11 @@
             <label class="admin-label">Título del juego</label>
             <input type="text" id="info-title" placeholder="Ej: Resident Evil Village">
           </div>
-
           <div class="info-field">
             <label class="admin-label">Categorías (separadas por coma)</label>
             <input type="text" id="info-categories" placeholder="ps4, ps5">
             <p class="admin-hint">Ejemplo: <strong>ps4, ps5</strong></p>
           </div>
-
           <div class="info-field">
             <label class="admin-label">🖼️ Portada del juego</label>
             <div class="upload-group">
@@ -394,7 +371,6 @@
             </div>
             <div id="info-cover-status" class="upload-status"></div>
           </div>
-
           <div class="info-field">
             <label class="admin-label">🎮 Gameplay / Captura</label>
             <div class="upload-group">
@@ -408,28 +384,23 @@
             </div>
             <div id="info-gameplay-status" class="upload-status"></div>
           </div>
-
           <div class="info-field">
             <label class="admin-label">🎬 Trailer de YouTube</label>
             <input type="text" id="info-youtube" placeholder="https://youtube.com/watch?v=...">
           </div>
-
           <div class="info-field">
             <label class="admin-label">📝 Descripción</label>
             <textarea id="info-description" rows="4" placeholder="Descripción del juego..."></textarea>
           </div>
-
           <div class="info-field">
             <label class="admin-label">📌 Opciones</label>
             <label class="check-label"><input type="checkbox" id="info-preorder"> Marcar como preventa</label>
             <label class="check-label"><input type="checkbox" id="info-visible" checked> Visible en la tienda</label>
           </div>
-
           <div class="info-field">
             <label class="admin-label">📅 Fecha de lanzamiento (si es preventa)</label>
             <input type="date" id="info-release">
           </div>
-
           <div class="admin-actions">
             <button id="btn-save-info" class="btn btn-primary">💾 Guardar información</button>
           </div>
@@ -457,7 +428,6 @@
       if (btn) btn.classList.add('active');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     };
-
     document.querySelectorAll('.nav-btn').forEach(btn => {
       if (btn.classList.contains('nav-btn-admin')) return;
       btn.addEventListener('click', () => {
@@ -465,43 +435,8 @@
         if (page) window.switchPage(page);
       });
     });
-
     window.switchTab = function(tabId) {
       document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
       document.querySelectorAll('.admin-tab-content').forEach(c => c.classList.remove('active'));
       const tab = document.querySelector('.admin-tab[data-tab="' + tabId + '"]');
-      const content = document.querySelector('.admin-tab-content[data-tab-content="' + tabId + '"]');
-      if (tab) tab.classList.add('active');
-      if (content) content.classList.add('active');
-    };
-
-    document.querySelectorAll('.admin-tab').forEach(tab => {
-      tab.addEventListener('click', () => window.switchTab(tab.dataset.tab));
-    });
-
-    window.switchModalTab = function(tabId) {
-      document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
-      document.querySelectorAll('.modal-tab-content').forEach(c => c.classList.remove('active'));
-      const tab = document.querySelector('.modal-tab[data-mtab="' + tabId + '"]');
-      const content = document.querySelector('.modal-tab-content[data-mtab-content="' + tabId + '"]');
-      if (tab) tab.classList.add('active');
-      if (content) content.classList.add('active');
-    };
-
-    document.querySelectorAll('.modal-tab').forEach(tab => {
-      tab.addEventListener('click', () => window.switchModalTab(tab.dataset.mtab));
-    });
-  </script>
-
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-
-  <script type="module" src="js/settings.js?v=18"></script>
-  <script type="module" src="js/auth.js?v=18"></script>
-  <script type="module" src="js/admin.js?v=18"></script>
-  <script type="module" src="js/excel-importer.js?v=18"></script>
-  <script type="module" src="js/maintenance.js?v=18"></script>
-  <script type="module" src="js/precios.js?v=18"></script>
-  <script type="module" src="js/store.js?v=18"></script>
-
-</body>
-</html>
+      const content = document.querySelector('.admin-tab-content[data-tab

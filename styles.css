@@ -2116,3 +2116,285 @@ body::after {
   font-weight: 800;
   letter-spacing: 1px;
 }
+
+/* ============================================================
+   FASE 7 — Carga masiva de precios
+   ============================================================ */
+
+.masivo-toolbar {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr auto;
+  gap: 12px;
+  margin-bottom: 16px;
+  align-items: center;
+}
+.masivo-toolbar input,
+.masivo-toolbar select {
+  font-family: inherit;
+  font-size: 0.9rem;
+  color: var(--text);
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 10px 14px;
+  outline: none;
+}
+.masivo-toolbar input:focus,
+.masivo-toolbar select:focus {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 3px var(--cyan-soft);
+}
+.masivo-count {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.masivo-save-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+  background: linear-gradient(135deg, rgba(0, 240, 255, 0.06), rgba(139, 92, 246, 0.06));
+  border: 1px solid var(--border-hi);
+  border-radius: var(--r-md);
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.masivo-changes {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.masivo-changes.con-cambios {
+  color: var(--green);
+}
+.masivo-save-bar .btn {
+  width: auto;
+  min-width: 240px;
+  padding: 12px 24px;
+}
+
+.masivo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.masivo-juego {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+.masivo-juego-preventa {
+  border-color: rgba(0, 145, 255, 0.4);
+}
+
+.masivo-juego-header {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(90deg, rgba(0, 240, 255, 0.03), transparent);
+}
+.masivo-juego-title {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.masivo-juego-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.masivo-juego-title h4 {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+}
+.masivo-preventa-badge {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  padding: 3px 8px;
+  border-radius: var(--r-sm);
+  background: linear-gradient(90deg, #0091ff, #00b4d8);
+  color: #fff;
+  text-transform: uppercase;
+  box-shadow: 0 0 10px rgba(0, 145, 255, 0.4);
+}
+
+.masivo-juego-variantes {
+  padding: 12px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.masivo-variante-row {
+  display: grid;
+  grid-template-columns: 130px 1fr 200px 90px;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--bg-0);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+}
+
+.masivo-var-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--cyan);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.masivo-var-costo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+.masivo-var-costo .masivo-input-costo {
+  width: 100px;
+  padding: 6px 10px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text);
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  outline: none;
+  text-align: right;
+  -moz-appearance: textfield;
+}
+.masivo-var-costo .masivo-input-costo::-webkit-outer-spin-button,
+.masivo-var-costo .masivo-input-costo::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.masivo-var-costo .masivo-input-costo:focus {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 2px var(--cyan-soft);
+}
+.masivo-var-ars {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+.masivo-var-arrow {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+.masivo-var-uyu {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--cyan);
+  min-width: 70px;
+}
+
+.masivo-var-precio {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 6px 10px;
+}
+.masivo-var-precio:focus-within {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 2px var(--cyan-soft);
+}
+.masivo-var-symbol {
+  color: var(--text-muted);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+.masivo-input-precio {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-align: right;
+  outline: none;
+  -moz-appearance: textfield;
+}
+.masivo-input-precio::-webkit-outer-spin-button,
+.masivo-input-precio::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.masivo-var-uyu-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.masivo-var-usd {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-align: right;
+}
+
+.masivo-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+.masivo-pagination .btn {
+  width: auto;
+  min-width: 140px;
+  padding: 10px 20px;
+  font-size: 0.85rem;
+}
+#masivo-page-info {
+  font-size: 0.9rem;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .masivo-toolbar {
+    grid-template-columns: 1fr;
+  }
+  .masivo-variante-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .masivo-var-label {
+    font-size: 0.75rem;
+  }
+  .masivo-var-costo,
+  .masivo-var-precio {
+    width: 100%;
+  }
+  .masivo-var-costo .masivo-input-costo {
+    flex: 1;
+    width: auto;
+  }
+  .masivo-save-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .masivo-save-bar .btn {
+    width: 100%;
+    min-width: 100%;
+  }
+}

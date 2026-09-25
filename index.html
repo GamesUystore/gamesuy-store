@@ -439,4 +439,34 @@
       document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
       document.querySelectorAll('.admin-tab-content').forEach(c => c.classList.remove('active'));
       const tab = document.querySelector('.admin-tab[data-tab="' + tabId + '"]');
-      const content = document.querySelector('.admin-tab-content[data-tab
+      const content = document.querySelector('.admin-tab-content[data-tab-content="' + tabId + '"]');
+      if (tab) tab.classList.add('active');
+      if (content) content.classList.add('active');
+    };
+    document.querySelectorAll('.admin-tab').forEach(tab => {
+      tab.addEventListener('click', () => window.switchTab(tab.dataset.tab));
+    });
+    window.switchModalTab = function(tabId) {
+      document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.modal-tab-content').forEach(c => c.classList.remove('active'));
+      const tab = document.querySelector('.modal-tab[data-mtab="' + tabId + '"]');
+      const content = document.querySelector('.modal-tab-content[data-mtab-content="' + tabId + '"]');
+      if (tab) tab.classList.add('active');
+      if (content) content.classList.add('active');
+    };
+    document.querySelectorAll('.modal-tab').forEach(tab => {
+      tab.addEventListener('click', () => window.switchModalTab(tab.dataset.mtab));
+    });
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <script type="module" src="js/settings.js?v=19"></script>
+  <script type="module" src="js/auth.js?v=19"></script>
+  <script type="module" src="js/admin.js?v=19"></script>
+  <script type="module" src="js/excel-importer.js?v=19"></script>
+  <script type="module" src="js/maintenance.js?v=19"></script>
+  <script type="module" src="js/precios.js?v=19"></script>
+  <script type="module" src="js/store.js?v=19"></script>
+</body>
+</html>

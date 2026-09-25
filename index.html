@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=19">
+  <link rel="stylesheet" href="styles.css?v=20">
 </head>
 <body>
 
@@ -81,9 +81,15 @@
     </section>
 
     <section id="page-ofertas" class="page-section">
-      <h2 class="section-title section-title-hot">🔥 Ofertas Especiales</h2>
-      <p class="section-subtitle">Juegos y suscripciones con descuentos por tiempo limitado.</p>
-      <div id="ofertas-grid" class="product-grid"><p class="empty-message">Próximamente.</p></div>
+      <div class="grid-section">
+        <div class="grid-header">
+          <h2 class="section-title section-title-hot">🔥 Ofertas Especiales</h2>
+          <span class="results-count" id="ofertas-count">Cargando ofertas...</span>
+        </div>
+        <p class="section-subtitle">Juegos y suscripciones con descuentos por tiempo limitado.</p>
+        <div id="ofertas-grid" class="product-grid"><p class="empty-message">Cargando ofertas...</p></div>
+        <div id="ofertas-pagination" class="catalog-pagination"></div>
+      </div>
     </section>
 
     <section id="page-preventas" class="page-section">
@@ -461,12 +467,12 @@
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-  <script type="module" src="js/settings.js?v=19"></script>
-  <script type="module" src="js/auth.js?v=19"></script>
-  <script type="module" src="js/admin.js?v=19"></script>
-  <script type="module" src="js/excel-importer.js?v=19"></script>
-  <script type="module" src="js/maintenance.js?v=19"></script>
-  <script type="module" src="js/precios.js?v=19"></script>
-  <script type="module" src="js/store.js?v=19"></script>
+  <script type="module" src="js/settings.js?v=20"></script>
+  <script type="module" src="js/auth.js?v=20"></script>
+  <script type="module" src="js/admin.js?v=20"></script>
+  <script type="module" src="js/excel-importer.js?v=20"></script>
+  <script type="module" src="js/maintenance.js?v=20"></script>
+  <script type="module" src="js/precios.js?v=20"></script>
+  <script type="module" src="js/store.js?v=20"></script>
 </body>
 </html>

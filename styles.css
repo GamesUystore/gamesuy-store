@@ -1815,3 +1815,21 @@ body::after {
   background: linear-gradient(90deg, #ff0055, transparent);
   box-shadow: 0 0 12px #ff0055;
 }
+
+/* ============================================================
+   FASE 5.1 — Etiquetas y costos manuales
+   ============================================================ */
+
+.card-price-tag {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #00b4d8;
+  background: rgba(0, 180, 216, 0.15);
+  border: 1px solid rgba(0, 180, 216, 0.4);
+  padding: 3px 8px;
+  border-radius: var(--r-sm);
+  margin-bottom: 4px;
+}

@@ -1,6 +1,6 @@
 // ============================================================
-// GAMESUY STORE — Catálogo público
-// Fase 4.3: AGOTADO cuando disponible: false
+// GAMESUY STORE — Catálogo público + Ofertas
+// Fase 5: pestaña Ofertas visible
 // ============================================================
 
 import { db } from './firebase-config.js';
@@ -12,31 +12,48 @@ const $ = (id) => document.getElementById(id);
 let productos = [];
 let cotizaciones = { arsAUYU: 0.055, usdAUYU: 39.50 };
 let pagosTexto = 'Prex / Mercado Pago / BROU';
+
+// Catálogo
 let filtroSearch = '';
 let filtroCat = 'all';
 let pagina = 1;
 const POR_PAGINA = 24;
+
+// Ofertas
+let ofertasPagina = 1;
+let ofertasSearch = '';
+let ofertasCat = 'all';
+
 let countdownInterval = null;
 
+// ============================================================
+// CARGA DE DATOS
+// ============================================================
 onSnapshot(doc(db, 'settings', 'cotizaciones'), (snap) => {
   if (!snap.exists()) return;
   const c = snap.data();
   cotizaciones.arsAUYU = Number(c.arsAUYU) || 0.055;
   cotizaciones.usdAUYU = Number(c.usdAUYU) || 39.50;
   render();
+  renderOfertas();
 });
 
 onSnapshot(doc(db, 'settings', 'payments'), (snap) => {
   pagosTexto = (snap.exists() && snap.data().text) ? snap.data().text : 'Prex / Mercado Pago / BROU';
   render();
+  renderOfertas();
 });
 
 onSnapshot(collection(db, 'products'), (snap) => {
   productos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   console.log('[GamesUy] Catálogo:', productos.length, 'productos');
   render();
+  renderOfertas();
 });
 
+// ============================================================
+// HELPERS
+// ============================================================
 function tienePrecioNormal(v) { return Number(v?.precioFinalUYU) > 0; }
 function tienePrecioOferta(v) { return Number(v?.ofertaPrecioUYU) > 0; }
 function tieneCostoNormal(v) { return Number(v?.costoARS) > 0; }
@@ -47,22 +64,30 @@ function ofertaVigente(v) {
   const hoy = new Date().toISOString().split('T')[0];
   if (v.ofertaHasta < hoy) return null;
   if (!(Number(v.ofertaPrecioUYU) > 0)) return null;
-  return { precio: Number(v.ofertaPrecioUYU), original: Number(v.precioFinalUYU) || 0, hasta: v.ofertaHasta };
+  return {
+    precio: Number(v.ofertaPrecioUYU),
+    original: Number(v.precioFinalUYU) || 0,
+    hasta: v.ofertaHasta
+  };
 }
 
 function varianteVendible(v) {
   if (v.disponible === false) return false;
-  // Vendible si tiene precio de oferta activo o precio normal
   return ofertaVigente(v) !== null || (tieneCostoNormal(v) && tienePrecioNormal(v));
 }
 
 function productoVisible(p) {
   if (p.visible === false) return false;
   if (p.soloOferta && !p.soloPreventa) {
-    // soloOferta → solo se muestra si tiene oferta vigente con precio
     return (p.variants || []).some(v => ofertaVigente(v));
   }
   return (p.variants || []).some(varianteVendible);
+}
+
+// Un producto está en "ofertas" si tiene al menos una variante con oferta vigente
+function productoTieneOferta(p) {
+  if (p.visible === false) return false;
+  return (p.variants || []).some(v => ofertaVigente(v));
 }
 
 function escapeHtml(str) {
@@ -75,6 +100,15 @@ function safeUrl(url) {
   return String(url || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+function formatearFecha(dateStr) {
+  if (!dateStr) return '';
+  const parts = String(dateStr).split('-');
+  return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : dateStr;
+}
+
+// ============================================================
+// FILTROS
+// ============================================================
 function filtrarProductos() {
   let lista = productos.filter(productoVisible);
   if (filtroCat !== 'all') lista = lista.filter(p => (p.categories || []).includes(filtroCat));
@@ -86,6 +120,25 @@ function filtrarProductos() {
   return lista;
 }
 
+function filtrarOfertas() {
+  let lista = productos.filter(productoTieneOferta);
+  if (ofertasCat !== 'all') lista = lista.filter(p => (p.categories || []).includes(ofertasCat));
+  if (ofertasSearch) {
+    const q = ofertasSearch.toLowerCase().trim();
+    lista = lista.filter(p => String(p.title || '').toLowerCase().includes(q));
+  }
+  // Ordenar por fecha de vencimiento más próxima
+  lista.sort((a, b) => {
+    const fa = (a.variants || []).map(v => v.ofertaHasta).filter(Boolean).sort()[0] || '9999';
+    const fb = (b.variants || []).map(v => v.ofertaHasta).filter(Boolean).sort()[0] || '9999';
+    return fa.localeCompare(fb);
+  });
+  return lista;
+}
+
+// ============================================================
+// RENDER CATÁLOGO
+// ============================================================
 function render() {
   const grid = $('product-grid');
   const count = $('results-count');
@@ -108,29 +161,71 @@ function render() {
         <p>No hay juegos con precio cargado por ahora.</p>
         <p class="catalog-empty-sub">Volvé pronto — estamos actualizando el catálogo.</p>
       </div>`;
-    renderPaginacion(0, 0);
+    renderPaginacion('catalog-pagination', 0, 0, (p) => { pagina = p; render(); });
     return;
   }
 
-  grid.innerHTML = enPagina.map(renderCard).join('');
-
-  enPagina.forEach(p => {
-    const cardId = p.id;
-    const selConsole = document.getElementById(`sel-console-${cardId}`);
-    const selAccount = document.getElementById(`sel-account-${cardId}`);
-    const selCurrency = document.getElementById(`sel-currency-${cardId}`);
-    if (selConsole) selConsole.addEventListener('change', () => { actualizarSelectoresCuenta(p, cardId); actualizarPrecio(p, cardId); });
-    if (selAccount) selAccount.addEventListener('change', () => actualizarPrecio(p, cardId));
-    if (selCurrency) selCurrency.addEventListener('change', () => actualizarPrecio(p, cardId));
-    if (selConsole) actualizarSelectoresCuenta(p, cardId);
-    actualizarPrecio(p, cardId);
-  });
-
-  renderPaginacion(pagina, totalPaginas);
+  grid.innerHTML = enPagina.map(p => renderCard(p, 'cat')).join('');
+  activarCards(enPagina, 'cat');
+  renderPaginacion('catalog-pagination', pagina, totalPaginas, (p) => { pagina = p; render(); });
 }
 
-function renderPaginacion(actual, total) {
-  const cont = document.getElementById('catalog-pagination');
+// ============================================================
+// RENDER OFERTAS
+// ============================================================
+function renderOfertas() {
+  const grid = $('ofertas-grid');
+  const count = $('ofertas-count');
+  if (!grid) return;
+
+  const filtrados = filtrarOfertas();
+  const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA));
+  if (ofertasPagina > totalPaginas) ofertasPagina = totalPaginas;
+  const inicio = (ofertasPagina - 1) * POR_PAGINA;
+  const enPagina = filtrados.slice(inicio, inicio + POR_PAGINA);
+
+  if (count) count.textContent = filtrados.length === 0
+    ? 'Sin ofertas activas'
+    : `${filtrados.length} oferta${filtrados.length !== 1 ? 's' : ''} disponible${filtrados.length !== 1 ? 's' : ''}`;
+
+  if (enPagina.length === 0) {
+    grid.innerHTML = `
+      <div class="catalog-empty">
+        <span class="catalog-empty-icon">🔥</span>
+        <p>No hay ofertas activas en este momento.</p>
+        <p class="catalog-empty-sub">Volvé pronto — renovamos las ofertas cada 15 días.</p>
+      </div>`;
+    renderPaginacion('ofertas-pagination', 0, 0, (p) => { ofertasPagina = p; renderOfertas(); });
+    return;
+  }
+
+  grid.innerHTML = enPagina.map(p => renderCard(p, 'oferta')).join('');
+  activarCards(enPagina, 'oferta');
+  renderPaginacion('ofertas-pagination', ofertasPagina, totalPaginas, (p) => { ofertasPagina = p; renderOfertas(); });
+}
+
+// ============================================================
+// ACTIVAR CARDS (listeners)
+// ============================================================
+function activarCards(lista, prefijo) {
+  lista.forEach(p => {
+    const cardId = p.id;
+    const selConsole = document.getElementById(`sel-console-${prefijo}-${cardId}`);
+    const selAccount = document.getElementById(`sel-account-${prefijo}-${cardId}`);
+    const selCurrency = document.getElementById(`sel-currency-${prefijo}-${cardId}`);
+    if (selConsole) selConsole.addEventListener('change', () => { actualizarSelectoresCuenta(p, cardId, prefijo); actualizarPrecio(p, cardId, prefijo); });
+    if (selAccount) selAccount.addEventListener('change', () => actualizarPrecio(p, cardId, prefijo));
+    if (selCurrency) selCurrency.addEventListener('change', () => actualizarPrecio(p, cardId, prefijo));
+    if (selConsole) actualizarSelectoresCuenta(p, cardId, prefijo);
+    actualizarPrecio(p, cardId, prefijo);
+  });
+}
+
+// ============================================================
+// PAGINACIÓN
+// ============================================================
+function renderPaginacion(contId, actual, total, onPage) {
+  const cont = document.getElementById(contId);
   if (!cont) return;
   if (total <= 1) { cont.innerHTML = ''; return; }
   cont.innerHTML = `
@@ -141,12 +236,15 @@ function renderPaginacion(actual, total) {
   cont.querySelectorAll('.pag-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const p = parseInt(btn.dataset.pag);
-      if (!isNaN(p) && p >= 1 && p <= total) { pagina = p; render(); window.scrollTo({ top: 200, behavior: 'smooth' }); }
+      if (!isNaN(p) && p >= 1 && p <= total) { onPage(p); window.scrollTo({ top: 200, behavior: 'smooth' }); }
     });
   });
 }
 
-function renderCard(p) {
+// ============================================================
+// CARD (compartida entre catálogo y ofertas)
+// ============================================================
+function renderCard(p, prefijo = 'cat') {
   const cardId = p.id;
   const cats = p.categories || [];
   const badges = cats.filter(c => ['ps4', 'ps5', 'ps3', 'steam', 'psplus', 'streaming', 'otros'].includes(c))
@@ -160,8 +258,14 @@ function renderCard(p) {
     ? `<div class="card-preorder-badge">🚀 PREVENTA${p.releaseDate ? ` · ${formatearFecha(p.releaseDate)}` : ''}</div>`
     : '';
 
+  // En modo oferta: solo mostrar consolas con oferta activa
+  const esModoOferta = prefijo === 'oferta';
   const consolasDisponibles = cats.filter(c => {
-    return (p.variants || []).some(v => v.categoria === c && (tieneCostoNormal(v) || tieneCostoOferta(v)));
+    return (p.variants || []).some(v => {
+      if (v.categoria !== c) return false;
+      if (esModoOferta) return ofertaVigente(v) !== null;
+      return tieneCostoNormal(v) || tieneCostoOferta(v);
+    });
   });
 
   const tieneSelectores = consolasDisponibles.length > 0;
@@ -170,10 +274,10 @@ function renderCard(p) {
     selectoresHtml = `
       <div class="card-variant-selectors">
         ${consolasDisponibles.length > 1
-          ? `<select id="sel-console-${cardId}" class="card-select">${consolasDisponibles.map(c => `<option value="${c}">${c.toUpperCase()}</option>`).join('')}</select>`
-          : `<input type="hidden" id="sel-console-${cardId}" value="${consolasDisponibles[0]}">`}
-        <select id="sel-account-${cardId}" class="card-select"></select>
-        <select id="sel-currency-${cardId}" class="card-select">
+          ? `<select id="sel-console-${prefijo}-${cardId}" class="card-select">${consolasDisponibles.map(c => `<option value="${c}">${c.toUpperCase()}</option>`).join('')}</select>`
+          : `<input type="hidden" id="sel-console-${prefijo}-${cardId}" value="${consolasDisponibles[0]}">`}
+        <select id="sel-account-${prefijo}-${cardId}" class="card-select"></select>
+        <select id="sel-currency-${prefijo}-${cardId}" class="card-select">
           <option value="UYU">$ UYU</option>
           <option value="USD">US$ USD</option>
         </select>
@@ -189,30 +293,33 @@ function renderCard(p) {
       ${imagen}
       <h3 class="card-title">${escapeHtml(p.title || '(sin título)')}</h3>
       ${preorderBadge}
-      <div class="card-offer-wrap" id="offer-wrap-${cardId}"></div>
+      <div class="card-offer-wrap" id="offer-wrap-${prefijo}-${cardId}"></div>
       ${selectoresHtml}
-      <div class="card-price-wrap" id="price-wrap-${cardId}"></div>
-      <div class="card-stock-wrap" id="stock-wrap-${cardId}"></div>
+      <div class="card-price-wrap" id="price-wrap-${prefijo}-${cardId}"></div>
+      <div class="card-stock-wrap" id="stock-wrap-${prefijo}-${cardId}"></div>
       <div class="card-payments">💳 ${escapeHtml(pagosTexto)}</div>
-      <div class="card-countdown" id="countdown-${cardId}"></div>
-      <a class="btn btn-buy" id="wa-${cardId}" href="#" target="_blank" rel="noopener">💬 Comprar por WhatsApp</a>
+      <div class="card-countdown" id="countdown-${prefijo}-${cardId}"></div>
+      <a class="btn btn-buy" id="wa-${prefijo}-${cardId}" href="#" target="_blank" rel="noopener">💬 Comprar por WhatsApp</a>
       ${tieneTrailer ? `<button class="btn btn-secondary" onclick="abrirTrailer('${cardId}')">🎬 Ver Trailer</button>` : ''}
     </article>
   `;
 }
 
-function formatearFecha(dateStr) {
-  if (!dateStr) return '';
-  const parts = String(dateStr).split('-');
-  return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : dateStr;
-}
-
-function actualizarSelectoresCuenta(p, cardId) {
-  const selConsole = document.getElementById(`sel-console-${cardId}`);
-  const selAccount = document.getElementById(`sel-account-${cardId}`);
+// ============================================================
+// SELECTORES DE CUENTA
+// ============================================================
+function actualizarSelectoresCuenta(p, cardId, prefijo) {
+  const selConsole = document.getElementById(`sel-console-${prefijo}-${cardId}`);
+  const selAccount = document.getElementById(`sel-account-${prefijo}-${cardId}`);
   if (!selConsole || !selAccount) return;
+
   const catActual = selConsole.value;
-  const variantesCat = (p.variants || []).filter(v => v.categoria === catActual);
+  const esModoOferta = prefijo === 'oferta';
+  const variantesCat = (p.variants || []).filter(v => {
+    if (v.categoria !== catActual) return false;
+    if (esModoOferta) return ofertaVigente(v) !== null;
+    return true;
+  });
 
   const tipos = [];
   if (variantesCat.some(v => v.tipo === 'primaria')) tipos.push('primaria');
@@ -225,17 +332,20 @@ function actualizarSelectoresCuenta(p, cardId) {
   if (tipos.length === 0) selAccount.innerHTML = '<option value="">—</option>';
 }
 
-function actualizarPrecio(p, cardId) {
-  const priceWrap = document.getElementById(`price-wrap-${cardId}`);
-  const stockWrap = document.getElementById(`stock-wrap-${cardId}`);
-  const offerWrap = document.getElementById(`offer-wrap-${cardId}`);
-  const countdown = document.getElementById(`countdown-${cardId}`);
-  const waBtn = document.getElementById(`wa-${cardId}`);
+// ============================================================
+// PRECIO
+// ============================================================
+function actualizarPrecio(p, cardId, prefijo) {
+  const priceWrap = document.getElementById(`price-wrap-${prefijo}-${cardId}`);
+  const stockWrap = document.getElementById(`stock-wrap-${prefijo}-${cardId}`);
+  const offerWrap = document.getElementById(`offer-wrap-${prefijo}-${cardId}`);
+  const countdown = document.getElementById(`countdown-${prefijo}-${cardId}`);
+  const waBtn = document.getElementById(`wa-${prefijo}-${cardId}`);
   if (!priceWrap) return;
 
-  const selConsole = document.getElementById(`sel-console-${cardId}`);
-  const selAccount = document.getElementById(`sel-account-${cardId}`);
-  const selCurrency = document.getElementById(`sel-currency-${cardId}`);
+  const selConsole = document.getElementById(`sel-console-${prefijo}-${cardId}`);
+  const selAccount = document.getElementById(`sel-account-${prefijo}-${cardId}`);
+  const selCurrency = document.getElementById(`sel-currency-${prefijo}-${cardId}`);
   if (!selConsole || !selAccount || !selCurrency) return;
 
   const cat = selConsole.value;
@@ -243,7 +353,7 @@ function actualizarPrecio(p, cardId) {
   const moneda = selCurrency.value;
   const variante = (p.variants || []).find(v => v.categoria === cat && v.tipo === acc);
 
-  // Sin variante o sin stock → AGOTADO con reserva
+  // Sin variante → AGOTADO
   if (!variante) {
     priceWrap.innerHTML = `<div class="card-price card-price-empty">AGOTADO</div>`;
     if (stockWrap) stockWrap.innerHTML = `<span class="stock-badge stock-out">Sin stock</span>`;
@@ -261,7 +371,6 @@ function actualizarPrecio(p, cardId) {
   const oferta = ofertaVigente(variante);
   const tieneNormal = Number(variante.costoARS) > 0 && Number(variante.precioFinalUYU) > 0;
 
-  // Si hay oferta → mostrar oferta
   if (oferta) {
     const precioMostrar = moneda === 'USD'
       ? formatUSD(calcPrecioUSD(oferta.precio, cotizaciones.usdAUYU))
@@ -296,7 +405,6 @@ function actualizarPrecio(p, cardId) {
     return;
   }
 
-  // Sin oferta → si tiene precio normal, mostrar
   if (tieneNormal) {
     const precioMostrar = moneda === 'USD'
       ? formatUSD(calcPrecioUSD(variante.precioFinalUYU, cotizaciones.usdAUYU))
@@ -323,7 +431,7 @@ function actualizarPrecio(p, cardId) {
     return;
   }
 
-  // Sin precio ni oferta → AGOTADO con reserva
+  // Sin precio ni oferta → AGOTADO
   priceWrap.innerHTML = `<div class="card-price card-price-empty">AGOTADO</div>`;
   if (stockWrap) stockWrap.innerHTML = `<span class="stock-badge stock-out">Sin stock</span>`;
   if (offerWrap) offerWrap.innerHTML = '';
@@ -336,6 +444,9 @@ function actualizarPrecio(p, cardId) {
   }
 }
 
+// ============================================================
+// COUNTDOWN
+// ============================================================
 function actualizarCountdown(el) {
   if (!el || !el.dataset.end) return;
   const end = new Date(el.dataset.end).getTime();
@@ -354,6 +465,9 @@ if (!countdownInterval) {
   }, 1000);
 }
 
+// ============================================================
+// TRAILER
+// ============================================================
 window.abrirTrailer = function(cardId) {
   const p = productos.find(x => x.id === cardId);
   if (!p) return;
@@ -381,19 +495,78 @@ function getYouTubeEmbed(url) {
   return (m && m[2].length === 11) ? `https://www.youtube.com/embed/${m[2]}` : null;
 }
 
-const searchInput = $('search-input');
-if (searchInput) searchInput.addEventListener('input', (e) => { filtroSearch = e.target.value; pagina = 1; render(); });
+// ============================================================
+// LISTENERS GENERALES
+// ============================================================
 
+// Búsqueda catálogo
+const searchInput = $('search-input');
+if (searchInput) {
+  searchInput.addEventListener('input', (e) => {
+    // Detectar si estamos en la página de ofertas
+    const pageOfertas = $('page-ofertas');
+    const enOfertas = pageOfertas && pageOfertas.classList.contains('active-page');
+    if (enOfertas) {
+      ofertasSearch = e.target.value;
+      ofertasPagina = 1;
+      renderOfertas();
+    } else {
+      filtroSearch = e.target.value;
+      pagina = 1;
+      render();
+    }
+  });
+}
+
+// Categorías catálogo
 document.querySelectorAll('#cat-nav .cat-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('#cat-nav .cat-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    filtroCat = btn.dataset.cat || 'all';
-    pagina = 1;
-    render();
+    const cat = btn.dataset.cat || 'all';
+
+    // Aplicar según la página activa
+    const pageOfertas = $('page-ofertas');
+    const enOfertas = pageOfertas && pageOfertas.classList.contains('active-page');
+
+    if (enOfertas) {
+      ofertasCat = cat;
+      ofertasPagina = 1;
+      renderOfertas();
+    } else {
+      filtroCat = cat;
+      pagina = 1;
+      render();
+    }
   });
 });
 
+// Detectar cambio de página para re-renderizar ofertas
+const originalSwitchPage = window.switchPage;
+window.switchPage = function(pageId) {
+  if (originalSwitchPage) originalSwitchPage(pageId);
+
+  // Si vamos a ofertas → sincronizar search + categorías
+  if (pageId === 'ofertas') {
+    const si = $('search-input');
+    if (si) ofertasSearch = si.value;
+    const catActiva = document.querySelector('#cat-nav .cat-btn.active');
+    if (catActiva) ofertasCat = catActiva.dataset.cat || 'all';
+    ofertasPagina = 1;
+    setTimeout(() => renderOfertas(), 50);
+  }
+  // Si vamos a catálogo → sincronizar
+  if (pageId === 'catalogo') {
+    const si = $('search-input');
+    if (si) filtroSearch = si.value;
+    const catActiva = document.querySelector('#cat-nav .cat-btn.active');
+    if (catActiva) filtroCat = catActiva.dataset.cat || 'all';
+    pagina = 1;
+    setTimeout(() => render(), 50);
+  }
+};
+
+// Cerrar trailer
 document.getElementById('trailer-close')?.addEventListener('click', () => {
   document.getElementById('trailer-modal')?.classList.add('hidden');
 });
@@ -401,4 +574,4 @@ document.getElementById('trailer-modal')?.addEventListener('click', (e) => {
   if (e.target.id === 'trailer-modal') document.getElementById('trailer-modal')?.classList.add('hidden');
 });
 
-console.log('[GamesUy] store.js v4.3 cargado');
+console.log('[GamesUy] store.js v5 cargado (catálogo + ofertas)');

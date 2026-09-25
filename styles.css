@@ -1833,3 +1833,212 @@ body::after {
   border-radius: var(--r-sm);
   margin-bottom: 4px;
 }
+
+/* ============================================================
+   FASE 5.3 — Modal unificado de precios
+   ============================================================ */
+
+.precio-seccion {
+  padding: 16px;
+  background: var(--bg-0);
+  border-radius: var(--r-md);
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+}
+.precio-seccion:last-child { margin-bottom: 0; }
+
+.precio-seccion-oferta {
+  background: linear-gradient(135deg, rgba(255, 0, 85, 0.06), rgba(255, 51, 119, 0.06));
+  border-color: rgba(255, 0, 85, 0.25);
+}
+
+.precio-seccion-titulo {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--cyan);
+  margin-bottom: 14px;
+}
+.precio-seccion-oferta .precio-seccion-titulo {
+  color: #ff4d6d;
+}
+
+.precio-costo-row { margin-bottom: 14px; }
+.precio-costo-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.precio-costo-inputs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.precio-costo-inputs .variante-input-costo,
+.precio-costo-inputs .variante-input-costo-oferta {
+  width: 140px;
+  padding: 8px 12px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text);
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  outline: none;
+  text-align: right;
+  -moz-appearance: textfield;
+}
+.precio-costo-inputs .variante-input-costo::-webkit-outer-spin-button,
+.precio-costo-inputs .variante-input-costo::-webkit-inner-spin-button,
+.precio-costo-inputs .variante-input-costo-oferta::-webkit-outer-spin-button,
+.precio-costo-inputs .variante-input-costo-oferta::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.precio-costo-inputs .variante-input-costo:focus,
+.precio-costo-inputs .variante-input-costo-oferta:focus {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 3px var(--cyan-soft);
+}
+.precio-costo-inputs .variante-input-costo-oferta:focus {
+  border-color: #ff4d6d;
+  box-shadow: 0 0 0 3px rgba(255, 77, 109, 0.15);
+}
+.costo-ars-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+}
+.costo-arrow {
+  color: var(--text-muted);
+  font-size: 1rem;
+  font-weight: 700;
+}
+.costo-uyu-preview {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--cyan);
+  padding: 6px 12px;
+  background: rgba(0, 240, 255, 0.08);
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  border-radius: var(--r-sm);
+  min-width: 90px;
+  text-align: center;
+}
+
+.precio-final-row { margin-bottom: 14px; }
+.precio-final-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.precio-final-inputs {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.precio-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 8px 12px;
+  min-width: 180px;
+}
+.precio-input-wrap:focus-within {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 3px var(--cyan-soft);
+}
+.precio-input-wrap .input-prefix,
+.precio-input-wrap .input-suffix {
+  color: var(--text-muted);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+.precio-input-wrap .variante-input-normal,
+.precio-input-wrap .variante-input-oferta {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  text-align: right;
+  outline: none;
+  -moz-appearance: textfield;
+}
+.precio-input-wrap .variante-input-normal::-webkit-outer-spin-button,
+.precio-input-wrap .variante-input-normal::-webkit-inner-spin-button,
+.precio-input-wrap .variante-input-oferta::-webkit-outer-spin-button,
+.precio-input-wrap .variante-input-oferta::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.precio-usd-preview {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  min-width: 90px;
+  text-align: left;
+}
+
+.variante-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 12px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.variante-header-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.precio-seccion .variante-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+.precio-seccion .variante-actions .btn {
+  min-width: 200px;
+}
+
+@media (max-width: 760px) {
+  .precio-costo-inputs,
+  .precio-final-inputs {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .precio-costo-inputs .variante-input-costo,
+  .precio-costo-inputs .variante-input-costo-oferta {
+    width: 100%;
+  }
+  .costo-uyu-preview,
+  .precio-usd-preview {
+    text-align: center;
+  }
+  .precio-seccion .variante-actions .btn {
+    min-width: 100%;
+  }
+}

@@ -1,6 +1,6 @@
 // ============================================================
 // GAMESUY STORE — Gestor de precios
-// Modelo: precio normal + precio de oferta (independientes)
+// Fase 4.3: Badge SIN STOCK + filtro con/sin stock
 // ============================================================
 
 import { db } from './firebase-config.js';
@@ -24,7 +24,7 @@ let pagina = 1;
 const POR_PAGINA = 30;
 let productoActivo = null;
 
-console.log('[GamesUy] precios.js v11 iniciando...');
+console.log('[GamesUy] precios.js v12 iniciando...');
 
 // ============================================================
 // COTIZACIONES
@@ -56,25 +56,26 @@ async function cargarProductos() {
 // ============================================================
 function tienePrecioNormal(v) { return Number(v?.precioFinalUYU) > 0; }
 function tienePrecioOferta(v) { return Number(v?.ofertaPrecioUYU) > 0; }
+function tieneStock(v) { return Number(v?.costoARS) > 0 && v?.disponible !== false; }
 
 function ofertaVigente(v) {
   if (!v.enOferta) return false;
   if (!v.ofertaHasta) return false;
   const hoy = new Date().toISOString().split('T')[0];
-  return v.ofertaHasta >= hoy && Number(v.ofertaCostoARS) > 0;
+  return v.ofertaHasta >= hoy;
 }
 
-/**
- * Un producto está "completo" si TODAS sus variantes tienen:
- *  - Precio normal cargado (si tiene costo Stock)
- *  - Precio de oferta cargado (si tiene oferta vigente)
- */
+// ¿Este producto tiene AL MENOS una variante con stock?
+function productoTieneStock(p) {
+  return (p.variants || []).some(tieneStock);
+}
+
 function productoCompleto(p) {
-  const vs = (p.variants || []).filter(v => Number(v.costoARS) > 0 || Number(v.ofertaCostoARS) > 0);
+  const vs = (p.variants || []).filter(v => Number(v.costoARS) > 0 || ofertaVigente(v));
   if (vs.length === 0) return false;
   return vs.every(v => {
     const necesitaNormal = Number(v.costoARS) > 0;
-    const necesitaOferta = ofertaVigente(v);
+    const necesitaOferta = ofertaVigente(v) && Number(v.ofertaCostoARS) > 0;
     if (necesitaNormal && !tienePrecioNormal(v)) return false;
     if (necesitaOferta && !tienePrecioOferta(v)) return false;
     return true;
@@ -82,11 +83,11 @@ function productoCompleto(p) {
 }
 
 function productoPendiente(p) {
-  const vs = (p.variants || []).filter(v => Number(v.costoARS) > 0 || Number(v.ofertaCostoARS) > 0);
+  const vs = (p.variants || []).filter(v => Number(v.costoARS) > 0 || ofertaVigente(v));
   if (vs.length === 0) return false;
   return vs.some(v => {
     const necesitaNormal = Number(v.costoARS) > 0;
-    const necesitaOferta = ofertaVigente(v);
+    const necesitaOferta = ofertaVigente(v) && Number(v.ofertaCostoARS) > 0;
     if (necesitaNormal && !tienePrecioNormal(v)) return true;
     if (necesitaOferta && !tienePrecioOferta(v)) return true;
     return false;
@@ -95,8 +96,12 @@ function productoPendiente(p) {
 
 function filtrarProductos() {
   let lista = productos.filter(p => (p.variants || []).length > 0);
+
   if (filtroEstado === 'pendientes') lista = lista.filter(productoPendiente);
   else if (filtroEstado === 'completos') lista = lista.filter(productoCompleto);
+  else if (filtroEstado === 'con-stock') lista = lista.filter(productoTieneStock);
+  else if (filtroEstado === 'sin-stock') lista = lista.filter(p => !productoTieneStock(p));
+
   if (filtroCat !== 'all') lista = lista.filter(p => (p.categories || []).includes(filtroCat));
   if (filtroSearch) {
     const q = filtroSearch.toLowerCase().trim();
@@ -128,7 +133,7 @@ function formatFecha(dateStr) {
 }
 
 // ============================================================
-// RENDER LISTA
+// RENDER
 // ============================================================
 function render() {
   const list = $('precios-list');
@@ -145,7 +150,6 @@ function render() {
   const filtrados = filtrarProductos();
   const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA));
   if (pagina > totalPaginas) pagina = totalPaginas;
-
   const inicio = (pagina - 1) * POR_PAGINA;
   const enPagina = filtrados.slice(inicio, inicio + POR_PAGINA);
 
@@ -164,17 +168,10 @@ function render() {
     const cats = (p.categories || []).map(c => `<span class="badge badge-${c}">${c.toUpperCase()}</span>`).join('');
     const vs = (p.variants || []).filter(v => Number(v.costoARS) > 0 || Number(v.ofertaCostoARS) > 0);
 
-    let totalItems = 0;
-    let completosItems = 0;
+    let totalItems = 0, completosItems = 0;
     vs.forEach(v => {
-      if (Number(v.costoARS) > 0) {
-        totalItems++;
-        if (tienePrecioNormal(v)) completosItems++;
-      }
-      if (ofertaVigente(v)) {
-        totalItems++;
-        if (tienePrecioOferta(v)) completosItems++;
-      }
+      if (Number(v.costoARS) > 0) { totalItems++; if (tienePrecioNormal(v)) completosItems++; }
+      if (ofertaVigente(v) && Number(v.ofertaCostoARS) > 0) { totalItems++; if (tienePrecioOferta(v)) completosItems++; }
     });
 
     const completo = completosItems === totalItems && totalItems > 0;
@@ -183,12 +180,16 @@ function render() {
     const oculto = p.visible === false ? '<span style="color:#ff8aa8; font-size:0.7rem;">(oculto)</span> ' : '';
     const tieneOferta = vs.some(ofertaVigente);
     const badgeOferta = tieneOferta ? '<span class="fila-oferta-badge">🔥</span> ' : '';
-    const soloOferta = p.soloOferta ? '<span style="color:#00b4d8; font-size:0.68rem;">[SOLO OFERTA]</span> ' : '';
+    const soloOferta = p.soloOferta ? '<span class="fila-solo-oferta">[SOLO OFERTA]</span> ' : '';
+    const tieneStock = productoTieneStock(p);
+    const badgeStock = tieneStock
+      ? '<span class="fila-stock-badge fila-stock-ok">🟢</span> '
+      : '<span class="fila-stock-badge fila-stock-off">⚫</span> ';
 
     return `
       <div class="fila-juego ${completo ? 'fila-completa' : ''}" data-prod-id="${p.id}">
         <div class="fila-badges">${cats}</div>
-        <div class="fila-titulo">${oculto}${tieneImg}${badgeOferta}${soloOferta}${escapeHtml(p.title || '(sin título)')}</div>
+        <div class="fila-titulo">${badgeStock}${oculto}${tieneImg}${badgeOferta}${soloOferta}${escapeHtml(p.title || '(sin título)')}</div>
         <div class="fila-progreso ${progresoClase}">${completosItems}/${totalItems}</div>
         <div class="fila-arrow">✏️</div>
       </div>
@@ -213,14 +214,11 @@ function abrirModal(prodId) {
   const prod = productos.find(p => p.id === prodId);
   if (!prod) return;
   productoActivo = prod;
-
   const title = $('price-modal-title');
   if (title) title.textContent = prod.title || 'Editar';
-
   window.switchModalTab('precios');
   renderModalPrecios(prod);
   renderModalInfo(prod);
-
   const modal = $('price-modal');
   if (modal) modal.classList.remove('hidden');
 }
@@ -239,17 +237,16 @@ function renderModalPrecios(prod) {
   if (!body) return;
 
   const variantes = (prod.variants || []).filter(v =>
-    Number(v.costoARS) > 0 || Number(v.ofertaCostoARS) > 0 || tienePrecioNormal(v) || tienePrecioOferta(v)
+    Number(v.costoARS) > 0 || Number(v.ofertaCostoARS) > 0 || ofertaVigente(v) || tienePrecioNormal(v)
   );
 
   if (variantes.length === 0) {
-    body.innerHTML = '<p class="empty-message">Este producto no tiene variantes con costo cargado.</p>';
+    body.innerHTML = '<p class="empty-message">Este producto no tiene variantes.</p>';
     return;
   }
 
   body.innerHTML = variantes.map(v => renderVarianteCompleta(v)).join('');
 
-  // Inputs de precio normal
   body.querySelectorAll('.variante-input-normal').forEach(inp => {
     inp.addEventListener('input', () => {
       const vid = inp.dataset.variant;
@@ -259,7 +256,6 @@ function renderModalPrecios(prod) {
     });
   });
 
-  // Inputs de precio de oferta
   body.querySelectorAll('.variante-input-oferta').forEach(inp => {
     inp.addEventListener('input', () => {
       const vid = inp.dataset.variant;
@@ -269,48 +265,62 @@ function renderModalPrecios(prod) {
     });
   });
 
-  // Botones guardar normal
   body.querySelectorAll('.btn-save-normal').forEach(btn => {
     btn.addEventListener('click', () => guardarPrecioNormal(prod, btn.dataset.variant, body));
   });
 
-  // Botones guardar oferta
   body.querySelectorAll('.btn-save-oferta').forEach(btn => {
     btn.addEventListener('click', () => guardarPrecioOferta(prod, btn.dataset.variant, body));
   });
 }
 
 function renderVarianteCompleta(v) {
-  const tieneCostoStock = Number(v.costoARS) > 0;
-  const tieneCostoOferta = Number(v.ofertaCostoARS) > 0;
+  const costoARS = Number(v.costoARS) || 0;
+  const ofertaCostoARS = Number(v.ofertaCostoARS) || 0;
+  const tieneCostoStock = costoARS > 0;
+  const tieneCostoOferta = ofertaCostoARS > 0;
   const esOferta = ofertaVigente(v);
-
-  // Si NO tiene costo Stock y SÍ tiene costo Oferta → es "solo oferta"
-  const esSoloOferta = !tieneCostoStock && tieneCostoOferta;
+  const sinStock = !tieneCostoStock && v.disponible === false && !esOferta;
 
   // Datos precio normal
-  const costoARS = Number(v.costoARS) || 0;
   const costoUYU = getCostoUYU(costoARS, cotizaciones.arsAUYU);
   const precioNormal = Number(v.precioFinalUYU) || 0;
   const usdNormal = precioNormal > 0 ? formatUSD(calcPrecioUSD(precioNormal, cotizaciones.usdAUYU)) : '—';
 
-  // Datos precio oferta
-  const ofertaCostoARS = Number(v.ofertaCostoARS) || 0;
+  // Datos oferta
   const ofertaCostoUYU = getCostoUYU(ofertaCostoARS, cotizaciones.arsAUYU);
   const ofertaPrecio = Number(v.ofertaPrecioUYU) || 0;
   const usdOferta = ofertaPrecio > 0 ? formatUSD(calcPrecioUSD(ofertaPrecio, cotizaciones.usdAUYU)) : '—';
 
   const ofertaBadge = esOferta
     ? `<span class="variante-oferta-badge">🔥 hasta ${formatFecha(v.ofertaHasta)}</span>`
-    : '';
+    : (v.enOferta ? `<span class="variante-oferta-badge variante-oferta-vencida">⌛ Oferta vencida</span>` : '');
 
-  // Si es solo oferta, mostramos SOLO la sección de oferta
-  if (esSoloOferta) {
+  const sinStockBadge = sinStock ? '<span class="variante-sinstock-badge">⛔ SIN STOCK</span>' : '';
+
+  // ---- BLOQUE: SIN COSTO NORMAL Y SIN OFERTA → solo mostrar mensaje
+  if (!tieneCostoStock && !tieneCostoOferta) {
+    return `
+      <div class="variante-bloque variante-sinstock">
+        <div class="variante-header">
+          <span class="variante-label">${v.label}</span>
+          ${sinStockBadge}
+        </div>
+        <p class="variante-sinstock-msg">
+          ⚠️ Esta variante no tiene costo del proveedor.<br>
+          <small>Va a activarse automáticamente cuando el próximo Excel de Stock traiga un precio.</small>
+        </p>
+      </div>
+    `;
+  }
+
+  // ---- BLOQUE: SOLO OFERTA (no tiene costo normal, y sí oferta)
+  if (!tieneCostoStock && tieneCostoOferta) {
     return `
       <div class="variante-bloque variante-con-oferta">
         <div class="variante-header">
           <span class="variante-label">${v.label}</span>
-          <span class="variante-solo-badge">SOLO OFERTA</span>
+          ${ofertaBadge}
         </div>
         <div class="precio-seccion precio-seccion-oferta">
           <div class="precio-seccion-titulo">🔥 Precio de oferta</div>
@@ -328,14 +338,14 @@ function renderVarianteCompleta(v) {
             <span class="variante-usd" data-usd-oferta="${v.id}">≈ ${usdOferta}</span>
           </div>
           <div class="variante-actions">
-            <button type="button" class="btn btn-primary btn-sm btn-save-oferta" data-variant="${v.id}">💾 Guardar precio</button>
+            <button type="button" class="btn btn-primary btn-sm btn-save-oferta" data-variant="${v.id}">💾 Guardar precio de oferta</button>
           </div>
         </div>
       </div>
     `;
   }
 
-  // Si tiene Stock → mostrar normal + (oferta si aplica)
+  // ---- BLOQUE: normal + (oferta si aplica)
   return `
     <div class="variante-bloque ${esOferta ? 'variante-con-oferta' : ''}">
       <div class="variante-header">
@@ -343,7 +353,6 @@ function renderVarianteCompleta(v) {
         ${ofertaBadge}
       </div>
 
-      <!-- PRECIO NORMAL -->
       <div class="precio-seccion">
         <div class="precio-seccion-titulo">💰 Precio normal</div>
         <div class="variante-costo">
@@ -365,24 +374,32 @@ function renderVarianteCompleta(v) {
       </div>
 
       ${esOferta ? `
-        <!-- PRECIO DE OFERTA -->
         <div class="precio-seccion precio-seccion-oferta">
           <div class="precio-seccion-titulo">🔥 Precio de oferta</div>
-          <div class="variante-costo">
-            <span class="info-label">Costo proveedor:</span>
-            <span class="info-value">${ofertaCostoARS} ARS → <strong>${formatUYU(ofertaCostoUYU)}</strong></span>
-          </div>
+          ${tieneCostoOferta ? `
+            <div class="variante-costo">
+              <span class="info-label">Costo proveedor:</span>
+              <span class="info-value">${ofertaCostoARS} ARS → <strong>${formatUYU(ofertaCostoUYU)}</strong></span>
+            </div>
+          ` : `
+            <div class="variante-sin-costo-oferta">
+              ⚠️ El proveedor no tiene precio de oferta para esta variante.<br>
+              <small>Si tenés otro proveedor, avisame y agregamos carga manual.</small>
+            </div>
+          `}
           <div class="variante-input-row">
             <div class="variante-input-wrap variante-input-wrap-oferta">
               <span class="input-prefix">$</span>
               <input type="number" class="variante-input-oferta" placeholder="Precio de oferta"
-                value="${ofertaPrecio || ''}" data-variant="${v.id}" min="0" step="1">
+                value="${ofertaPrecio || ''}" data-variant="${v.id}" min="0" step="1"
+                ${!tieneCostoOferta ? 'disabled' : ''}>
               <span class="input-suffix">UYU</span>
             </div>
             <span class="variante-usd" data-usd-oferta="${v.id}">≈ ${usdOferta}</span>
           </div>
           <div class="variante-actions">
-            <button type="button" class="btn btn-primary btn-sm btn-save-oferta" data-variant="${v.id}">💾 Guardar precio de oferta</button>
+            <button type="button" class="btn btn-primary btn-sm btn-save-oferta" data-variant="${v.id}"
+              ${!tieneCostoOferta ? 'disabled' : ''}>💾 Guardar precio de oferta</button>
           </div>
         </div>
       ` : ''}
@@ -391,13 +408,12 @@ function renderVarianteCompleta(v) {
 }
 
 // ============================================================
-// GUARDAR PRECIO NORMAL
+// GUARDAR PRECIOS
 // ============================================================
 async function guardarPrecioNormal(prod, variantId, body) {
   const input = body.querySelector(`.variante-input-normal[data-variant="${variantId}"]`);
   const btn = body.querySelector(`.btn-save-normal[data-variant="${variantId}"]`);
   if (!input || !btn) return;
-
   const nuevoPrecio = parseFloat(input.value) || 0;
   if (nuevoPrecio <= 0) { alert('Ingresá un precio mayor a 0.'); return; }
 
@@ -417,36 +433,25 @@ async function guardarPrecioNormal(prod, variantId, body) {
     };
   });
 
-  btn.disabled = true;
-  btn.textContent = '⏳';
-
+  btn.disabled = true; btn.textContent = '⏳';
   try {
     await updateDoc(doc(db, 'products', prod.id), { variants: nuevasVariantes });
     prod.variants = nuevasVariantes;
-    btn.textContent = '✅ Guardado';
-    setTimeout(() => {
-      btn.disabled = false;
-      btn.textContent = '💾 Guardar precio normal';
-      render();
-    }, 900);
+    btn.textContent = '✅';
+    setTimeout(() => { btn.disabled = false; btn.textContent = '💾 Guardar precio normal'; render(); }, 900);
   } catch (err) {
     console.error('[GamesUy] Error:', err);
     alert('Error: ' + err.message);
-    btn.disabled = false;
-    btn.textContent = '💾 Guardar precio normal';
+    btn.disabled = false; btn.textContent = '💾 Guardar precio normal';
   }
 }
 
-// ============================================================
-// GUARDAR PRECIO DE OFERTA
-// ============================================================
 async function guardarPrecioOferta(prod, variantId, body) {
   const input = body.querySelector(`.variante-input-oferta[data-variant="${variantId}"]`);
   const btn = body.querySelector(`.btn-save-oferta[data-variant="${variantId}"]`);
   if (!input || !btn) return;
-
   const nuevoPrecio = parseFloat(input.value) || 0;
-  if (nuevoPrecio <= 0) { alert('Ingresá un precio de oferta mayor a 0.'); return; }
+  if (nuevoPrecio <= 0) { alert('Ingresá un precio mayor a 0.'); return; }
 
   const variante = (prod.variants || []).find(v => v.id === variantId);
   if (!variante) return;
@@ -464,23 +469,16 @@ async function guardarPrecioOferta(prod, variantId, body) {
     };
   });
 
-  btn.disabled = true;
-  btn.textContent = '⏳';
-
+  btn.disabled = true; btn.textContent = '⏳';
   try {
     await updateDoc(doc(db, 'products', prod.id), { variants: nuevasVariantes });
     prod.variants = nuevasVariantes;
-    btn.textContent = '✅ Guardado';
-    setTimeout(() => {
-      btn.disabled = false;
-      btn.textContent = '💾 Guardar precio de oferta';
-      render();
-    }, 900);
+    btn.textContent = '✅';
+    setTimeout(() => { btn.disabled = false; btn.textContent = '💾 Guardar precio de oferta'; render(); }, 900);
   } catch (err) {
     console.error('[GamesUy] Error:', err);
     alert('Error: ' + err.message);
-    btn.disabled = false;
-    btn.textContent = '💾 Guardar precio de oferta';
+    btn.disabled = false; btn.textContent = '💾 Guardar precio de oferta';
   }
 }
 
@@ -495,10 +493,8 @@ function renderModalInfo(prod) {
   const p = $('info-preorder'); if (p) p.checked = !!prod.isPreorder;
   const v = $('info-visible'); if (v) v.checked = prod.visible !== false;
   const r = $('info-release'); if (r) r.value = prod.releaseDate || '';
-
   actualizarPreview('cover', prod.coverUrl || '');
   actualizarPreview('gameplay', prod.gameplayUrl || '');
-
   const cf = $('info-cover-file'); if (cf) cf.value = '';
   const gf = $('info-gameplay-file'); if (gf) gf.value = '';
   const cu = $('info-cover-url'); if (cu) cu.value = '';
@@ -549,9 +545,7 @@ function actualizarPreview(tipo, url) {
       fileInput.value = '';
     });
   }
-  if (urlInput) {
-    urlInput.addEventListener('input', () => actualizarPreview(tipo, urlInput.value));
-  }
+  if (urlInput) urlInput.addEventListener('input', () => actualizarPreview(tipo, urlInput.value));
 });
 
 document.querySelectorAll('.upload-preview-clear').forEach(btn => {
@@ -567,17 +561,13 @@ document.querySelectorAll('.upload-preview-clear').forEach(btn => {
 $('btn-save-info')?.addEventListener('click', async () => {
   if (!productoActivo) return;
   const btn = $('btn-save-info');
-  btn.disabled = true;
-  btn.textContent = '⏳ Guardando...';
-
+  btn.disabled = true; btn.textContent = '⏳ Guardando...';
   try {
     const coverWrap = $('info-cover-preview-wrap');
     const gameplayWrap = $('info-gameplay-preview-wrap');
     const coverUrl = (coverWrap?.dataset.url) || '';
     const gameplayUrl = (gameplayWrap?.dataset.url) || '';
-
-    const categorias = $('info-categories').value
-      .split(',').map(c => c.trim().toLowerCase()).filter(Boolean);
+    const categorias = $('info-categories').value.split(',').map(c => c.trim().toLowerCase()).filter(Boolean);
 
     const data = {
       title: $('info-title').value.trim(),
@@ -593,18 +583,12 @@ $('btn-save-info')?.addEventListener('click', async () => {
 
     await updateDoc(doc(db, 'products', productoActivo.id), data);
     Object.assign(productoActivo, data);
-
     btn.textContent = '✅ Guardado';
-    setTimeout(() => {
-      btn.disabled = false;
-      btn.textContent = '💾 Guardar información';
-      render();
-    }, 900);
+    setTimeout(() => { btn.disabled = false; btn.textContent = '💾 Guardar información'; render(); }, 900);
   } catch (err) {
     console.error('[GamesUy] Error:', err);
     alert('Error: ' + err.message);
-    btn.disabled = false;
-    btn.textContent = '💾 Guardar información';
+    btn.disabled = false; btn.textContent = '💾 Guardar información';
   }
 });
 
@@ -629,4 +613,4 @@ $('precios-next')?.addEventListener('click', () => { pagina++; render(); });
 // INIT
 // ============================================================
 cargarProductos();
-console.log('[GamesUy] precios.js v11 cargado');
+console.log('[GamesUy] precios.js v12 cargado');

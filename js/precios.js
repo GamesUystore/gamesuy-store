@@ -1,6 +1,6 @@
 // ============================================================
 // GAMESUY STORE — Gestor de precios
-// Fase 5.1: Edición manual de costos en variantes SIN STOCK
+// Fase 5.2: Mostrar SIEMPRE todas las variantes en el modal
 // ============================================================
 
 import { db } from './firebase-config.js';
@@ -24,7 +24,7 @@ let pagina = 1;
 const POR_PAGINA = 30;
 let productoActivo = null;
 
-console.log('[GamesUy] precios.js v13 iniciando...');
+console.log('[GamesUy] precios.js v14 iniciando...');
 
 onSnapshot(doc(db, 'settings', 'cotizaciones'), (snap) => {
   if (!snap.exists()) return;
@@ -149,7 +149,7 @@ function render() {
 
   list.innerHTML = enPagina.map(p => {
     const cats = (p.categories || []).map(c => `<span class="badge badge-${c}">${c.toUpperCase()}</span>`).join('');
-    const vs = (p.variants || []).filter(v => Number(v.costoARS) > 0 || Number(v.ofertaCostoARS) > 0);
+    const vs = (p.variants || []);
 
     let totalItems = 0, completosItems = 0;
     vs.forEach(v => {
@@ -209,16 +209,24 @@ function cerrarModal() {
   productoActivo = null;
 }
 
+// ============================================================
+// TAB PRECIOS — AHORA MUESTRA TODAS LAS VARIANTES
+// ============================================================
 function renderModalPrecios(prod) {
   const body = $('price-modal-precios');
   if (!body) return;
 
-  const variantes = (prod.variants || []).filter(v =>
-    Number(v.costoARS) > 0 || Number(v.ofertaCostoARS) > 0 || ofertaVigente(v) || tienePrecioNormal(v)
-  );
+  // ⚠️ CAMBIO CLAVE: mostramos TODAS las variantes, sin filtrar
+  const variantes = prod.variants || [];
 
   if (variantes.length === 0) {
-    body.innerHTML = '<p class="empty-message">Este producto no tiene variantes.</p>';
+    body.innerHTML = `
+      <div class="empty-message">
+        <p>Este producto no tiene variantes cargadas.</p>
+        <p style="font-size:0.85rem;margin-top:8px;color:var(--text-muted);">
+          Probá re-procesar el Excel de Stock.
+        </p>
+      </div>`;
     return;
   }
 
@@ -276,12 +284,10 @@ function renderVarianteCompleta(v) {
   const tieneCostoOferta = ofertaCostoARS > 0;
   const esOferta = ofertaVigente(v);
 
-  // Datos precio normal
   const costoUYU = getCostoUYU(costoARS, cotizaciones.arsAUYU);
   const precioNormal = Number(v.precioFinalUYU) || 0;
   const usdNormal = precioNormal > 0 ? formatUSD(calcPrecioUSD(precioNormal, cotizaciones.usdAUYU)) : '—';
 
-  // Datos oferta
   const ofertaCostoUYU = getCostoUYU(ofertaCostoARS, cotizaciones.arsAUYU);
   const ofertaPrecio = Number(v.ofertaPrecioUYU) || 0;
   const usdOferta = ofertaPrecio > 0 ? formatUSD(calcPrecioUSD(ofertaPrecio, cotizaciones.usdAUYU)) : '—';
@@ -292,7 +298,7 @@ function renderVarianteCompleta(v) {
 
   const sinStockBadge = !tieneCostoStock && !esOferta ? '<span class="variante-sinstock-badge">⛔ SIN STOCK</span>' : '';
 
-  // Bloque SIN COSTO STOCK ni OFERTA: solo mensaje + input manual
+  // ---- CASO A: SIN COSTO STOCK, SIN OFERTA → mensaje + input manual
   if (!tieneCostoStock && !tieneCostoOferta && !esOferta) {
     return `
       <div class="variante-bloque variante-sinstock">
@@ -323,8 +329,8 @@ function renderVarianteCompleta(v) {
     `;
   }
 
-  // Bloque SOLO OFERTA (sin costo normal, con costo oferta)
-  if (!tieneCostoStock && tieneCostoOferta) {
+  // ---- CASO B: SIN COSTO STOCK + OFERTA activa → solo oferta + input manual
+  if (!tieneCostoStock && esOferta) {
     return `
       <div class="variante-bloque variante-con-oferta">
         <div class="variante-header">
@@ -333,10 +339,12 @@ function renderVarianteCompleta(v) {
         </div>
         <div class="precio-seccion precio-seccion-oferta">
           <div class="precio-seccion-titulo">🔥 Precio de oferta</div>
-          <div class="variante-costo">
-            <span class="info-label">Costo proveedor:</span>
-            <span class="info-value">${ofertaCostoARS} ARS → <strong>${formatUYU(ofertaCostoUYU)}</strong></span>
-          </div>
+          ${tieneCostoOferta ? `
+            <div class="variante-costo">
+              <span class="info-label">Costo proveedor:</span>
+              <span class="info-value">${ofertaCostoARS} ARS → <strong>${formatUYU(ofertaCostoUYU)}</strong></span>
+            </div>
+          ` : ''}
           <div class="variante-input-row">
             <div class="variante-input-wrap variante-input-wrap-oferta">
               <span class="input-prefix">$</span>
@@ -369,7 +377,7 @@ function renderVarianteCompleta(v) {
     `;
   }
 
-  // Bloque normal + (oferta si aplica)
+  // ---- CASO C: CON COSTO STOCK + (oferta si aplica) → normal + oferta
   return `
     <div class="variante-bloque ${esOferta ? 'variante-con-oferta' : ''}">
       <div class="variante-header">
@@ -636,4 +644,4 @@ $('precios-prev')?.addEventListener('click', () => { if (pagina > 1) { pagina--;
 $('precios-next')?.addEventListener('click', () => { pagina++; render(); });
 
 cargarProductos();
-console.log('[GamesUy] precios.js v13 cargado');
+console.log('[GamesUy] precios.js v14 cargado');

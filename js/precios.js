@@ -1,6 +1,6 @@
 // ============================================================
 // GAMESUY STORE — Gestor de precios
-// Fase 4.3: Badge SIN STOCK + filtro con/sin stock
+// Fase 5.1: Edición manual de costos en variantes SIN STOCK
 // ============================================================
 
 import { db } from './firebase-config.js';
@@ -24,11 +24,8 @@ let pagina = 1;
 const POR_PAGINA = 30;
 let productoActivo = null;
 
-console.log('[GamesUy] precios.js v12 iniciando...');
+console.log('[GamesUy] precios.js v13 iniciando...');
 
-// ============================================================
-// COTIZACIONES
-// ============================================================
 onSnapshot(doc(db, 'settings', 'cotizaciones'), (snap) => {
   if (!snap.exists()) return;
   const c = snap.data();
@@ -37,35 +34,25 @@ onSnapshot(doc(db, 'settings', 'cotizaciones'), (snap) => {
   render();
 });
 
-// ============================================================
-// PRODUCTOS
-// ============================================================
 async function cargarProductos() {
   try {
     const snap = await getDocs(collection(db, 'products'));
     productos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     console.log('[GamesUy] Productos cargados:', productos.length);
     render();
-  } catch (err) {
-    console.error('[GamesUy] Error:', err);
-  }
+  } catch (err) { console.error('[GamesUy] Error:', err); }
 }
 
-// ============================================================
-// HELPERS
-// ============================================================
 function tienePrecioNormal(v) { return Number(v?.precioFinalUYU) > 0; }
 function tienePrecioOferta(v) { return Number(v?.ofertaPrecioUYU) > 0; }
-function tieneStock(v) { return Number(v?.costoARS) > 0 && v?.disponible !== false; }
+function tieneStock(v) { return Number(v?.costoARS) > 0; }
 
 function ofertaVigente(v) {
-  if (!v.enOferta) return false;
-  if (!v.ofertaHasta) return false;
+  if (!v.enOferta || !v.ofertaHasta) return false;
   const hoy = new Date().toISOString().split('T')[0];
   return v.ofertaHasta >= hoy;
 }
 
-// ¿Este producto tiene AL MENOS una variante con stock?
 function productoTieneStock(p) {
   return (p.variants || []).some(tieneStock);
 }
@@ -96,7 +83,6 @@ function productoPendiente(p) {
 
 function filtrarProductos() {
   let lista = productos.filter(p => (p.variants || []).length > 0);
-
   if (filtroEstado === 'pendientes') lista = lista.filter(productoPendiente);
   else if (filtroEstado === 'completos') lista = lista.filter(productoCompleto);
   else if (filtroEstado === 'con-stock') lista = lista.filter(productoTieneStock);
@@ -132,9 +118,6 @@ function formatFecha(dateStr) {
   return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : dateStr;
 }
 
-// ============================================================
-// RENDER
-// ============================================================
 function render() {
   const list = $('precios-list');
   if (!list) return;
@@ -181,8 +164,8 @@ function render() {
     const tieneOferta = vs.some(ofertaVigente);
     const badgeOferta = tieneOferta ? '<span class="fila-oferta-badge">🔥</span> ' : '';
     const soloOferta = p.soloOferta ? '<span class="fila-solo-oferta">[SOLO OFERTA]</span> ' : '';
-    const tieneStock = productoTieneStock(p);
-    const badgeStock = tieneStock
+    const tieneStockReal = productoTieneStock(p);
+    const badgeStock = tieneStockReal
       ? '<span class="fila-stock-badge fila-stock-ok">🟢</span> '
       : '<span class="fila-stock-badge fila-stock-off">⚫</span> ';
 
@@ -207,9 +190,6 @@ function render() {
   }
 }
 
-// ============================================================
-// MODAL
-// ============================================================
 function abrirModal(prodId) {
   const prod = productos.find(p => p.id === prodId);
   if (!prod) return;
@@ -229,9 +209,6 @@ function cerrarModal() {
   productoActivo = null;
 }
 
-// ============================================================
-// TAB PRECIOS
-// ============================================================
 function renderModalPrecios(prod) {
   const body = $('price-modal-precios');
   if (!body) return;
@@ -247,6 +224,7 @@ function renderModalPrecios(prod) {
 
   body.innerHTML = variantes.map(v => renderVarianteCompleta(v)).join('');
 
+  // Inputs precio normal
   body.querySelectorAll('.variante-input-normal').forEach(inp => {
     inp.addEventListener('input', () => {
       const vid = inp.dataset.variant;
@@ -256,6 +234,20 @@ function renderModalPrecios(prod) {
     });
   });
 
+  // Inputs costo manual (para SIN STOCK)
+  body.querySelectorAll('.variante-input-costo-manual').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const vid = inp.dataset.variant;
+      const val = parseFloat(inp.value) || 0;
+      const costUYUEl = body.querySelector(`[data-costo-uyu="${vid}"]`);
+      if (costUYUEl) {
+        const costUYU = getCostoUYU(val, cotizaciones.arsAUYU);
+        costUYUEl.textContent = costUYU > 0 ? formatUYU(costUYU) : '$ 0';
+      }
+    });
+  });
+
+  // Inputs precio de oferta
   body.querySelectorAll('.variante-input-oferta').forEach(inp => {
     inp.addEventListener('input', () => {
       const vid = inp.dataset.variant;
@@ -265,10 +257,13 @@ function renderModalPrecios(prod) {
     });
   });
 
+  // Botones
   body.querySelectorAll('.btn-save-normal').forEach(btn => {
     btn.addEventListener('click', () => guardarPrecioNormal(prod, btn.dataset.variant, body));
   });
-
+  body.querySelectorAll('.btn-save-costo-manual').forEach(btn => {
+    btn.addEventListener('click', () => guardarCostoManual(prod, btn.dataset.variant, body));
+  });
   body.querySelectorAll('.btn-save-oferta').forEach(btn => {
     btn.addEventListener('click', () => guardarPrecioOferta(prod, btn.dataset.variant, body));
   });
@@ -280,7 +275,6 @@ function renderVarianteCompleta(v) {
   const tieneCostoStock = costoARS > 0;
   const tieneCostoOferta = ofertaCostoARS > 0;
   const esOferta = ofertaVigente(v);
-  const sinStock = !tieneCostoStock && v.disponible === false && !esOferta;
 
   // Datos precio normal
   const costoUYU = getCostoUYU(costoARS, cotizaciones.arsAUYU);
@@ -294,12 +288,12 @@ function renderVarianteCompleta(v) {
 
   const ofertaBadge = esOferta
     ? `<span class="variante-oferta-badge">🔥 hasta ${formatFecha(v.ofertaHasta)}</span>`
-    : (v.enOferta ? `<span class="variante-oferta-badge variante-oferta-vencida">⌛ Oferta vencida</span>` : '');
+    : (v.enOferta ? `<span class="variante-oferta-badge variante-oferta-vencida">⌛ Vencida</span>` : '');
 
-  const sinStockBadge = sinStock ? '<span class="variante-sinstock-badge">⛔ SIN STOCK</span>' : '';
+  const sinStockBadge = !tieneCostoStock && !esOferta ? '<span class="variante-sinstock-badge">⛔ SIN STOCK</span>' : '';
 
-  // ---- BLOQUE: SIN COSTO NORMAL Y SIN OFERTA → solo mostrar mensaje
-  if (!tieneCostoStock && !tieneCostoOferta) {
+  // Bloque SIN COSTO STOCK ni OFERTA: solo mensaje + input manual
+  if (!tieneCostoStock && !tieneCostoOferta && !esOferta) {
     return `
       <div class="variante-bloque variante-sinstock">
         <div class="variante-header">
@@ -307,14 +301,29 @@ function renderVarianteCompleta(v) {
           ${sinStockBadge}
         </div>
         <p class="variante-sinstock-msg">
-          ⚠️ Esta variante no tiene costo del proveedor.<br>
-          <small>Va a activarse automáticamente cuando el próximo Excel de Stock traiga un precio.</small>
+          Esta variante no tiene costo del proveedor. Se activará sola cuando el próximo Excel de Stock traiga un precio.
         </p>
+        <div class="precio-seccion">
+          <div class="precio-seccion-titulo">🔧 O cargá un costo manual</div>
+          <p class="admin-hint" style="margin-bottom:10px;">Si lo comprás a otro proveedor, ingresá el costo en pesos argentinos:</p>
+          <div class="variante-input-row">
+            <div class="variante-input-wrap">
+              <span class="input-prefix">$</span>
+              <input type="number" class="variante-input-costo-manual" placeholder="Costo ARS"
+                value="" data-variant="${v.id}" min="0" step="1">
+              <span class="input-suffix">ARS</span>
+            </div>
+            <span class="variante-usd">→ <strong data-costo-uyu="${v.id}">$ 0</strong></span>
+          </div>
+          <div class="variante-actions">
+            <button type="button" class="btn btn-secondary btn-sm btn-save-costo-manual" data-variant="${v.id}">🔧 Guardar costo manual</button>
+          </div>
+        </div>
       </div>
     `;
   }
 
-  // ---- BLOQUE: SOLO OFERTA (no tiene costo normal, y sí oferta)
+  // Bloque SOLO OFERTA (sin costo normal, con costo oferta)
   if (!tieneCostoStock && tieneCostoOferta) {
     return `
       <div class="variante-bloque variante-con-oferta">
@@ -341,11 +350,26 @@ function renderVarianteCompleta(v) {
             <button type="button" class="btn btn-primary btn-sm btn-save-oferta" data-variant="${v.id}">💾 Guardar precio de oferta</button>
           </div>
         </div>
+        <div class="precio-seccion" style="margin-top:12px;">
+          <div class="precio-seccion-titulo">🔧 O cargá un costo normal manual</div>
+          <div class="variante-input-row">
+            <div class="variante-input-wrap">
+              <span class="input-prefix">$</span>
+              <input type="number" class="variante-input-costo-manual" placeholder="Costo ARS"
+                value="" data-variant="${v.id}" min="0" step="1">
+              <span class="input-suffix">ARS</span>
+            </div>
+            <span class="variante-usd">→ <strong data-costo-uyu="${v.id}">$ 0</strong></span>
+          </div>
+          <div class="variante-actions">
+            <button type="button" class="btn btn-secondary btn-sm btn-save-costo-manual" data-variant="${v.id}">🔧 Guardar costo normal</button>
+          </div>
+        </div>
       </div>
     `;
   }
 
-  // ---- BLOQUE: normal + (oferta si aplica)
+  // Bloque normal + (oferta si aplica)
   return `
     <div class="variante-bloque ${esOferta ? 'variante-con-oferta' : ''}">
       <div class="variante-header">
@@ -383,8 +407,7 @@ function renderVarianteCompleta(v) {
             </div>
           ` : `
             <div class="variante-sin-costo-oferta">
-              ⚠️ El proveedor no tiene precio de oferta para esta variante.<br>
-              <small>Si tenés otro proveedor, avisame y agregamos carga manual.</small>
+              ⚠️ El proveedor no tiene precio de oferta para esta variante.
             </div>
           `}
           <div class="variante-input-row">
@@ -407,9 +430,6 @@ function renderVarianteCompleta(v) {
   `;
 }
 
-// ============================================================
-// GUARDAR PRECIOS
-// ============================================================
 async function guardarPrecioNormal(prod, variantId, body) {
   const input = body.querySelector(`.variante-input-normal[data-variant="${variantId}"]`);
   const btn = body.querySelector(`.btn-save-normal[data-variant="${variantId}"]`);
@@ -425,12 +445,7 @@ async function guardarPrecioNormal(prod, variantId, body) {
 
   const nuevasVariantes = (prod.variants || []).map(v => {
     if (v.id !== variantId) return v;
-    return {
-      ...v,
-      precioFinalUYU: roundUYU(nuevoPrecio),
-      gananciaPct: ganancia,
-      updatedAt: new Date().toISOString()
-    };
+    return { ...v, precioFinalUYU: roundUYU(nuevoPrecio), gananciaPct: ganancia, updatedAt: new Date().toISOString() };
   });
 
   btn.disabled = true; btn.textContent = '⏳';
@@ -443,6 +458,31 @@ async function guardarPrecioNormal(prod, variantId, body) {
     console.error('[GamesUy] Error:', err);
     alert('Error: ' + err.message);
     btn.disabled = false; btn.textContent = '💾 Guardar precio normal';
+  }
+}
+
+async function guardarCostoManual(prod, variantId, body) {
+  const input = body.querySelector(`.variante-input-costo-manual[data-variant="${variantId}"]`);
+  const btn = body.querySelector(`.btn-save-costo-manual[data-variant="${variantId}"]`);
+  if (!input || !btn) return;
+  const nuevoCosto = parseFloat(input.value) || 0;
+  if (nuevoCosto <= 0) { alert('Ingresá un costo mayor a 0.'); return; }
+
+  const nuevasVariantes = (prod.variants || []).map(v => {
+    if (v.id !== variantId) return v;
+    return { ...v, costoARS: nuevoCosto, disponible: true, updatedAt: new Date().toISOString() };
+  });
+
+  btn.disabled = true; btn.textContent = '⏳';
+  try {
+    await updateDoc(doc(db, 'products', prod.id), { variants: nuevasVariantes });
+    prod.variants = nuevasVariantes;
+    btn.textContent = '✅';
+    setTimeout(() => { btn.disabled = false; btn.textContent = '🔧 Guardar costo manual'; render(); }, 900);
+  } catch (err) {
+    console.error('[GamesUy] Error:', err);
+    alert('Error: ' + err.message);
+    btn.disabled = false; btn.textContent = '🔧 Guardar costo manual';
   }
 }
 
@@ -461,12 +501,7 @@ async function guardarPrecioOferta(prod, variantId, body) {
 
   const nuevasVariantes = (prod.variants || []).map(v => {
     if (v.id !== variantId) return v;
-    return {
-      ...v,
-      ofertaPrecioUYU: roundUYU(nuevoPrecio),
-      ofertaGananciaPct: ganancia,
-      updatedAt: new Date().toISOString()
-    };
+    return { ...v, ofertaPrecioUYU: roundUYU(nuevoPrecio), ofertaGananciaPct: ganancia, updatedAt: new Date().toISOString() };
   });
 
   btn.disabled = true; btn.textContent = '⏳';
@@ -482,9 +517,6 @@ async function guardarPrecioOferta(prod, variantId, body) {
   }
 }
 
-// ============================================================
-// TAB INFORMACIÓN
-// ============================================================
 function renderModalInfo(prod) {
   const t = $('info-title'); if (t) t.value = prod.title || '';
   const c = $('info-categories'); if (c) c.value = (prod.categories || []).join(', ');
@@ -538,7 +570,7 @@ function actualizarPreview(tipo, url) {
       try {
         const b64 = await fileToBase64(file);
         actualizarPreview(tipo, b64);
-        if (statusEl) statusEl.textContent = `✅ Imagen lista (${sizeKB} KB). Guardá información.`;
+        if (statusEl) statusEl.textContent = `✅ Imagen lista. Guardá información.`;
       } catch (err) {
         if (statusEl) statusEl.textContent = '❌ Error: ' + err.message;
       }
@@ -592,25 +624,16 @@ $('btn-save-info')?.addEventListener('click', async () => {
   }
 });
 
-// ============================================================
-// CERRAR MODAL
-// ============================================================
 $('price-modal-close')?.addEventListener('click', cerrarModal);
 $('price-modal')?.addEventListener('click', (e) => {
   if (e.target.id === 'price-modal') cerrarModal();
 });
 
-// ============================================================
-// FILTROS
-// ============================================================
 $('precios-search')?.addEventListener('input', (e) => { filtroSearch = e.target.value; pagina = 1; render(); });
 $('precios-cat')?.addEventListener('change', (e) => { filtroCat = e.target.value; pagina = 1; render(); });
 $('precios-estado')?.addEventListener('change', (e) => { filtroEstado = e.target.value; pagina = 1; render(); });
 $('precios-prev')?.addEventListener('click', () => { if (pagina > 1) { pagina--; render(); } });
 $('precios-next')?.addEventListener('click', () => { pagina++; render(); });
 
-// ============================================================
-// INIT
-// ============================================================
 cargarProductos();
-console.log('[GamesUy] precios.js v12 cargado');
+console.log('[GamesUy] precios.js v13 cargado');

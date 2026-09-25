@@ -1731,3 +1731,73 @@ body::after {
   .variante-usd { text-align: left; }
   .variante-actions .btn { min-width: 100%; }
 }
+
+/* ============================================================
+   FASE 4.3 — Variantes SIN STOCK + Filtros
+   ============================================================ */
+
+.fila-solo-oferta {
+  color: #00b4d8;
+  font-size: 0.68rem;
+  font-weight: 700;
+  margin-right: 4px;
+}
+.fila-stock-badge {
+  font-size: 0.75rem;
+  margin-right: 3px;
+}
+.fila-stock-ok { color: #00ff9d; }
+.fila-stock-off { color: #5b6688; }
+
+.variante-sinstock {
+  opacity: 0.85;
+  border-color: rgba(91, 102, 136, 0.5) !important;
+}
+.variante-sinstock .variante-header {
+  border-bottom-color: rgba(91, 102, 136, 0.3);
+}
+.variante-sinstock-msg {
+  margin: 8px 0 0;
+  padding: 12px;
+  background: rgba(91, 102, 136, 0.08);
+  border: 1px dashed rgba(91, 102, 136, 0.4);
+  border-radius: 8px;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  text-align: center;
+  line-height: 1.5;
+}
+.variante-sinstock-msg small {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+.variante-sinstock-badge {
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  padding: 3px 8px;
+  border-radius: var(--r-sm);
+  background: rgba(91, 102, 136, 0.2);
+  border: 1px solid rgba(91, 102, 136, 0.5);
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+.variante-oferta-vencida {
+  background: linear-gradient(90deg, #5b6688, #3a445c) !important;
+  box-shadow: none !important;
+}
+.variante-sin-costo-oferta {
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  background: rgba(255, 184, 0, 0.08);
+  border: 1px dashed rgba(255, 184, 0, 0.4);
+  border-radius: 8px;
+  color: var(--gold);
+  font-size: 0.82rem;
+  text-align: center;
+  line-height: 1.4;
+}
+.variante-sin-costo-oferta small {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}

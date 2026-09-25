@@ -2042,3 +2042,50 @@ body::after {
     min-width: 100%;
   }
 }
+
+/* ============================================================
+   FASE 6 — Preventas visibles
+   ============================================================ */
+
+.card-price-preorder {
+  color: #ffb800;
+  font-size: 1.15rem;
+  text-shadow: 0 0 14px rgba(255, 184, 0, 0.3);
+}
+
+.stock-preorder {
+  color: #000;
+  background: linear-gradient(90deg, #0091ff, #00b4d8);
+  box-shadow: 0 0 12px rgba(0, 145, 255, 0.4);
+}
+
+.btn-preorder {
+  background: linear-gradient(135deg, #0091ff, #00b4d8);
+  color: #fff;
+}
+.btn-preorder:hover {
+  box-shadow: 0 8px 24px rgba(0, 145, 255, 0.5);
+}
+
+/* Preorder badge más visible */
+.card-preorder-badge {
+  display: inline-block;
+  background: linear-gradient(90deg, #0091ff, #00b4d8);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  border-radius: var(--r-sm);
+  margin-bottom: 10px;
+  box-shadow: 0 0 12px rgba(0, 145, 255, 0.4);
+  width: 100%;
+  text-align: center;
+}
+
+/* Título preventas */
+#page-preventas .section-title {
+  color: #00b4d8;
+  text-shadow: 0 0 20px rgba(0, 180, 216, 0.4);
+}

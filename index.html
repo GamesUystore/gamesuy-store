@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=23">
+  <link rel="stylesheet" href="styles.css?v=24">
 </head>
 <body>
 
@@ -93,9 +93,15 @@
     </section>
 
     <section id="page-preventas" class="page-section">
-      <h2 class="section-title section-title-new">🚀 Preventas</h2>
-      <p class="section-subtitle">Títulos próximos a salir.</p>
-      <div id="preventas-grid" class="product-grid"><p class="empty-message">Próximamente.</p></div>
+      <div class="grid-section">
+        <div class="grid-header">
+          <h2 class="section-title section-title-new">🚀 Preventas</h2>
+          <span class="results-count" id="preventas-count">Cargando preventas...</span>
+        </div>
+        <p class="section-subtitle">Títulos próximos a salir. Reservá tu copia antes del lanzamiento.</p>
+        <div id="preventas-grid" class="product-grid"><p class="empty-message">Cargando preventas...</p></div>
+        <div id="preventas-pagination" class="catalog-pagination"></div>
+      </div>
     </section>
 
     <section id="page-faq" class="page-section">
@@ -152,7 +158,7 @@
           <div class="admin-grid">
             <div class="admin-card admin-card-wide">
               <h3>💰 Gestionar precios</h3>
-              <p class="admin-help">Poné el precio final en pesos uruguayos de cada variante. Los juegos con oferta activa muestran 2 bloques (normal + oferta). Cada variante tiene su propio costo independiente.</p>
+              <p class="admin-help">Poné el precio final en pesos uruguayos de cada variante. Cada variante tiene su propio costo independiente.</p>
 
               <div class="precios-stats">
                 <span class="stat-badge">📊 Total: <strong id="stat-total">0</strong></span>
@@ -467,12 +473,12 @@
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-  <script type="module" src="js/settings.js?v=23"></script>
-  <script type="module" src="js/auth.js?v=23"></script>
-  <script type="module" src="js/admin.js?v=23"></script>
-  <script type="module" src="js/excel-importer.js?v=23"></script>
-  <script type="module" src="js/maintenance.js?v=23"></script>
-  <script type="module" src="js/precios.js?v=23"></script>
-  <script type="module" src="js/store.js?v=23"></script>
+  <script type="module" src="js/settings.js?v=24"></script>
+  <script type="module" src="js/auth.js?v=24"></script>
+  <script type="module" src="js/admin.js?v=24"></script>
+  <script type="module" src="js/excel-importer.js?v=24"></script>
+  <script type="module" src="js/maintenance.js?v=24"></script>
+  <script type="module" src="js/precios.js?v=24"></script>
+  <script type="module" src="js/store.js?v=24"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 // ============================================================
 // GAMESUY STORE — Gestor de precios
-// Fase 5.3: Modal unificado (todas las variantes igual)
+// Fase 6.2: Badge de preventa en el admin
 // ============================================================
 
 import { db } from './firebase-config.js';
@@ -24,7 +24,7 @@ let pagina = 1;
 const POR_PAGINA = 30;
 let productoActivo = null;
 
-console.log('[GamesUy] precios.js v15 iniciando...');
+console.log('[GamesUy] precios.js v16 iniciando...');
 
 onSnapshot(doc(db, 'settings', 'cotizaciones'), (snap) => {
   if (!snap.exists()) return;
@@ -57,6 +57,14 @@ function productoTieneStock(p) {
   return (p.variants || []).some(tieneStock);
 }
 
+function productoEsPreventa(p) {
+  if (p.visible === false) return false;
+  if (p.isPreorder !== true) return false;
+  if (!p.releaseDate) return true;
+  const hoy = new Date().toISOString().split('T')[0];
+  return p.releaseDate > hoy;
+}
+
 function productoCompleto(p) {
   const vs = (p.variants || []);
   if (vs.length === 0) return false;
@@ -87,6 +95,7 @@ function filtrarProductos() {
   else if (filtroEstado === 'completos') lista = lista.filter(productoCompleto);
   else if (filtroEstado === 'con-stock') lista = lista.filter(productoTieneStock);
   else if (filtroEstado === 'sin-stock') lista = lista.filter(p => !productoTieneStock(p));
+  else if (filtroEstado === 'preventas') lista = lista.filter(productoEsPreventa);
 
   if (filtroCat !== 'all') lista = lista.filter(p => (p.categories || []).includes(filtroCat));
   if (filtroSearch) {
@@ -163,6 +172,8 @@ function render() {
     const oculto = p.visible === false ? '<span style="color:#ff8aa8; font-size:0.7rem;">(oculto)</span> ' : '';
     const tieneOferta = vs.some(ofertaVigente);
     const badgeOferta = tieneOferta ? '<span class="fila-oferta-badge">🔥</span> ' : '';
+    const esPreventa = productoEsPreventa(p);
+    const badgePreventa = esPreventa ? '<span class="fila-preventa-badge">🚀</span> ' : '';
     const soloOferta = p.soloOferta ? '<span class="fila-solo-oferta">[SOLO OFERTA]</span> ' : '';
     const tieneStockReal = productoTieneStock(p);
     const badgeStock = tieneStockReal
@@ -172,7 +183,7 @@ function render() {
     return `
       <div class="fila-juego ${completo ? 'fila-completa' : ''}" data-prod-id="${p.id}">
         <div class="fila-badges">${cats}</div>
-        <div class="fila-titulo">${badgeStock}${oculto}${tieneImg}${badgeOferta}${soloOferta}${escapeHtml(p.title || '(sin título)')}</div>
+        <div class="fila-titulo">${badgeStock}${badgePreventa}${oculto}${tieneImg}${badgeOferta}${soloOferta}${escapeHtml(p.title || '(sin título)')}</div>
         <div class="fila-progreso ${progresoClase}">${completosItems}/${totalItems}</div>
         <div class="fila-arrow">✏️</div>
       </div>
@@ -223,7 +234,15 @@ function renderModalPrecios(prod) {
     return;
   }
 
-  body.innerHTML = variantes.map(v => renderVarianteUnificada(v)).join('');
+  // Banner de preventa arriba del todo
+  const preventaBanner = productoEsPreventa(prod) ? `
+    <div class="preventa-banner-admin">
+      🚀 <strong>PREVENTA</strong>
+      ${prod.releaseDate ? ` · Estreno: ${formatFecha(prod.releaseDate)}` : ' · Sin fecha de estreno'}
+    </div>
+  ` : '';
+
+  body.innerHTML = preventaBanner + variantes.map(v => renderVarianteUnificada(v)).join('');
   activarListenersVariante(body, prod);
 }
 
@@ -582,4 +601,4 @@ $('precios-prev')?.addEventListener('click', () => { if (pagina > 1) { pagina--;
 $('precios-next')?.addEventListener('click', () => { pagina++; render(); });
 
 cargarProductos();
-console.log('[GamesUy] precios.js v15 cargado (modal unificado)');
+console.log('[GamesUy] precios.js v16 cargado');

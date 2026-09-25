@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=26">
+  <link rel="stylesheet" href="styles.css?v=27">
 </head>
 <body>
 
@@ -149,6 +149,7 @@
 
         <div class="admin-tabs">
           <button class="admin-tab active" data-tab="precios">💰 Precios</button>
+          <button class="admin-tab" data-tab="masivo">⚡ Carga masiva</button>
           <button class="admin-tab" data-tab="excel">📥 Importar Excel</button>
           <button class="admin-tab" data-tab="config">⚙️ Configuración</button>
           <button class="admin-tab" data-tab="mantenimiento">🧹 Mantenimiento</button>
@@ -157,8 +158,8 @@
         <div class="admin-tab-content active" data-tab-content="precios">
           <div class="admin-grid">
             <div class="admin-card admin-card-wide">
-              <h3>💰 Gestionar precios</h3>
-              <p class="admin-help">Poné el precio final en pesos uruguayos de cada variante. Cada variante tiene su propio costo independiente.</p>
+              <h3>💰 Gestionar precios (uno por uno)</h3>
+              <p class="admin-help">Hacé click en un juego para editarlo con detalle. Ideal para juegos con oferta o preventa.</p>
 
               <div class="precios-stats">
                 <span class="stat-badge">📊 Total: <strong id="stat-total">0</strong></span>
@@ -196,6 +197,50 @@
                 <button id="precios-prev" class="btn btn-secondary">← Anterior</button>
                 <span id="precios-page-info">Página 1 de 1</span>
                 <button id="precios-next" class="btn btn-secondary">Siguiente →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="admin-tab-content" data-tab-content="masivo">
+          <div class="admin-grid">
+            <div class="admin-card admin-card-wide">
+              <h3>⚡ Carga masiva de precios</h3>
+              <p class="admin-help">Editá varios juegos a la vez. Los cambios se guardan cuando apretás <b>Guardar todo</b>. Podés cargar 20 juegos por página.</p>
+
+              <div class="masivo-toolbar">
+                <input type="text" id="masivo-search" placeholder="🔍 Buscar juego..." autocomplete="off">
+                <select id="masivo-cat">
+                  <option value="all">Todas las categorías</option>
+                  <option value="ps5">PS5</option>
+                  <option value="ps4">PS4</option>
+                  <option value="ps3">PS3</option>
+                  <option value="steam">Steam</option>
+                  <option value="psplus">PS Plus</option>
+                  <option value="streaming">Streaming</option>
+                  <option value="otros">Otros</option>
+                </select>
+                <select id="masivo-estado">
+                  <option value="sin-precio">⏳ Sin precio cargado</option>
+                  <option value="con-precio">✅ Con precio cargado</option>
+                  <option value="todos">Todos</option>
+                </select>
+                <span class="masivo-count" id="masivo-count">Cargando...</span>
+              </div>
+
+              <div class="masivo-save-bar">
+                <span class="masivo-changes" id="masivo-changes">0 cambios pendientes</span>
+                <button id="btn-save-masivo" class="btn btn-primary" disabled>💾 Guardar todos los cambios</button>
+              </div>
+
+              <div id="masivo-list" class="masivo-list">
+                <p class="empty-message">Cargando productos...</p>
+              </div>
+
+              <div class="masivo-pagination">
+                <button id="masivo-prev" class="btn btn-secondary">← Anterior</button>
+                <span id="masivo-page-info">Página 1 de 1</span>
+                <button id="masivo-next" class="btn btn-secondary">Siguiente →</button>
               </div>
             </div>
           </div>
@@ -474,12 +519,13 @@
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-  <script type="module" src="js/settings.js?v=26"></script>
-  <script type="module" src="js/auth.js?v=26"></script>
-  <script type="module" src="js/admin.js?v=26"></script>
-  <script type="module" src="js/excel-importer.js?v=26"></script>
-  <script type="module" src="js/maintenance.js?v=26"></script>
-  <script type="module" src="js/precios.js?v=26"></script>
-  <script type="module" src="js/store.js?v=26"></script>
+  <script type="module" src="js/settings.js?v=27"></script>
+  <script type="module" src="js/auth.js?v=27"></script>
+  <script type="module" src="js/admin.js?v=27"></script>
+  <script type="module" src="js/excel-importer.js?v=27"></script>
+  <script type="module" src="js/maintenance.js?v=27"></script>
+  <script type="module" src="js/precios.js?v=27"></script>
+  <script type="module" src="js/precios-masivo.js?v=27"></script>
+  <script type="module" src="js/store.js?v=27"></script>
 </body>
 </html>

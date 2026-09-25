@@ -1,6 +1,6 @@
 // ============================================================
 // GAMESUY STORE — Gestor de precios
-// Fase 5.2: Mostrar SIEMPRE todas las variantes en el modal
+// Fase 5.3: Modal unificado (todas las variantes igual)
 // ============================================================
 
 import { db } from './firebase-config.js';
@@ -24,7 +24,7 @@ let pagina = 1;
 const POR_PAGINA = 30;
 let productoActivo = null;
 
-console.log('[GamesUy] precios.js v14 iniciando...');
+console.log('[GamesUy] precios.js v15 iniciando...');
 
 onSnapshot(doc(db, 'settings', 'cotizaciones'), (snap) => {
   if (!snap.exists()) return;
@@ -58,11 +58,11 @@ function productoTieneStock(p) {
 }
 
 function productoCompleto(p) {
-  const vs = (p.variants || []).filter(v => Number(v.costoARS) > 0 || ofertaVigente(v));
+  const vs = (p.variants || []);
   if (vs.length === 0) return false;
   return vs.every(v => {
     const necesitaNormal = Number(v.costoARS) > 0;
-    const necesitaOferta = ofertaVigente(v) && Number(v.ofertaCostoARS) > 0;
+    const necesitaOferta = ofertaVigente(v);
     if (necesitaNormal && !tienePrecioNormal(v)) return false;
     if (necesitaOferta && !tienePrecioOferta(v)) return false;
     return true;
@@ -70,11 +70,11 @@ function productoCompleto(p) {
 }
 
 function productoPendiente(p) {
-  const vs = (p.variants || []).filter(v => Number(v.costoARS) > 0 || ofertaVigente(v));
+  const vs = (p.variants || []);
   if (vs.length === 0) return false;
   return vs.some(v => {
     const necesitaNormal = Number(v.costoARS) > 0;
-    const necesitaOferta = ofertaVigente(v) && Number(v.ofertaCostoARS) > 0;
+    const necesitaOferta = ofertaVigente(v);
     if (necesitaNormal && !tienePrecioNormal(v)) return true;
     if (necesitaOferta && !tienePrecioOferta(v)) return true;
     return false;
@@ -209,80 +209,29 @@ function cerrarModal() {
   productoActivo = null;
 }
 
-// ============================================================
-// TAB PRECIOS — AHORA MUESTRA TODAS LAS VARIANTES
-// ============================================================
 function renderModalPrecios(prod) {
   const body = $('price-modal-precios');
   if (!body) return;
 
-  // ⚠️ CAMBIO CLAVE: mostramos TODAS las variantes, sin filtrar
   const variantes = prod.variants || [];
-
   if (variantes.length === 0) {
     body.innerHTML = `
       <div class="empty-message">
         <p>Este producto no tiene variantes cargadas.</p>
-        <p style="font-size:0.85rem;margin-top:8px;color:var(--text-muted);">
-          Probá re-procesar el Excel de Stock.
-        </p>
+        <p style="font-size:0.85rem;margin-top:8px;color:var(--text-muted);">Re-procesá el Excel de Stock.</p>
       </div>`;
     return;
   }
 
-  body.innerHTML = variantes.map(v => renderVarianteCompleta(v)).join('');
-
-  // Inputs precio normal
-  body.querySelectorAll('.variante-input-normal').forEach(inp => {
-    inp.addEventListener('input', () => {
-      const vid = inp.dataset.variant;
-      const val = parseFloat(inp.value) || 0;
-      const usdEl = body.querySelector(`[data-usd-normal="${vid}"]`);
-      if (usdEl) usdEl.textContent = val > 0 ? '≈ ' + formatUSD(calcPrecioUSD(val, cotizaciones.usdAUYU)) : '≈ —';
-    });
-  });
-
-  // Inputs costo manual (para SIN STOCK)
-  body.querySelectorAll('.variante-input-costo-manual').forEach(inp => {
-    inp.addEventListener('input', () => {
-      const vid = inp.dataset.variant;
-      const val = parseFloat(inp.value) || 0;
-      const costUYUEl = body.querySelector(`[data-costo-uyu="${vid}"]`);
-      if (costUYUEl) {
-        const costUYU = getCostoUYU(val, cotizaciones.arsAUYU);
-        costUYUEl.textContent = costUYU > 0 ? formatUYU(costUYU) : '$ 0';
-      }
-    });
-  });
-
-  // Inputs precio de oferta
-  body.querySelectorAll('.variante-input-oferta').forEach(inp => {
-    inp.addEventListener('input', () => {
-      const vid = inp.dataset.variant;
-      const val = parseFloat(inp.value) || 0;
-      const usdEl = body.querySelector(`[data-usd-oferta="${vid}"]`);
-      if (usdEl) usdEl.textContent = val > 0 ? '≈ ' + formatUSD(calcPrecioUSD(val, cotizaciones.usdAUYU)) : '≈ —';
-    });
-  });
-
-  // Botones
-  body.querySelectorAll('.btn-save-normal').forEach(btn => {
-    btn.addEventListener('click', () => guardarPrecioNormal(prod, btn.dataset.variant, body));
-  });
-  body.querySelectorAll('.btn-save-costo-manual').forEach(btn => {
-    btn.addEventListener('click', () => guardarCostoManual(prod, btn.dataset.variant, body));
-  });
-  body.querySelectorAll('.btn-save-oferta').forEach(btn => {
-    btn.addEventListener('click', () => guardarPrecioOferta(prod, btn.dataset.variant, body));
-  });
+  body.innerHTML = variantes.map(v => renderVarianteUnificada(v)).join('');
+  activarListenersVariante(body, prod);
 }
 
-function renderVarianteCompleta(v) {
+function renderVarianteUnificada(v) {
   const costoARS = Number(v.costoARS) || 0;
   const ofertaCostoARS = Number(v.ofertaCostoARS) || 0;
-  const tieneCostoStock = costoARS > 0;
-  const tieneCostoOferta = ofertaCostoARS > 0;
   const esOferta = ofertaVigente(v);
+  const sinStock = !costoARS && !esOferta;
 
   const costoUYU = getCostoUYU(costoARS, cotizaciones.arsAUYU);
   const precioNormal = Number(v.precioFinalUYU) || 0;
@@ -296,171 +245,174 @@ function renderVarianteCompleta(v) {
     ? `<span class="variante-oferta-badge">🔥 hasta ${formatFecha(v.ofertaHasta)}</span>`
     : (v.enOferta ? `<span class="variante-oferta-badge variante-oferta-vencida">⌛ Vencida</span>` : '');
 
-  const sinStockBadge = !tieneCostoStock && !esOferta ? '<span class="variante-sinstock-badge">⛔ SIN STOCK</span>' : '';
+  const sinStockBadge = sinStock ? '<span class="variante-sinstock-badge">SIN STOCK</span>' : '';
 
-  // ---- CASO A: SIN COSTO STOCK, SIN OFERTA → mensaje + input manual
-  if (!tieneCostoStock && !tieneCostoOferta && !esOferta) {
-    return `
-      <div class="variante-bloque variante-sinstock">
-        <div class="variante-header">
-          <span class="variante-label">${v.label}</span>
-          ${sinStockBadge}
-        </div>
-        <p class="variante-sinstock-msg">
-          Esta variante no tiene costo del proveedor. Se activará sola cuando el próximo Excel de Stock traiga un precio.
-        </p>
-        <div class="precio-seccion">
-          <div class="precio-seccion-titulo">🔧 O cargá un costo manual</div>
-          <p class="admin-hint" style="margin-bottom:10px;">Si lo comprás a otro proveedor, ingresá el costo en pesos argentinos:</p>
-          <div class="variante-input-row">
-            <div class="variante-input-wrap">
-              <span class="input-prefix">$</span>
-              <input type="number" class="variante-input-costo-manual" placeholder="Costo ARS"
-                value="" data-variant="${v.id}" min="0" step="1">
-              <span class="input-suffix">ARS</span>
-            </div>
-            <span class="variante-usd">→ <strong data-costo-uyu="${v.id}">$ 0</strong></span>
-          </div>
-          <div class="variante-actions">
-            <button type="button" class="btn btn-secondary btn-sm btn-save-costo-manual" data-variant="${v.id}">🔧 Guardar costo manual</button>
-          </div>
+  const bloqueNormal = `
+    <div class="precio-seccion">
+      <div class="precio-seccion-titulo">💰 PRECIO NORMAL</div>
+
+      <div class="precio-costo-row">
+        <label class="precio-costo-label">Costo proveedor (ARS):</label>
+        <div class="precio-costo-inputs">
+          <input type="number" class="variante-input-costo" data-variant="${v.id}"
+                 value="${costoARS || ''}" placeholder="0" min="0" step="1">
+          <span class="costo-ars-label">ARS</span>
+          <span class="costo-arrow">→</span>
+          <span class="costo-uyu-preview" data-costo-uyu="${v.id}">${costoUYU > 0 ? formatUYU(costoUYU) : '$ 0'}</span>
         </div>
       </div>
-    `;
-  }
 
-  // ---- CASO B: SIN COSTO STOCK + OFERTA activa → solo oferta + input manual
-  if (!tieneCostoStock && esOferta) {
-    return `
-      <div class="variante-bloque variante-con-oferta">
-        <div class="variante-header">
-          <span class="variante-label">${v.label}</span>
-          ${ofertaBadge}
-        </div>
-        <div class="precio-seccion precio-seccion-oferta">
-          <div class="precio-seccion-titulo">🔥 Precio de oferta</div>
-          ${tieneCostoOferta ? `
-            <div class="variante-costo">
-              <span class="info-label">Costo proveedor:</span>
-              <span class="info-value">${ofertaCostoARS} ARS → <strong>${formatUYU(ofertaCostoUYU)}</strong></span>
-            </div>
-          ` : ''}
-          <div class="variante-input-row">
-            <div class="variante-input-wrap variante-input-wrap-oferta">
-              <span class="input-prefix">$</span>
-              <input type="number" class="variante-input-oferta" placeholder="Precio de oferta"
-                value="${ofertaPrecio || ''}" data-variant="${v.id}" min="0" step="1">
-              <span class="input-suffix">UYU</span>
-            </div>
-            <span class="variante-usd" data-usd-oferta="${v.id}">≈ ${usdOferta}</span>
+      <div class="precio-final-row">
+        <label class="precio-final-label">Precio final (UYU):</label>
+        <div class="precio-final-inputs">
+          <div class="precio-input-wrap">
+            <span class="input-prefix">$</span>
+            <input type="number" class="variante-input-normal" data-variant="${v.id}"
+                   value="${precioNormal || ''}" placeholder="0" min="0" step="1">
+            <span class="input-suffix">UYU</span>
           </div>
-          <div class="variante-actions">
-            <button type="button" class="btn btn-primary btn-sm btn-save-oferta" data-variant="${v.id}">💾 Guardar precio de oferta</button>
-          </div>
-        </div>
-        <div class="precio-seccion" style="margin-top:12px;">
-          <div class="precio-seccion-titulo">🔧 O cargá un costo normal manual</div>
-          <div class="variante-input-row">
-            <div class="variante-input-wrap">
-              <span class="input-prefix">$</span>
-              <input type="number" class="variante-input-costo-manual" placeholder="Costo ARS"
-                value="" data-variant="${v.id}" min="0" step="1">
-              <span class="input-suffix">ARS</span>
-            </div>
-            <span class="variante-usd">→ <strong data-costo-uyu="${v.id}">$ 0</strong></span>
-          </div>
-          <div class="variante-actions">
-            <button type="button" class="btn btn-secondary btn-sm btn-save-costo-manual" data-variant="${v.id}">🔧 Guardar costo normal</button>
-          </div>
+          <span class="precio-usd-preview" data-usd-normal="${v.id}">≈ ${usdNormal}</span>
         </div>
       </div>
-    `;
-  }
 
-  // ---- CASO C: CON COSTO STOCK + (oferta si aplica) → normal + oferta
+      <div class="variante-actions">
+        <button type="button" class="btn btn-primary btn-sm btn-save-normal" data-variant="${v.id}">💾 Guardar precio normal</button>
+      </div>
+    </div>
+  `;
+
+  const bloqueOferta = esOferta ? `
+    <div class="precio-seccion precio-seccion-oferta">
+      <div class="precio-seccion-titulo">🔥 PRECIO DE OFERTA</div>
+
+      <div class="precio-costo-row">
+        <label class="precio-costo-label">Costo proveedor (ARS):</label>
+        <div class="precio-costo-inputs">
+          <input type="number" class="variante-input-costo-oferta" data-variant="${v.id}"
+                 value="${ofertaCostoARS || ''}" placeholder="0" min="0" step="1">
+          <span class="costo-ars-label">ARS</span>
+          <span class="costo-arrow">→</span>
+          <span class="costo-uyu-preview" data-costo-uyu-oferta="${v.id}">${ofertaCostoUYU > 0 ? formatUYU(ofertaCostoUYU) : '$ 0'}</span>
+        </div>
+      </div>
+
+      <div class="precio-final-row">
+        <label class="precio-final-label">Precio de oferta (UYU):</label>
+        <div class="precio-final-inputs">
+          <div class="precio-input-wrap">
+            <span class="input-prefix">$</span>
+            <input type="number" class="variante-input-oferta" data-variant="${v.id}"
+                   value="${ofertaPrecio || ''}" placeholder="0" min="0" step="1">
+            <span class="input-suffix">UYU</span>
+          </div>
+          <span class="precio-usd-preview" data-usd-oferta="${v.id}">≈ ${usdOferta}</span>
+        </div>
+      </div>
+
+      <div class="variante-actions">
+        <button type="button" class="btn btn-primary btn-sm btn-save-oferta" data-variant="${v.id}">💾 Guardar precio de oferta</button>
+      </div>
+    </div>
+  ` : '';
+
   return `
     <div class="variante-bloque ${esOferta ? 'variante-con-oferta' : ''}">
       <div class="variante-header">
         <span class="variante-label">${v.label}</span>
-        ${ofertaBadge}
-      </div>
-
-      <div class="precio-seccion">
-        <div class="precio-seccion-titulo">💰 Precio normal</div>
-        <div class="variante-costo">
-          <span class="info-label">Costo proveedor:</span>
-          <span class="info-value">${costoARS} ARS → <strong>${formatUYU(costoUYU)}</strong></span>
-        </div>
-        <div class="variante-input-row">
-          <div class="variante-input-wrap">
-            <span class="input-prefix">$</span>
-            <input type="number" class="variante-input-normal" placeholder="Precio final"
-              value="${precioNormal || ''}" data-variant="${v.id}" min="0" step="1">
-            <span class="input-suffix">UYU</span>
-          </div>
-          <span class="variante-usd" data-usd-normal="${v.id}">≈ ${usdNormal}</span>
-        </div>
-        <div class="variante-actions">
-          <button type="button" class="btn btn-primary btn-sm btn-save-normal" data-variant="${v.id}">💾 Guardar precio normal</button>
+        <div class="variante-header-badges">
+          ${sinStockBadge}
+          ${ofertaBadge}
         </div>
       </div>
-
-      ${esOferta ? `
-        <div class="precio-seccion precio-seccion-oferta">
-          <div class="precio-seccion-titulo">🔥 Precio de oferta</div>
-          ${tieneCostoOferta ? `
-            <div class="variante-costo">
-              <span class="info-label">Costo proveedor:</span>
-              <span class="info-value">${ofertaCostoARS} ARS → <strong>${formatUYU(ofertaCostoUYU)}</strong></span>
-            </div>
-          ` : `
-            <div class="variante-sin-costo-oferta">
-              ⚠️ El proveedor no tiene precio de oferta para esta variante.
-            </div>
-          `}
-          <div class="variante-input-row">
-            <div class="variante-input-wrap variante-input-wrap-oferta">
-              <span class="input-prefix">$</span>
-              <input type="number" class="variante-input-oferta" placeholder="Precio de oferta"
-                value="${ofertaPrecio || ''}" data-variant="${v.id}" min="0" step="1"
-                ${!tieneCostoOferta ? 'disabled' : ''}>
-              <span class="input-suffix">UYU</span>
-            </div>
-            <span class="variante-usd" data-usd-oferta="${v.id}">≈ ${usdOferta}</span>
-          </div>
-          <div class="variante-actions">
-            <button type="button" class="btn btn-primary btn-sm btn-save-oferta" data-variant="${v.id}"
-              ${!tieneCostoOferta ? 'disabled' : ''}>💾 Guardar precio de oferta</button>
-          </div>
-        </div>
-      ` : ''}
+      ${bloqueNormal}
+      ${bloqueOferta}
     </div>
   `;
 }
 
-async function guardarPrecioNormal(prod, variantId, body) {
-  const input = body.querySelector(`.variante-input-normal[data-variant="${variantId}"]`);
+function activarListenersVariante(body, prod) {
+  body.querySelectorAll('.variante-input-costo').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const vid = inp.dataset.variant;
+      const val = parseFloat(inp.value) || 0;
+      const costUYU = getCostoUYU(val, cotizaciones.arsAUYU);
+      const el = body.querySelector(`[data-costo-uyu="${vid}"]`);
+      if (el) el.textContent = costUYU > 0 ? formatUYU(costUYU) : '$ 0';
+    });
+  });
+
+  body.querySelectorAll('.variante-input-costo-oferta').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const vid = inp.dataset.variant;
+      const val = parseFloat(inp.value) || 0;
+      const costUYU = getCostoUYU(val, cotizaciones.arsAUYU);
+      const el = body.querySelector(`[data-costo-uyu-oferta="${vid}"]`);
+      if (el) el.textContent = costUYU > 0 ? formatUYU(costUYU) : '$ 0';
+    });
+  });
+
+  body.querySelectorAll('.variante-input-normal').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const vid = inp.dataset.variant;
+      const val = parseFloat(inp.value) || 0;
+      const el = body.querySelector(`[data-usd-normal="${vid}"]`);
+      if (el) el.textContent = val > 0 ? '≈ ' + formatUSD(calcPrecioUSD(val, cotizaciones.usdAUYU)) : '≈ —';
+    });
+  });
+
+  body.querySelectorAll('.variante-input-oferta').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const vid = inp.dataset.variant;
+      const val = parseFloat(inp.value) || 0;
+      const el = body.querySelector(`[data-usd-oferta="${vid}"]`);
+      if (el) el.textContent = val > 0 ? '≈ ' + formatUSD(calcPrecioUSD(val, cotizaciones.usdAUYU)) : '≈ —';
+    });
+  });
+
+  body.querySelectorAll('.btn-save-normal').forEach(btn => {
+    btn.addEventListener('click', () => guardarNormal(prod, btn.dataset.variant, body));
+  });
+
+  body.querySelectorAll('.btn-save-oferta').forEach(btn => {
+    btn.addEventListener('click', () => guardarOferta(prod, btn.dataset.variant, body));
+  });
+}
+
+async function guardarNormal(prod, variantId, body) {
+  const costoInput = body.querySelector(`.variante-input-costo[data-variant="${variantId}"]`);
+  const precioInput = body.querySelector(`.variante-input-normal[data-variant="${variantId}"]`);
   const btn = body.querySelector(`.btn-save-normal[data-variant="${variantId}"]`);
-  if (!input || !btn) return;
-  const nuevoPrecio = parseFloat(input.value) || 0;
-  if (nuevoPrecio <= 0) { alert('Ingresá un precio mayor a 0.'); return; }
+  if (!costoInput || !precioInput || !btn) return;
 
-  const variante = (prod.variants || []).find(v => v.id === variantId);
-  if (!variante) return;
+  const nuevoCosto = parseFloat(costoInput.value) || 0;
+  const nuevoPrecio = parseFloat(precioInput.value) || 0;
 
-  const costoARS = Number(variante.costoARS) || 0;
-  const ganancia = calcGananciaPct(nuevoPrecio, costoARS, cotizaciones.arsAUYU);
+  if (nuevoCosto <= 0 && nuevoPrecio <= 0) {
+    alert('Ingresá al menos el costo o el precio final.');
+    return;
+  }
+
+  const ganancia = nuevoCosto > 0 && nuevoPrecio > 0
+    ? calcGananciaPct(nuevoPrecio, nuevoCosto, cotizaciones.arsAUYU)
+    : null;
 
   const nuevasVariantes = (prod.variants || []).map(v => {
     if (v.id !== variantId) return v;
-    return { ...v, precioFinalUYU: roundUYU(nuevoPrecio), gananciaPct: ganancia, updatedAt: new Date().toISOString() };
+    return {
+      ...v,
+      costoARS: nuevoCosto,
+      disponible: nuevoCosto > 0,
+      precioFinalUYU: nuevoPrecio > 0 ? roundUYU(nuevoPrecio) : v.precioFinalUYU,
+      gananciaPct: ganancia !== null ? ganancia : v.gananciaPct,
+      updatedAt: new Date().toISOString()
+    };
   });
 
   btn.disabled = true; btn.textContent = '⏳';
   try {
     await updateDoc(doc(db, 'products', prod.id), { variants: nuevasVariantes });
     prod.variants = nuevasVariantes;
-    btn.textContent = '✅';
+    btn.textContent = '✅ Guardado';
     setTimeout(() => { btn.disabled = false; btn.textContent = '💾 Guardar precio normal'; render(); }, 900);
   } catch (err) {
     console.error('[GamesUy] Error:', err);
@@ -469,54 +421,40 @@ async function guardarPrecioNormal(prod, variantId, body) {
   }
 }
 
-async function guardarCostoManual(prod, variantId, body) {
-  const input = body.querySelector(`.variante-input-costo-manual[data-variant="${variantId}"]`);
-  const btn = body.querySelector(`.btn-save-costo-manual[data-variant="${variantId}"]`);
-  if (!input || !btn) return;
-  const nuevoCosto = parseFloat(input.value) || 0;
-  if (nuevoCosto <= 0) { alert('Ingresá un costo mayor a 0.'); return; }
-
-  const nuevasVariantes = (prod.variants || []).map(v => {
-    if (v.id !== variantId) return v;
-    return { ...v, costoARS: nuevoCosto, disponible: true, updatedAt: new Date().toISOString() };
-  });
-
-  btn.disabled = true; btn.textContent = '⏳';
-  try {
-    await updateDoc(doc(db, 'products', prod.id), { variants: nuevasVariantes });
-    prod.variants = nuevasVariantes;
-    btn.textContent = '✅';
-    setTimeout(() => { btn.disabled = false; btn.textContent = '🔧 Guardar costo manual'; render(); }, 900);
-  } catch (err) {
-    console.error('[GamesUy] Error:', err);
-    alert('Error: ' + err.message);
-    btn.disabled = false; btn.textContent = '🔧 Guardar costo manual';
-  }
-}
-
-async function guardarPrecioOferta(prod, variantId, body) {
-  const input = body.querySelector(`.variante-input-oferta[data-variant="${variantId}"]`);
+async function guardarOferta(prod, variantId, body) {
+  const costoInput = body.querySelector(`.variante-input-costo-oferta[data-variant="${variantId}"]`);
+  const precioInput = body.querySelector(`.variante-input-oferta[data-variant="${variantId}"]`);
   const btn = body.querySelector(`.btn-save-oferta[data-variant="${variantId}"]`);
-  if (!input || !btn) return;
-  const nuevoPrecio = parseFloat(input.value) || 0;
-  if (nuevoPrecio <= 0) { alert('Ingresá un precio mayor a 0.'); return; }
+  if (!costoInput || !precioInput || !btn) return;
 
-  const variante = (prod.variants || []).find(v => v.id === variantId);
-  if (!variante) return;
+  const nuevoCosto = parseFloat(costoInput.value) || 0;
+  const nuevoPrecio = parseFloat(precioInput.value) || 0;
 
-  const ofertaCostoARS = Number(variante.ofertaCostoARS) || 0;
-  const ganancia = calcGananciaPct(nuevoPrecio, ofertaCostoARS, cotizaciones.arsAUYU);
+  if (nuevoCosto <= 0 && nuevoPrecio <= 0) {
+    alert('Ingresá al menos el costo o el precio final.');
+    return;
+  }
+
+  const ganancia = nuevoCosto > 0 && nuevoPrecio > 0
+    ? calcGananciaPct(nuevoPrecio, nuevoCosto, cotizaciones.arsAUYU)
+    : null;
 
   const nuevasVariantes = (prod.variants || []).map(v => {
     if (v.id !== variantId) return v;
-    return { ...v, ofertaPrecioUYU: roundUYU(nuevoPrecio), ofertaGananciaPct: ganancia, updatedAt: new Date().toISOString() };
+    return {
+      ...v,
+      ofertaCostoARS: nuevoCosto,
+      ofertaPrecioUYU: nuevoPrecio > 0 ? roundUYU(nuevoPrecio) : v.ofertaPrecioUYU,
+      ofertaGananciaPct: ganancia !== null ? ganancia : v.ofertaGananciaPct,
+      updatedAt: new Date().toISOString()
+    };
   });
 
   btn.disabled = true; btn.textContent = '⏳';
   try {
     await updateDoc(doc(db, 'products', prod.id), { variants: nuevasVariantes });
     prod.variants = nuevasVariantes;
-    btn.textContent = '✅';
+    btn.textContent = '✅ Guardado';
     setTimeout(() => { btn.disabled = false; btn.textContent = '💾 Guardar precio de oferta'; render(); }, 900);
   } catch (err) {
     console.error('[GamesUy] Error:', err);
@@ -644,4 +582,4 @@ $('precios-prev')?.addEventListener('click', () => { if (pagina > 1) { pagina--;
 $('precios-next')?.addEventListener('click', () => { pagina++; render(); });
 
 cargarProductos();
-console.log('[GamesUy] precios.js v14 cargado');
+console.log('[GamesUy] precios.js v15 cargado (modal unificado)');

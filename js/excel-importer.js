@@ -1,36 +1,24 @@
 // ============================================================
 // GAMESUY STORE — Importador de Excel
-// Fase 3.6: Preventas (PS5, Primaria)
+// Fase 4.3: Variantes SIN STOCK + Ofertas con 4 variantes
 // ============================================================
 
 import { db } from './firebase-config.js';
 import {
-  collection,
-  getDocs,
-  doc,
-  writeBatch
+  collection, getDocs, doc, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import {
-  parseCosto,
-  esCostoValido,
-  aplicarVariacion,
-  roundUYU
+  parseCosto, esCostoValido, aplicarVariacion, roundUYU
 } from './data-model.js';
 
 const $ = (id) => document.getElementById(id);
 
-const EXCEL = {
-  stock:    null,
-  ofertas:  null,
-  preventas: null
-};
-
+const EXCEL = { stock: null, ofertas: null, preventas: null };
 const PALABRAS_IDIOMA = /\b(español|espanol|inglés|ingles|latino|españa|espana|sub|subtitulado|latam)\b/gi;
 
 // ============================================================
 // UTILIDADES
 // ============================================================
-
 function log(id, msg, tipo = 'info') {
   const el = $(id);
   if (!el) return;
@@ -110,32 +98,22 @@ function quitarAcentos(str) {
 }
 
 function crearClaveRelajada(str) {
-  return String(str || '')
-    .toLowerCase()
-    .replace(/[™®©]/g, '')
-    .replace(/[:\-–—.,;!?'"()\[\]{}]/g, ' ')
-    .replace(/[\uFE0E\uFE0F]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return String(str || '').toLowerCase()
+    .replace(/[™®©]/g, '').replace(/[:\-–—.,;!?'"()\[\]{}]/g, ' ')
+    .replace(/[\uFE0E\uFE0F]/g, '').replace(/\s+/g, ' ').trim();
 }
 
 function crearClaveSúperRelajada(str) {
-  let s = String(str || '')
-    .toLowerCase()
+  return String(str || '').toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/[™®©]/g, '')
-    .replace(/[:\-–—.,;!?'"()\[\]{}]/g, ' ')
-    .replace(/[\uFE0E\uFE0F]/g, '')
-    .replace(PALABRAS_IDIOMA, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return s;
+    .replace(/[™®©]/g, '').replace(/[:\-–—.,;!?'"()\[\]{}]/g, ' ')
+    .replace(/[\uFE0E\uFE0F]/g, '').replace(PALABRAS_IDIOMA, ' ')
+    .replace(/\s+/g, ' ').trim();
 }
 
 function parsearTituloOferta(tituloRaw) {
   let titulo = limpiarTituloBase(tituloRaw);
   const plataformas = [];
-
   titulo = titulo.replace(/\s*[-–—]\s*$/, '').trim();
 
   const matchParentesis = titulo.match(/\s*\(([^)]+)\)\s*$/);
@@ -143,9 +121,7 @@ function parsearTituloOferta(tituloRaw) {
     const contenido = matchParentesis[1].toUpperCase();
     if (contenido.includes('PS5')) plataformas.push('ps5');
     if (contenido.includes('PS4')) plataformas.push('ps4');
-    if (plataformas.length > 0) {
-      titulo = titulo.replace(/\s*\([^)]+\)\s*$/, '').trim();
-    }
+    if (plataformas.length > 0) titulo = titulo.replace(/\s*\([^)]+\)\s*$/, '').trim();
   }
 
   const matchPS = titulo.match(/\s+PS([45])\s*[-–—]?\s*$/i);
@@ -160,13 +136,11 @@ function parsearTituloOferta(tituloRaw) {
     plataformas.push('ps' + matchPSAny[1]);
   }
   titulo = titulo.replace(/\s*[-–—]?\s*PS[45]\s*[-–—]?\s*/gi, ' ').trim();
-
   titulo = titulo.replace(/\s*[-–—]\s*$/, '').trim();
   titulo = titulo.replace(/\s+/g, ' ').trim();
   titulo = titulo.replace(/[“”«»]/g, '"').replace(/[‘’]/g, "'");
 
   if (plataformas.length === 0) plataformas.push('ps4', 'ps5');
-
   return { titulo, plataformas };
 }
 
@@ -199,69 +173,49 @@ function extraerFechaVencimiento(rows) {
   return null;
 }
 
-/**
- * Convierte una fecha del Excel a formato YYYY-MM-DD.
- * Soporta:
- *  - Excel ya serializado: "2026-11-19 00:00:00"
- *  - DD/MM/YYYY
- *  - YYYY-MM-DD
- */
 function parseFechaExcel(valor) {
   if (!valor) return '';
   const s = String(valor).trim();
-
-  // Formato ISO ya: "2026-11-19 00:00:00"
   let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (m) return `${m[1]}-${m[2]}-${m[3]}`;
-
-  // DD/MM/YYYY
   m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
   if (m) {
     const d = m[1].padStart(2, '0');
     const mes = m[2].padStart(2, '0');
     return `${m[3]}-${mes}-${d}`;
   }
-
   return '';
 }
 
 // ============================================================
 // MATCHING
 // ============================================================
-
 function buscarFuzzy(matchKey, productosMap) {
   const palabrasExcel = quitarAcentos(matchKey).split(/\s+/).filter(w => w.length >= 3);
   if (palabrasExcel.length < 2) return null;
   const palabrasExcelSet = new Set(palabrasExcel);
-  let mejorProd = null;
-  let mejorScore = 0;
-
+  let mejorProd = null; let mejorScore = 0;
   for (const [key, prod] of Object.entries(productosMap)) {
     const palabrasStock = quitarAcentos(key).split(/\s+/).filter(w => w.length >= 3);
     if (palabrasStock.length < 2) continue;
     const palabrasStockSet = new Set(palabrasStock);
     let comunes = 0;
-    for (const w of palabrasExcelSet) {
-      if (palabrasStockSet.has(w)) comunes++;
-    }
+    for (const w of palabrasExcelSet) if (palabrasStockSet.has(w)) comunes++;
     if (comunes < 3) continue;
     const minTokens = Math.min(palabrasExcelSet.size, palabrasStockSet.size);
     const score = comunes / minTokens;
-    if (score >= 0.85 && score > mejorScore) {
-      mejorScore = score;
-      mejorProd = prod;
-    }
+    if (score >= 0.85 && score > mejorScore) { mejorScore = score; mejorProd = prod; }
   }
   return mejorProd;
 }
 
-function buscarProducto(matchKey, productosMap, productosMapRelajado, productosMapSuperRelajado) {
-  if (productosMap[matchKey]) return { prod: productosMap[matchKey], tipo: 'exacto' };
+function buscarProducto(matchKey, m1, m2, m3) {
+  if (m1[matchKey]) return { prod: m1[matchKey], tipo: 'exacto' };
   const claveRel = crearClaveRelajada(matchKey);
-  if (productosMapRelajado[claveRel]) return { prod: productosMapRelajado[claveRel], tipo: 'relajado' };
+  if (m2[claveRel]) return { prod: m2[claveRel], tipo: 'relajado' };
   const claveSuper = crearClaveSúperRelajada(matchKey);
-  if (productosMapSuperRelajado[claveSuper]) return { prod: productosMapSuperRelajado[claveSuper], tipo: 'super-relajado' };
-  const prodFuzzy = buscarFuzzy(claveSuper, productosMapSuperRelajado);
+  if (m3[claveSuper]) return { prod: m3[claveSuper], tipo: 'super-relajado' };
+  const prodFuzzy = buscarFuzzy(claveSuper, m3);
   if (prodFuzzy) return { prod: prodFuzzy, tipo: 'fuzzy' };
   return { prod: null, tipo: null };
 }
@@ -269,30 +223,23 @@ function buscarProducto(matchKey, productosMap, productosMapRelajado, productosM
 // ============================================================
 // LISTENERS
 // ============================================================
-
 function attachFileListener(inputId, tipo, logId, btnId, autoFechaId) {
   const input = $(inputId);
   if (!input) return;
-
   input.addEventListener('change', async () => {
     const file = input.files && input.files[0];
     const logEl = $(logId);
     const btn = $(btnId);
-
     if (logEl) logEl.innerHTML = '';
     EXCEL[tipo] = null;
     if (btn) btn.disabled = true;
-
     if (!file) return;
-
     try {
       const { sheetName, rows } = await leerExcel(file);
       EXCEL[tipo] = { nombre: file.name, sheetName, rows };
-
       log(logId, `📄 <b>${file.name}</b>`);
       log(logId, `Hoja: <code>${sheetName}</code>`);
       log(logId, `Total de filas: <b>${rows.length}</b>`);
-
       if (autoFechaId) {
         const fecha = extraerFechaVencimiento(rows);
         if (fecha) {
@@ -303,7 +250,6 @@ function attachFileListener(inputId, tipo, logId, btnId, autoFechaId) {
           }
         }
       }
-
       if (btn) btn.disabled = false;
     } catch (err) {
       log(logId, `❌ Error al leer: ${err.message}`, 'error');
@@ -319,7 +265,6 @@ attachFileListener('excel-preventas','preventas','preventas-log','btn-process-pr
 // ============================================================
 // STOCK
 // ============================================================
-
 function construirVariantesStock(fila) {
   const ps4PriRaw = fila[1];
   const ps5PriRaw = fila[2];
@@ -335,6 +280,7 @@ function construirVariantesStock(fila) {
 
   const variantes = [];
 
+  // PS4 Primaria — se crea siempre que NO sea NO DISPONIBLE
   if (tienePS4) {
     const costoARS = parseCosto(ps4PriRaw);
     variantes.push({
@@ -345,6 +291,7 @@ function construirVariantesStock(fila) {
     });
   }
 
+  // PS5 Primaria — se crea siempre que NO sea NO DISPONIBLE
   if (tienePS5) {
     const costoARS = parseCosto(ps5PriRaw);
     variantes.push({
@@ -355,6 +302,7 @@ function construirVariantesStock(fila) {
     });
   }
 
+  // Secundaria — si NO dice "NO DISPONIBLE", creamos las 2 (PS4 y PS5)
   if (!secNoDisp) {
     const costoSec = parseCosto(secRaw);
     const disponible = esCostoValido(secRaw);
@@ -380,30 +328,29 @@ function construirVariantesStock(fila) {
   return variantes;
 }
 
-function fusionarVarianteStock(varianteNueva, existente) {
-  if (!existente) return varianteNueva;
+function fusionarVarianteStock(nueva, existente) {
+  if (!existente) return nueva;
 
   const costoViejo = Number(existente.costoARS) || 0;
-  const costoNuevo = Number(varianteNueva.costoARS) || 0;
+  const costoNuevo = Number(nueva.costoARS) || 0;
   const resultado = { ...existente };
 
   if (costoViejo === costoNuevo) {
-    resultado.disponible = varianteNueva.disponible;
+    resultado.disponible = nueva.disponible;
     return resultado;
   }
 
   if (costoViejo > 0 && costoNuevo > 0) {
     const variacion = (costoNuevo / costoViejo) - 1;
     const precioViejo = Number(resultado.precioFinalUYU) || 0;
-    if (precioViejo > 0) {
-      resultado.precioFinalUYU = aplicarVariacion(precioViejo, variacion);
-    }
+    if (precioViejo > 0) resultado.precioFinalUYU = aplicarVariacion(precioViejo, variacion);
     resultado.costoARS = costoNuevo;
     resultado.disponible = true;
     return resultado;
   }
 
   if (costoViejo === 0 && costoNuevo > 0) {
+    // ⚠️ Era SIN STOCK y ahora tiene stock → NO pisamos el precio (está vacío)
     resultado.costoARS = costoNuevo;
     resultado.disponible = true;
     return resultado;
@@ -432,10 +379,11 @@ async function procesarStock() {
     const data = d.data();
     if (data.matchKey) productosMap[data.matchKey] = { id: d.id, ...data };
   });
-  log('stock-log', `✔ ${snap.size} productos encontrados en Firestore.`);
+  log('stock-log', `✔ ${snap.size} productos encontrados.`);
 
   const filas = excel.rows.slice(5);
   let creados = 0, actualizados = 0, saltados = 0;
+  let nuevosConStock = 0; // ← variantes que pasaron de SIN STOCK a con stock
   const operaciones = [];
 
   for (const fila of filas) {
@@ -444,7 +392,6 @@ async function procesarStock() {
 
     const matchKey = normalizarTitulo(titulo);
     const variantesNuevas = construirVariantesStock(fila);
-
     if (variantesNuevas.length === 0) { saltados++; continue; }
 
     const existente = productosMap[matchKey];
@@ -452,7 +399,12 @@ async function procesarStock() {
     if (existente) {
       const variantesFinales = variantesNuevas.map(vn => {
         const ve = (existente.variants || []).find(v => v.id === vn.id);
-        return fusionarVarianteStock(vn, ve);
+        const resultado = fusionarVarianteStock(vn, ve);
+        // Detectar si pasó de sin stock a con stock
+        if (ve && Number(ve.costoARS) === 0 && Number(resultado.costoARS) > 0) {
+          nuevosConStock++;
+        }
+        return resultado;
       });
 
       const idsNuevos = new Set(variantesNuevas.map(v => v.id));
@@ -498,52 +450,47 @@ async function procesarStock() {
   log('stock-log', '');
   log('stock-log', '═══════════════════════════════════');
   log('stock-log', `✅ STOCK PROCESADO`);
-  log('stock-log', `   🆕 Creados:      ${creados}`);
-  log('stock-log', `   🔄 Actualizados: ${actualizados}`);
-  log('stock-log', `   ⏭️  Saltados:     ${saltados}`);
+  log('stock-log', `   🆕 Creados:              ${creados}`);
+  log('stock-log', `   🔄 Actualizados:         ${actualizados}`);
+  log('stock-log', `   🟢 Nuevas con stock:     ${nuevosConStock}`);
+  log('stock-log', `   ⏭️  Saltados:             ${saltados}`);
   log('stock-log', '═══════════════════════════════════');
 
-  alert(`✅ Stock procesado\n\nCreados: ${creados}\nActualizados: ${actualizados}\nSaltados: ${saltados}`);
+  if (nuevosConStock > 0) {
+    log('stock-log', '');
+    log('stock-log', `⚠️  <b>${nuevosConStock} variantes pasaron de SIN STOCK a con stock.</b>`);
+    log('stock-log', `Andá al panel de Precios y cargales el precio.`);
+  }
+
+  alert(`✅ Stock procesado\n\nCreados: ${creados}\nActualizados: ${actualizados}\nNuevas con stock: ${nuevosConStock}`);
 }
 
 // ============================================================
-// OFERTAS
+// OFERTAS — Ahora crea las 4 variantes
 // ============================================================
-
 async function procesarOfertas() {
   const excel = EXCEL.ofertas;
-  if (!excel) {
-    log('ofertas-log', '⚠ No hay Excel de Ofertas cargado.', 'error');
-    return;
-  }
+  if (!excel) { log('ofertas-log', '⚠ No hay Excel de Ofertas cargado.', 'error'); return; }
 
   const fechaHasta = $('oferta-fecha-hasta').value;
   if (!fechaHasta) {
     log('ofertas-log', '⚠ Ingresá la fecha de vencimiento.', 'error');
-    alert('Ingresá la fecha antes de procesar.');
-    return;
+    alert('Ingresá la fecha antes de procesar.'); return;
   }
 
   log('ofertas-log', `📅 Válidas hasta: <b>${fechaHasta}</b>`);
-  log('ofertas-log', '⏳ Leyendo productos existentes...');
+  log('ofertas-log', '⏳ Leyendo productos...');
 
   const snap = await getDocs(collection(db, 'products'));
-  const productosMap = {};
-  const productosMapRelajado = {};
-  const productosMapSuperRelajado = {};
-
+  const m1 = {}, m2 = {}, m3 = {};
   snap.docs.forEach(d => {
     const data = d.data();
     if (data.matchKey) {
-      productosMap[data.matchKey] = { id: d.id, ...data };
-      const claveRel = crearClaveRelajada(data.matchKey);
-      if (!productosMapRelajado[claveRel]) {
-        productosMapRelajado[claveRel] = { id: d.id, ...data };
-      }
-      const claveSuper = crearClaveSúperRelajada(data.matchKey);
-      if (!productosMapSuperRelajado[claveSuper]) {
-        productosMapSuperRelajado[claveSuper] = { id: d.id, ...data };
-      }
+      m1[data.matchKey] = { id: d.id, ...data };
+      const r = crearClaveRelajada(data.matchKey);
+      if (!m2[r]) m2[r] = { id: d.id, ...data };
+      const s = crearClaveSúperRelajada(data.matchKey);
+      if (!m3[s]) m3[s] = { id: d.id, ...data };
     }
   });
   log('ofertas-log', `✔ ${snap.size} productos en Firestore.`);
@@ -554,10 +501,7 @@ async function procesarOfertas() {
     if (!fila) continue;
     const titulo = String(fila[0] || '').trim();
     const costo = parseCosto(fila[1]);
-    if (titulo && costo > 0 && !esFilaEncabezado(titulo)) {
-      inicioIdx = i;
-      break;
-    }
+    if (titulo && costo > 0 && !esFilaEncabezado(titulo)) { inicioIdx = i; break; }
   }
   log('ofertas-log', `📌 Datos desde la fila ${inicioIdx + 1}`);
 
@@ -576,31 +520,53 @@ async function procesarOfertas() {
     const { titulo, plataformas } = parsearTituloOferta(tituloRaw);
     const matchKey = normalizarTitulo(titulo);
 
-    const { prod, tipo } = buscarProducto(matchKey, productosMap, productosMapRelajado, productosMapSuperRelajado);
+    const { prod, tipo } = buscarProducto(matchKey, m1, m2, m3);
 
     if (prod) {
+      // Aplicar oferta respetando variantes existentes
       let modificado = false;
       const nuevasVariantes = (prod.variants || []).map(v => {
         if (v.tipo !== 'primaria') return v;
         if (!plataformas.includes(v.categoria)) return v;
-
-        const precioActual = Number(v.precioFinalUYU) || 0;
-        const costoActual = Number(v.costoARS) || 0;
-
-        let ofertaPrecioUYU = 0;
-        if (precioActual > 0 && costoActual > 0) {
-          const variacion = (costoOfertaARS / costoActual) - 1;
-          ofertaPrecioUYU = roundUYU(precioActual * (1 + variacion));
-        }
-
         modificado = true;
         return {
           ...v,
           enOferta: true,
           ofertaCostoARS: costoOfertaARS,
-          ofertaPrecioUYU: ofertaPrecioUYU,
+          ofertaPrecioUYU: Number(v.ofertaPrecioUYU) || 0,
           ofertaHasta: fechaHasta
         };
+      });
+
+      // Agregar variantes primarias que no existían
+      plataformas.forEach(plat => {
+        if (!nuevasVariantes.some(v => v.id === `${plat}_primaria`)) {
+          nuevasVariantes.push({
+            id: `${plat}_primaria`, label: `${plat.toUpperCase()} Primaria`,
+            categoria: plat, tipo: 'primaria',
+            costoARS: 0, disponible: false,
+            gananciaPct: null, precioFinalUYU: null,
+            enOferta: true, ofertaCostoARS: costoOfertaARS,
+            ofertaPrecioUYU: 0, ofertaHasta: fechaHasta
+          });
+          modificado = true;
+        }
+      });
+
+      // Agregar variantes secundarias (con costo de oferta en 0 → cargar a mano)
+      plataformas.forEach(plat => {
+        const idSec = `${plat}_secundaria`;
+        if (!nuevasVariantes.some(v => v.id === idSec)) {
+          nuevasVariantes.push({
+            id: idSec, label: `${plat.toUpperCase()} Secundaria`,
+            categoria: plat, tipo: 'secundaria',
+            costoARS: 0, disponible: false,
+            gananciaPct: null, precioFinalUYU: null,
+            enOferta: true, ofertaCostoARS: 0,
+            ofertaPrecioUYU: 0, ofertaHasta: fechaHasta
+          });
+          modificado = true;
+        }
       });
 
       if (modificado) {
@@ -611,29 +577,34 @@ async function procesarOfertas() {
         stats[tipo] = (stats[tipo] || 0) + 1;
       }
     } else {
+      // Juego NUEVO desde Ofertas → crear las 4 variantes
       const categories = [...plataformas];
-
-      const variantesNuevas = plataformas.map(plat => ({
-        id: `${plat}_primaria`,
-        label: `${plat.toUpperCase()} Primaria`,
-        categoria: plat,
-        tipo: 'primaria',
-        costoARS: costoOfertaARS,
-        disponible: true,
-        gananciaPct: null,
-        precioFinalUYU: null,
-        enOferta: true,
-        ofertaCostoARS: costoOfertaARS,
-        ofertaPrecioUYU: 0,
-        ofertaHasta: fechaHasta
-      }));
+      const variantesNuevas = [];
+      plataformas.forEach(plat => {
+        // Primaria con costo de oferta
+        variantesNuevas.push({
+          id: `${plat}_primaria`, label: `${plat.toUpperCase()} Primaria`,
+          categoria: plat, tipo: 'primaria',
+          costoARS: 0, disponible: false,
+          gananciaPct: null, precioFinalUYU: null,
+          enOferta: true, ofertaCostoARS: costoOfertaARS,
+          ofertaPrecioUYU: 0, ofertaHasta: fechaHasta
+        });
+        // Secundaria con costo de oferta 0 (para cargar a mano)
+        variantesNuevas.push({
+          id: `${plat}_secundaria`, label: `${plat.toUpperCase()} Secundaria`,
+          categoria: plat, tipo: 'secundaria',
+          costoARS: 0, disponible: false,
+          gananciaPct: null, precioFinalUYU: null,
+          enOferta: true, ofertaCostoARS: 0,
+          ofertaPrecioUYU: 0, ofertaHasta: fechaHasta
+        });
+      });
 
       operaciones.push({
         ref: doc(collection(db, 'products')),
         data: {
-          title: titulo,
-          matchKey,
-          categories,
+          title: titulo, matchKey, categories,
           coverUrl: '', gameplayUrl: '', youtubeUrl: '', description: '',
           isPreorder: false, releaseDate: '', visible: true, soloOferta: true,
           variants: variantesNuevas,
@@ -648,12 +619,7 @@ async function procesarOfertas() {
   log('ofertas-log', `⏳ Guardando ${operaciones.length} operaciones...`);
   await ejecutarBatches(operaciones, 'ofertas-log');
 
-  const totalAplicadas =
-    (stats.exacto || 0) +
-    (stats.relajado || 0) +
-    (stats['super-relajado'] || 0) +
-    (stats.fuzzy || 0);
-
+  const totalAplicadas = (stats.exacto || 0) + (stats.relajado || 0) + (stats['super-relajado'] || 0) + (stats.fuzzy || 0);
   log('ofertas-log', '');
   log('ofertas-log', '═══════════════════════════════════');
   log('ofertas-log', `✅ OFERTAS PROCESADAS`);
@@ -661,9 +627,8 @@ async function procesarOfertas() {
   log('ofertas-log', `   🎯 Relajadas:      ${stats.relajado || 0}`);
   log('ofertas-log', `   🎯 Súper relajadas: ${stats['super-relajado'] || 0}`);
   log('ofertas-log', `   🎯 Fuzzy:          ${stats.fuzzy || 0}`);
-  log('ofertas-log', `   ─────────────────────`);
   log('ofertas-log', `   ✨ Total aplicadas: ${totalAplicadas}`);
-  log('ofertas-log', `   🆕 CREADOS NUEVOS:  ${stats.creados}`);
+  log('ofertas-log', `   🆕 Creados nuevos:  ${stats.creados}`);
   log('ofertas-log', `   ⏭️  Sin precio:      ${sinPrecio}`);
   log('ofertas-log', `   ⏭️  Saltadas:        ${saltadas}`);
   log('ofertas-log', '═══════════════════════════════════');
@@ -674,56 +639,31 @@ async function procesarOfertas() {
 // ============================================================
 // PREVENTAS
 // ============================================================
-
-/**
- * Excel de Preventas:
- *   col 0 (A) → JUEGO
- *   col 1 (B) → FECHA DE ESTRENO
- *   col 2 (C) → PRECIO PS5 PRIMARIA (ARS)
- *   col 3 (D) → USDT (ignorar)
- *   col 4 (E) → SECUNDARIA PESOS (ARS) - la ignoramos por ahora
- *   col 5 (F) → USDT SECUNDARIA (ignorar)
- */
 async function procesarPreventas() {
   const excel = EXCEL.preventas;
-  if (!excel) {
-    log('preventas-log', '⚠ No hay Excel de Preventas cargado.', 'error');
-    return;
-  }
+  if (!excel) { log('preventas-log', '⚠ No hay Excel de Preventas cargado.', 'error'); return; }
 
-  log('preventas-log', '⏳ Leyendo productos existentes...');
+  log('preventas-log', '⏳ Leyendo productos...');
   const snap = await getDocs(collection(db, 'products'));
-  const productosMap = {};
-  const productosMapRelajado = {};
-  const productosMapSuperRelajado = {};
-
+  const m1 = {}, m2 = {}, m3 = {};
   snap.docs.forEach(d => {
     const data = d.data();
     if (data.matchKey) {
-      productosMap[data.matchKey] = { id: d.id, ...data };
-      const claveRel = crearClaveRelajada(data.matchKey);
-      if (!productosMapRelajado[claveRel]) {
-        productosMapRelajado[claveRel] = { id: d.id, ...data };
-      }
-      const claveSuper = crearClaveSúperRelajada(data.matchKey);
-      if (!productosMapSuperRelajado[claveSuper]) {
-        productosMapSuperRelajado[claveSuper] = { id: d.id, ...data };
-      }
+      m1[data.matchKey] = { id: d.id, ...data };
+      const r = crearClaveRelajada(data.matchKey);
+      if (!m2[r]) m2[r] = { id: d.id, ...data };
+      const s = crearClaveSúperRelajada(data.matchKey);
+      if (!m3[s]) m3[s] = { id: d.id, ...data };
     }
   });
-  log('preventas-log', `✔ ${snap.size} productos en Firestore.`);
 
-  // Encontrar la primera fila con datos válidos
   let inicioIdx = 0;
   for (let i = 0; i < Math.min(excel.rows.length, 20); i++) {
     const fila = excel.rows[i];
     if (!fila) continue;
     const titulo = String(fila[0] || '').trim();
     const costo = parseCosto(fila[2]);
-    if (titulo && costo > 0 && !esFilaEncabezado(titulo)) {
-      inicioIdx = i;
-      break;
-    }
+    if (titulo && costo > 0 && !esFilaEncabezado(titulo)) { inicioIdx = i; break; }
   }
   log('preventas-log', `📌 Datos desde la fila ${inicioIdx + 1}`);
 
@@ -738,50 +678,32 @@ async function procesarPreventas() {
 
     const fechaEstreno = parseFechaExcel(fila[1]);
     const costoPS5Primaria = parseCosto(fila[2]);
-
     if (!costoPS5Primaria) { sinCosto++; continue; }
 
-    // Para preventas, el título viene sin sufijo PS4/PS5, lo limpiamos igual
     const { titulo } = parsearTituloOferta(tituloRaw);
     const matchKey = normalizarTitulo(titulo);
 
-    const { prod, tipo } = buscarProducto(matchKey, productosMap, productosMapRelajado, productosMapSuperRelajado);
+    const { prod, tipo } = buscarProducto(matchKey, m1, m2, m3);
 
     if (prod) {
-      // Ya existe → actualizar con info de preventa
       const variantesActualizadas = (prod.variants || []).map(v => {
         if (v.id === 'ps5_primaria') {
-          return {
-            ...v,
-            costoARS: costoPS5Primaria,
-            disponible: true,
-            // actualizar fecha como oferta hasta
-          };
+          return { ...v, costoARS: costoPS5Primaria, disponible: true };
         }
         return v;
       });
 
-      // Si NO existía la variante ps5_primaria, la creamos
       const tienePS5 = (prod.variants || []).some(v => v.id === 'ps5_primaria');
       if (!tienePS5) {
         variantesActualizadas.push({
-          id: 'ps5_primaria',
-          label: 'PS5 Primaria',
-          categoria: 'ps5',
-          tipo: 'primaria',
-          costoARS: costoPS5Primaria,
-          disponible: true,
-          gananciaPct: null,
-          precioFinalUYU: null,
-          enOferta: false,
-          ofertaCostoARS: null,
-          ofertaPrecioUYU: null,
-          ofertaHasta: null
+          id: 'ps5_primaria', label: 'PS5 Primaria', categoria: 'ps5', tipo: 'primaria',
+          costoARS: costoPS5Primaria, disponible: true,
+          gananciaPct: null, precioFinalUYU: null,
+          enOferta: false, ofertaCostoARS: null, ofertaPrecioUYU: null, ofertaHasta: null
         });
       }
 
       const categories = new Set([...(prod.categories || []), 'ps5']);
-
       operaciones.push({
         ref: doc(db, 'products', prod.id),
         data: {
@@ -794,33 +716,20 @@ async function procesarPreventas() {
       });
       stats[tipo] = (stats[tipo] || 0) + 1;
     } else {
-      // No existe → crear como preventa
       const variantesNuevas = [{
-        id: 'ps5_primaria',
-        label: 'PS5 Primaria',
-        categoria: 'ps5',
-        tipo: 'primaria',
-        costoARS: costoPS5Primaria,
-        disponible: true,
-        gananciaPct: null,
-        precioFinalUYU: null,
-        enOferta: false,
-        ofertaCostoARS: null,
-        ofertaPrecioUYU: null,
-        ofertaHasta: null
+        id: 'ps5_primaria', label: 'PS5 Primaria', categoria: 'ps5', tipo: 'primaria',
+        costoARS: costoPS5Primaria, disponible: true,
+        gananciaPct: null, precioFinalUYU: null,
+        enOferta: false, ofertaCostoARS: null, ofertaPrecioUYU: null, ofertaHasta: null
       }];
 
       operaciones.push({
         ref: doc(collection(db, 'products')),
         data: {
-          title: titulo,
-          matchKey,
-          categories: ['ps5'],
+          title: titulo, matchKey, categories: ['ps5'],
           coverUrl: '', gameplayUrl: '', youtubeUrl: '', description: '',
-          isPreorder: true,
-          releaseDate: fechaEstreno || '',
-          visible: true,
-          soloPreventa: true,
+          isPreorder: true, releaseDate: fechaEstreno || '',
+          visible: true, soloPreventa: true,
           variants: variantesNuevas,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
@@ -833,24 +742,13 @@ async function procesarPreventas() {
   log('preventas-log', `⏳ Guardando ${operaciones.length} operaciones...`);
   await ejecutarBatches(operaciones, 'preventas-log');
 
-  const totalAplicadas =
-    (stats.exacto || 0) +
-    (stats.relajado || 0) +
-    (stats['super-relajado'] || 0) +
-    (stats.fuzzy || 0);
-
+  const totalAplicadas = (stats.exacto || 0) + (stats.relajado || 0) + (stats['super-relajado'] || 0) + (stats.fuzzy || 0);
   log('preventas-log', '');
   log('preventas-log', '═══════════════════════════════════');
   log('preventas-log', `✅ PREVENTAS PROCESADAS`);
-  log('preventas-log', `   🎯 Exactas:        ${stats.exacto || 0}`);
-  log('preventas-log', `   🎯 Relajadas:      ${stats.relajado || 0}`);
-  log('preventas-log', `   🎯 Súper relajadas: ${stats['super-relajado'] || 0}`);
-  log('preventas-log', `   🎯 Fuzzy:          ${stats.fuzzy || 0}`);
-  log('preventas-log', `   ─────────────────────`);
   log('preventas-log', `   ✨ Total aplicadas: ${totalAplicadas}`);
-  log('preventas-log', `   🆕 CREADOS NUEVOS:  ${stats.creados}`);
+  log('preventas-log', `   🆕 Creados nuevos:  ${stats.creados}`);
   log('preventas-log', `   ⏭️  Sin costo:       ${sinCosto}`);
-  log('preventas-log', `   ⏭️  Saltadas:        ${saltadas}`);
   log('preventas-log', '═══════════════════════════════════');
 
   alert(`✅ Preventas procesadas\n\nAplicadas: ${totalAplicadas}\nCreados nuevos: ${stats.creados}`);
@@ -859,28 +757,20 @@ async function procesarPreventas() {
 // ============================================================
 // LIMPIAR OFERTAS VENCIDAS
 // ============================================================
-
 async function limpiarOfertasVencidas() {
-  if (!confirm('¿Limpiar todas las ofertas cuya fecha de vencimiento ya pasó?')) return;
-
+  if (!confirm('¿Limpiar todas las ofertas vencidas?')) return;
   const hoy = new Date().toISOString().split('T')[0];
   const snap = await getDocs(collection(db, 'products'));
   const operaciones = [];
 
   snap.docs.forEach(d => {
     const data = d.data();
-    const variantes = data.variants || [];
     let modificado = false;
-
-    const nuevasVariantes = variantes.map(v => {
-      if (!v.enOferta) return v;
-      if (!v.ofertaHasta) return v;
-      if (v.ofertaHasta >= hoy) return v;
-
+    const nuevasVariantes = (data.variants || []).map(v => {
+      if (!v.enOferta || !v.ofertaHasta || v.ofertaHasta >= hoy) return v;
       modificado = true;
       return { ...v, enOferta: false, ofertaCostoARS: null, ofertaPrecioUYU: null, ofertaHasta: null };
     });
-
     if (modificado) {
       operaciones.push({
         ref: doc(db, 'products', d.id),
@@ -889,21 +779,16 @@ async function limpiarOfertasVencidas() {
     }
   });
 
-  if (operaciones.length === 0) {
-    alert('No había ofertas vencidas para limpiar.');
-    return;
-  }
-
+  if (operaciones.length === 0) { alert('No había ofertas vencidas.'); return; }
   log('ofertas-log', `⏳ Limpiando ${operaciones.length} ofertas vencidas...`);
   await ejecutarBatches(operaciones, 'ofertas-log');
-  log('ofertas-log', `✅ ${operaciones.length} productos limpiados.`);
+  log('ofertas-log', `✅ ${operaciones.length} limpiadas.`);
   alert(`✅ ${operaciones.length} productos actualizados.`);
 }
 
 // ============================================================
 // BATCHES
 // ============================================================
-
 async function ejecutarBatches(operaciones, logId) {
   const TAM = 400;
   for (let i = 0; i < operaciones.length; i += TAM) {
@@ -918,7 +803,6 @@ async function ejecutarBatches(operaciones, logId) {
 // ============================================================
 // BOTONES
 // ============================================================
-
 $('btn-process-stock')?.addEventListener('click', async () => {
   const btn = $('btn-process-stock');
   btn.disabled = true; btn.textContent = '⏳ Procesando...';
@@ -951,4 +835,4 @@ $('btn-clean-ofertas')?.addEventListener('click', async () => {
   finally { btn.disabled = false; btn.textContent = '🧹 Limpiar ofertas vencidas'; }
 });
 
-console.log('[GamesUy] excel-importer.js v15 cargado (Preventas)');
+console.log('[GamesUy] excel-importer.js v16 cargado (variantes SIN STOCK + ofertas con 4 variantes)');

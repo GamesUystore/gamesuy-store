@@ -1,719 +1,781 @@
 // ============================================================
-// GAMESUY STORE — Catálogo público + Ofertas + Preventas
-// Fase 6.1: Preventas separadas + auto-activación al estreno
+// GAMESUY STORE — Importador de Excel
+// Fase 6.2: Fuzzy matching más estricto
 // ============================================================
 
 import { db } from './firebase-config.js';
-import { collection, onSnapshot, doc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { calcPrecioUSD, formatUYU, formatUSD } from './data-model.js';
+import {
+  collection, getDocs, doc, writeBatch
+} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import {
+  parseCosto, esCostoValido, aplicarVariacion, roundUYU
+} from './data-model.js';
 
 const $ = (id) => document.getElementById(id);
 
-let productos = [];
-let cotizaciones = { arsAUYU: 0.055, usdAUYU: 39.50 };
-let pagosTexto = 'Prex / Mercado Pago / BROU';
+const EXCEL = { stock: null, ofertas: null, preventas: null };
+const PALABRAS_IDIOMA = /\b(español|espanol|inglés|ingles|latino|españa|espana|sub|subtitulado|latam)\b/gi;
 
-let catState = { search: '', cat: 'all', pagina: 1 };
-let ofState = { search: '', cat: 'all', pagina: 1 };
-let preState = { search: '', cat: 'all', pagina: 1 };
-const POR_PAGINA = 24;
-
-let countdownInterval = null;
-
-// ============================================================
-// CARGA DE DATOS
-// ============================================================
-onSnapshot(doc(db, 'settings', 'cotizaciones'), (snap) => {
-  if (!snap.exists()) return;
-  const c = snap.data();
-  cotizaciones.arsAUYU = Number(c.arsAUYU) || 0.055;
-  cotizaciones.usdAUYU = Number(c.usdAUYU) || 39.50;
-  renderAll();
-});
-
-onSnapshot(doc(db, 'settings', 'payments'), (snap) => {
-  pagosTexto = (snap.exists() && snap.data().text) ? snap.data().text : 'Prex / Mercado Pago / BROU';
-  renderAll();
-});
-
-onSnapshot(collection(db, 'products'), (snap) => {
-  productos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  console.log('[GamesUy] Catálogo:', productos.length, 'productos');
-  renderAll();
-});
-
-// ============================================================
-// HELPERS
-// ============================================================
-function tienePrecioNormal(v) { return Number(v?.precioFinalUYU) > 0; }
-function tienePrecioOferta(v) { return Number(v?.ofertaPrecioUYU) > 0; }
-function tieneCostoNormal(v) { return Number(v?.costoARS) > 0; }
-function tieneCostoOferta(v) { return Number(v?.ofertaCostoARS) > 0; }
-
-function ofertaVigente(v) {
-  if (!v.enOferta || !v.ofertaHasta) return null;
-  const hoy = new Date().toISOString().split('T')[0];
-  if (v.ofertaHasta < hoy) return null;
-  if (!(Number(v.ofertaPrecioUYU) > 0)) return null;
-  return {
-    precio: Number(v.ofertaPrecioUYU),
-    original: Number(v.precioFinalUYU) || 0,
-    hasta: v.ofertaHasta
-  };
+function log(id, msg, tipo = 'info') {
+  const el = $(id);
+  if (!el) return;
+  const cls = tipo === 'error' ? 'import-error' : (tipo === 'ok' ? 'import-ok' : '');
+  el.innerHTML += `<div class="${cls}">${msg}</div>`;
+  el.scrollTop = el.scrollHeight;
 }
 
-/**
- * Devuelve true si el producto está en preventa ACTIVA.
- * Preventa activa = isPreorder: true Y (sin fecha o fecha futura).
- * Si la fecha ya pasó → ya no es preventa (salió a la venta).
- */
-function esPreventaActiva(p) {
-  if (p.visible === false) return false;
-  if (p.isPreorder !== true) return false;
-  if (!p.releaseDate) return true; // sin fecha → sigue siendo preventa
-  const hoy = new Date().toISOString().split('T')[0];
-  return p.releaseDate > hoy; // fecha futura → preventa activa
-}
-
-function varianteVendible(v) {
-  if (v.disponible === false) return false;
-  return ofertaVigente(v) !== null || (tieneCostoNormal(v) && tienePrecioNormal(v));
-}
-
-function productoVisible(p) {
-  if (p.visible === false) return false;
-  // Preventas activas NO van al catálogo general
-  if (esPreventaActiva(p)) return false;
-  // Juegos solo-oferta (no están en Stock)
-  if (p.soloOferta && !p.soloPreventa) {
-    return (p.variants || []).some(v => ofertaVigente(v));
-  }
-  return (p.variants || []).some(varianteVendible);
-}
-
-function productoTieneOferta(p) {
-  if (p.visible === false) return false;
-  // Preventas activas NO van a ofertas
-  if (esPreventaActiva(p)) return false;
-  return (p.variants || []).some(v => ofertaVigente(v));
-}
-
-function productoEsPreventa(p) {
-  return esPreventaActiva(p);
-}
-
-function escapeHtml(str) {
-  return String(str ?? '').replace(/[&<>'"]/g, ch => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
-  }[ch]));
-}
-
-function safeUrl(url) {
-  return String(url || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
-
-function formatearFecha(dateStr) {
-  if (!dateStr) return '';
-  const parts = String(dateStr).split('-');
-  return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : dateStr;
-}
-
-// ============================================================
-// FILTROS
-// ============================================================
-function filtrarProductos() {
-  let lista = productos.filter(productoVisible);
-  if (catState.cat !== 'all') lista = lista.filter(p => (p.categories || []).includes(catState.cat));
-  if (catState.search) {
-    const q = catState.search.toLowerCase().trim();
-    lista = lista.filter(p => String(p.title || '').toLowerCase().includes(q));
-  }
-  lista.sort((a, b) => String(a.title || '').localeCompare(String(b.title || ''), 'es'));
-  return lista;
-}
-
-function filtrarOfertas() {
-  let lista = productos.filter(productoTieneOferta);
-  if (ofState.cat !== 'all') lista = lista.filter(p => (p.categories || []).includes(ofState.cat));
-  if (ofState.search) {
-    const q = ofState.search.toLowerCase().trim();
-    lista = lista.filter(p => String(p.title || '').toLowerCase().includes(q));
-  }
-  lista.sort((a, b) => {
-    const fa = (a.variants || []).map(v => v.ofertaHasta).filter(Boolean).sort()[0] || '9999';
-    const fb = (b.variants || []).map(v => v.ofertaHasta).filter(Boolean).sort()[0] || '9999';
-    return fa.localeCompare(fb);
-  });
-  return lista;
-}
-
-function filtrarPreventas() {
-  let lista = productos.filter(productoEsPreventa);
-  if (preState.cat !== 'all') lista = lista.filter(p => (p.categories || []).includes(preState.cat));
-  if (preState.search) {
-    const q = preState.search.toLowerCase().trim();
-    lista = lista.filter(p => String(p.title || '').toLowerCase().includes(q));
-  }
-  lista.sort((a, b) => {
-    const fa = a.releaseDate || '9999';
-    const fb = b.releaseDate || '9999';
-    return fa.localeCompare(fb);
-  });
-  return lista;
-}
-
-// ============================================================
-// RENDER GLOBAL
-// ============================================================
-function renderAll() {
-  renderCatalogo();
-  renderOfertas();
-  renderPreventas();
-}
-
-// ============================================================
-// RENDER CATÁLOGO
-// ============================================================
-function renderCatalogo() {
-  const grid = $('product-grid');
-  const count = $('results-count');
-  if (!grid) return;
-
-  const filtrados = filtrarProductos();
-  const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA));
-  if (catState.pagina > totalPaginas) catState.pagina = totalPaginas;
-  const inicio = (catState.pagina - 1) * POR_PAGINA;
-  const enPagina = filtrados.slice(inicio, inicio + POR_PAGINA);
-
-  if (count) count.textContent = filtrados.length === 0
-    ? 'Sin productos'
-    : `${filtrados.length} producto${filtrados.length !== 1 ? 's' : ''}`;
-
-  if (enPagina.length === 0) {
-    grid.innerHTML = `
-      <div class="catalog-empty">
-        <span class="catalog-empty-icon">🎮</span>
-        <p>No hay juegos con precio cargado por ahora.</p>
-        <p class="catalog-empty-sub">Volvé pronto — estamos actualizando el catálogo.</p>
-      </div>`;
-    renderPaginacion('catalog-pagination', 0, 0, (p) => { catState.pagina = p; renderCatalogo(); });
-    return;
-  }
-
-  grid.innerHTML = enPagina.map(p => renderCard(p, 'cat')).join('');
-  activarCards(enPagina, 'cat');
-  renderPaginacion('catalog-pagination', catState.pagina, totalPaginas, (p) => { catState.pagina = p; renderCatalogo(); });
-}
-
-// ============================================================
-// RENDER OFERTAS
-// ============================================================
-function renderOfertas() {
-  const grid = $('ofertas-grid');
-  const count = $('ofertas-count');
-  if (!grid) return;
-
-  const filtrados = filtrarOfertas();
-  const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA));
-  if (ofState.pagina > totalPaginas) ofState.pagina = totalPaginas;
-  const inicio = (ofState.pagina - 1) * POR_PAGINA;
-  const enPagina = filtrados.slice(inicio, inicio + POR_PAGINA);
-
-  if (count) count.textContent = filtrados.length === 0
-    ? 'Sin ofertas activas'
-    : `${filtrados.length} oferta${filtrados.length !== 1 ? 's' : ''} disponible${filtrados.length !== 1 ? 's' : ''}`;
-
-  if (enPagina.length === 0) {
-    grid.innerHTML = `
-      <div class="catalog-empty">
-        <span class="catalog-empty-icon">🔥</span>
-        <p>No hay ofertas activas en este momento.</p>
-        <p class="catalog-empty-sub">Volvé pronto — renovamos las ofertas cada 15 días.</p>
-      </div>`;
-    renderPaginacion('ofertas-pagination', 0, 0, (p) => { ofState.pagina = p; renderOfertas(); });
-    return;
-  }
-
-  grid.innerHTML = enPagina.map(p => renderCard(p, 'oferta')).join('');
-  activarCards(enPagina, 'oferta');
-  renderPaginacion('ofertas-pagination', ofState.pagina, totalPaginas, (p) => { ofState.pagina = p; renderOfertas(); });
-}
-
-// ============================================================
-// RENDER PREVENTAS
-// ============================================================
-function renderPreventas() {
-  const grid = $('preventas-grid');
-  const count = $('preventas-count');
-  if (!grid) return;
-
-  const filtrados = filtrarPreventas();
-  const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA));
-  if (preState.pagina > totalPaginas) preState.pagina = totalPaginas;
-  const inicio = (preState.pagina - 1) * POR_PAGINA;
-  const enPagina = filtrados.slice(inicio, inicio + POR_PAGINA);
-
-  if (count) count.textContent = filtrados.length === 0
-    ? 'Sin preventas disponibles'
-    : `${filtrados.length} preventa${filtrados.length !== 1 ? 's' : ''} disponible${filtrados.length !== 1 ? 's' : ''}`;
-
-  if (enPagina.length === 0) {
-    grid.innerHTML = `
-      <div class="catalog-empty">
-        <span class="catalog-empty-icon">🚀</span>
-        <p>No hay preventas publicadas en este momento.</p>
-        <p class="catalog-empty-sub">Volvé pronto — actualizamos las preventas cada mes.</p>
-      </div>`;
-    renderPaginacion('preventas-pagination', 0, 0, (p) => { preState.pagina = p; renderPreventas(); });
-    return;
-  }
-
-  grid.innerHTML = enPagina.map(p => renderCard(p, 'preventa')).join('');
-  activarCards(enPagina, 'preventa');
-  renderPaginacion('preventas-pagination', preState.pagina, totalPaginas, (p) => { preState.pagina = p; renderPreventas(); });
-}
-
-// ============================================================
-// ACTIVAR CARDS
-// ============================================================
-function activarCards(lista, prefijo) {
-  lista.forEach(p => {
-    const cardId = p.id;
-    const selConsole = document.getElementById(`sel-console-${prefijo}-${cardId}`);
-    const selAccount = document.getElementById(`sel-account-${prefijo}-${cardId}`);
-    const selCurrency = document.getElementById(`sel-currency-${prefijo}-${cardId}`);
-    if (selConsole) selConsole.addEventListener('change', () => { actualizarSelectoresCuenta(p, cardId, prefijo); actualizarPrecio(p, cardId, prefijo); });
-    if (selAccount) selAccount.addEventListener('change', () => actualizarPrecio(p, cardId, prefijo));
-    if (selCurrency) selCurrency.addEventListener('change', () => actualizarPrecio(p, cardId, prefijo));
-    if (selConsole) actualizarSelectoresCuenta(p, cardId, prefijo);
-    actualizarPrecio(p, cardId, prefijo);
+async function leerExcel(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, {
+          type: 'array', cellText: true, cellDates: false, raw: false, codepage: 65001
+        });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false });
+        resolve({ sheetName, rows });
+      } catch (err) { reject(err); }
+    };
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
   });
 }
 
+function repararEncodingRoto(str) {
+  if (!str) return str;
+  const s = String(str);
+  const tieneHalfwidth = /[\uFF61-\uFF9F]/.test(s);
+  const tieneRaros = /[\u3000-\u303F\u4E00-\u9FFF\uFF00-\uFFEF]/.test(s);
+  if (!tieneHalfwidth && !tieneRaros) return s;
+  try {
+    const bytes = [];
+    for (let i = 0; i < s.length; i++) {
+      const code = s.charCodeAt(i);
+      if (code >= 0xFF61 && code <= 0xFF9F) { bytes.push(code - 0xFEC0); continue; }
+      if (code < 0x80) { bytes.push(code); continue; }
+      if (code >= 0x80 && code <= 0xFF) { bytes.push(code); continue; }
+      if (code >= 0x4E00 && code <= 0x9FFF) return s;
+      bytes.push(code & 0xFF);
+    }
+    const decoded = new TextDecoder('utf-8', { fatal: false }).decode(new Uint8Array(bytes));
+    const reemplazos = (decoded.match(/\uFFFD/g) || []).length;
+    if (reemplazos > s.length * 0.3) return s;
+    return decoded;
+  } catch (e) { return s; }
+}
+
+function limpiarTituloBase(titulo) {
+  let t = String(titulo || '');
+  t = repararEncodingRoto(t);
+  t = t.replace(/[\u00A0\u2007\u202F\u2009\u200A\u200B\u200C\u200D\u2060\uFEFF]/g, ' ');
+  t = t.replace(/[\r\n\t]+/g, ' ');
+  t = t.replace(/[\uFE0E\uFE0F]/g, '');
+  t = t.replace(/^[\p{Emoji_Presentation}\p{Extended_Pictographic}\s]+/u, '');
+  t = t.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '');
+  t = t.replace(/\s+/g, ' ').trim();
+  return t;
+}
+
+function normalizarTitulo(titulo) {
+  return String(titulo || '')
+    .replace(/[\uFE0E\uFE0F]/g, '')
+    .replace(/^[\p{Emoji_Presentation}\p{Extended_Pictographic}\s]+/u, '')
+    .replace(/[“”«»]/g, '"')
+    .replace(/[‘’]/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function quitarAcentos(str) {
+  return String(str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function crearClaveRelajada(str) {
+  return String(str || '').toLowerCase()
+    .replace(/[™®©]/g, '').replace(/[:\-–—.,;!?'"()\[\]{}]/g, ' ')
+    .replace(/[\uFE0E\uFE0F]/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function crearClaveSúperRelajada(str) {
+  return String(str || '').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[™®©]/g, '').replace(/[:\-–—.,;!?'"()\[\]{}]/g, ' ')
+    .replace(/[\uFE0E\uFE0F]/g, '').replace(PALABRAS_IDIOMA, ' ')
+    .replace(/\s+/g, ' ').trim();
+}
+
+function parsearTituloOferta(tituloRaw) {
+  let titulo = limpiarTituloBase(tituloRaw);
+  const plataformas = [];
+  titulo = titulo.replace(/\s*[-–—]\s*$/, '').trim();
+
+  const matchParentesis = titulo.match(/\s*\(([^)]+)\)\s*$/);
+  if (matchParentesis) {
+    const contenido = matchParentesis[1].toUpperCase();
+    if (contenido.includes('PS5')) plataformas.push('ps5');
+    if (contenido.includes('PS4')) plataformas.push('ps4');
+    if (plataformas.length > 0) titulo = titulo.replace(/\s*\([^)]+\)\s*$/, '').trim();
+  }
+
+  const matchPS = titulo.match(/\s+PS([45])\s*[-–—]?\s*$/i);
+  if (matchPS) {
+    const plat = 'ps' + matchPS[1];
+    if (!plataformas.includes(plat)) plataformas.push(plat);
+    titulo = titulo.replace(/\s+PS[45]\s*[-–—]?\s*$/i, '').trim();
+  }
+
+  const matchPSAny = titulo.match(/PS([45])/i);
+  if (matchPSAny && !plataformas.includes('ps' + matchPSAny[1])) {
+    plataformas.push('ps' + matchPSAny[1]);
+  }
+  titulo = titulo.replace(/\s*[-–—]?\s*PS[45]\s*[-–—]?\s*/gi, ' ').trim();
+  titulo = titulo.replace(/\s*[-–—]\s*$/, '').trim();
+  titulo = titulo.replace(/\s+/g, ' ').trim();
+  titulo = titulo.replace(/[“”«»]/g, '"').replace(/[‘’]/g, "'");
+
+  if (plataformas.length === 0) plataformas.push('ps4', 'ps5');
+  return { titulo, plataformas };
+}
+
+function esFilaEncabezado(titulo) {
+  const t = String(titulo || '').trim();
+  if (!t) return true;
+  const upper = t.toUpperCase();
+  if (upper === 'JUEGO') return true;
+  if (/🎮|TOKYO|VIGENTES|PARA USAR LA FUNCION|IMPORTANTE|SI EL JUEGO/i.test(t)) return true;
+  if (/OFERTAS|AVENTURAS DE PRIMAVERA|DESTACADAS HASTA/i.test(t)) return true;
+  if (/CUENTA ORIGINAL|CON GARANTIA|STOCKEABLE|CONSULTAR SECUNDARIA/i.test(t)) return true;
+  if (/^▬+|^[━═]+$/.test(t)) return true;
+  if (/^PREVENTAS$/i.test(t)) return true;
+  if (/^CUENTA ORIGINAL$|^CON GARANTIA$|^STOCKEABLE$/i.test(t)) return true;
+  return false;
+}
+
+function esNoDisponible(v) {
+  if (v === null || v === undefined) return false;
+  return /no\s*disponible/i.test(String(v));
+}
+
+function extraerFechaVencimiento(rows) {
+  for (const fila of rows.slice(0, 15)) {
+    for (const celda of fila) {
+      const txt = String(celda || '');
+      const m = txt.match(/(\d{2})[\/\-](\d{2})[\/\-](\d{4})/);
+      if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+    }
+  }
+  return null;
+}
+
+function parseFechaExcel(valor) {
+  if (!valor) return '';
+  const s = String(valor).trim();
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+  if (m) {
+    const d = m[1].padStart(2, '0');
+    const mes = m[2].padStart(2, '0');
+    return `${m[3]}-${mes}-${d}`;
+  }
+  return '';
+}
+
 // ============================================================
-// PAGINACIÓN
+// MATCHING (fuzzy más estricto)
 // ============================================================
-function renderPaginacion(contId, actual, total, onPage) {
-  const cont = document.getElementById(contId);
-  if (!cont) return;
-  if (total <= 1) { cont.innerHTML = ''; return; }
-  cont.innerHTML = `
-    <button class="btn btn-secondary pag-btn" ${actual <= 1 ? 'disabled' : ''} data-pag="${actual - 1}">← Anterior</button>
-    <span class="pag-info">Página ${actual} de ${total}</span>
-    <button class="btn btn-secondary pag-btn" ${actual >= total ? 'disabled' : ''} data-pag="${actual + 1}">Siguiente →</button>
-  `;
-  cont.querySelectorAll('.pag-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const p = parseInt(btn.dataset.pag);
-      if (!isNaN(p) && p >= 1 && p <= total) { onPage(p); window.scrollTo({ top: 200, behavior: 'smooth' }); }
+function buscarFuzzy(matchKey, productosMap) {
+  const palabrasExcel = quitarAcentos(matchKey).split(/\s+/).filter(w => w.length >= 3);
+  if (palabrasExcel.length < 3) return null;
+  const palabrasExcelSet = new Set(palabrasExcel);
+  let mejorProd = null;
+  let mejorScore = 0;
+
+  for (const [key, prod] of Object.entries(productosMap)) {
+    const palabrasStock = quitarAcentos(key).split(/\s+/).filter(w => w.length >= 3);
+    if (palabrasStock.length < 3) continue;
+    const palabrasStockSet = new Set(palabrasStock);
+
+    let comunes = 0;
+    for (const w of palabrasExcelSet) if (palabrasStockSet.has(w)) comunes++;
+    if (comunes < 3) continue;
+
+    // ⚠️ CAMBIO CLAVE: usar Math.max para ser MÁS estricto
+    const maxTokens = Math.max(palabrasExcelSet.size, palabrasStockSet.size);
+    const score = comunes / maxTokens;
+
+    // ⚠️ Subimos el umbral a 0.9 (era 0.85)
+    if (score >= 0.9 && score > mejorScore) {
+      mejorScore = score;
+      mejorProd = prod;
+    }
+  }
+  return mejorProd;
+}
+
+function buscarProducto(matchKey, m1, m2, m3) {
+  if (m1[matchKey]) return { prod: m1[matchKey], tipo: 'exacto' };
+  const claveRel = crearClaveRelajada(matchKey);
+  if (m2[claveRel]) return { prod: m2[claveRel], tipo: 'relajado' };
+  const claveSuper = crearClaveSúperRelajada(matchKey);
+  if (m3[claveSuper]) return { prod: m3[claveSuper], tipo: 'super-relajado' };
+  const prodFuzzy = buscarFuzzy(claveSuper, m3);
+  if (prodFuzzy) return { prod: prodFuzzy, tipo: 'fuzzy' };
+  return { prod: null, tipo: null };
+}
+
+// ============================================================
+// LISTENERS
+// ============================================================
+function attachFileListener(inputId, tipo, logId, btnId, autoFechaId) {
+  const input = $(inputId);
+  if (!input) return;
+  input.addEventListener('change', async () => {
+    const file = input.files && input.files[0];
+    const logEl = $(logId);
+    const btn = $(btnId);
+    if (logEl) logEl.innerHTML = '';
+    EXCEL[tipo] = null;
+    if (btn) btn.disabled = true;
+    if (!file) return;
+    try {
+      const { sheetName, rows } = await leerExcel(file);
+      EXCEL[tipo] = { nombre: file.name, sheetName, rows };
+      log(logId, `📄 <b>${file.name}</b>`);
+      log(logId, `Hoja: <code>${sheetName}</code>`);
+      log(logId, `Total de filas: <b>${rows.length}</b>`);
+      if (autoFechaId) {
+        const fecha = extraerFechaVencimiento(rows);
+        if (fecha) {
+          const input = $(autoFechaId);
+          if (input && !input.value) {
+            input.value = fecha;
+            log(logId, `📅 Fecha detectada: <b>${fecha}</b>`);
+          }
+        }
+      }
+      if (btn) btn.disabled = false;
+    } catch (err) {
+      log(logId, `❌ Error al leer: ${err.message}`, 'error');
+      console.error('[GamesUy] Error leyendo Excel:', err);
+    }
+  });
+}
+
+attachFileListener('excel-stock',    'stock',    'stock-log',    'btn-process-stock',    null);
+attachFileListener('excel-ofertas',  'ofertas',  'ofertas-log',  'btn-process-ofertas',  'oferta-fecha-hasta');
+attachFileListener('excel-preventas','preventas','preventas-log','btn-process-preventas',null);
+
+// ============================================================
+// STOCK
+// ============================================================
+function construirVariantesStock(fila) {
+  const ps4PriRaw = fila[1];
+  const ps5PriRaw = fila[2];
+  const secRaw    = fila[3];
+  const promoRaw  = fila[7];
+
+  const ps4PriNoDisp = esNoDisponible(ps4PriRaw);
+  const ps5PriNoDisp = esNoDisponible(ps5PriRaw);
+  const secNoDisp    = esNoDisponible(secRaw);
+
+  const tienePS4 = !ps4PriNoDisp;
+  const tienePS5 = !ps5PriNoDisp;
+
+  const variantes = [];
+
+  if (tienePS4) {
+    const costoARS = parseCosto(ps4PriRaw);
+    variantes.push({
+      id: 'ps4_primaria', label: 'PS4 Primaria', categoria: 'ps4', tipo: 'primaria',
+      costoARS, disponible: esCostoValido(ps4PriRaw),
+      gananciaPct: null, precioFinalUYU: null,
+      enOferta: false, ofertaCostoARS: null, ofertaPrecioUYU: null, ofertaHasta: null
     });
-  });
-}
-
-// ============================================================
-// CARD
-// ============================================================
-function renderCard(p, prefijo = 'cat') {
-  const cardId = p.id;
-  const cats = p.categories || [];
-  const badges = cats.filter(c => ['ps4', 'ps5', 'ps3', 'steam', 'psplus', 'streaming', 'otros'].includes(c))
-    .map(c => `<span class="badge badge-${c}">${c.toUpperCase()}</span>`).join('');
-
-  const imagen = p.coverUrl
-    ? `<div class="card-image"><img src="${safeUrl(p.coverUrl)}" alt="${escapeHtml(p.title || '')}" class="card-image-img" loading="lazy"></div>`
-    : `<div class="card-image card-image-empty"><span class="card-image-placeholder">🎮</span></div>`;
-
-  const esPreventa = prefijo === 'preventa';
-  const preorderBadge = esPreventa
-    ? `<div class="card-preorder-badge">🚀 PREVENTA${p.releaseDate ? ` · Estreno: ${formatearFecha(p.releaseDate)}` : ''}</div>`
-    : '';
-
-  const esModoOferta = prefijo === 'oferta';
-  const consolasDisponibles = cats.filter(c => {
-    return (p.variants || []).some(v => {
-      if (v.categoria !== c) return false;
-      if (esModoOferta) return ofertaVigente(v) !== null;
-      return tieneCostoNormal(v) || tieneCostoOferta(v) || esPreventa;
+  }
+  if (tienePS5) {
+    const costoARS = parseCosto(ps5PriRaw);
+    variantes.push({
+      id: 'ps5_primaria', label: 'PS5 Primaria', categoria: 'ps5', tipo: 'primaria',
+      costoARS, disponible: esCostoValido(ps5PriRaw),
+      gananciaPct: null, precioFinalUYU: null,
+      enOferta: false, ofertaCostoARS: null, ofertaPrecioUYU: null, ofertaHasta: null
     });
-  });
-
-  const tieneSelectores = consolasDisponibles.length > 0;
-  let selectoresHtml = '';
-  if (tieneSelectores) {
-    selectoresHtml = `
-      <div class="card-variant-selectors">
-        ${consolasDisponibles.length > 1
-          ? `<select id="sel-console-${prefijo}-${cardId}" class="card-select">${consolasDisponibles.map(c => `<option value="${c}">${c.toUpperCase()}</option>`).join('')}</select>`
-          : `<input type="hidden" id="sel-console-${prefijo}-${cardId}" value="${consolasDisponibles[0]}">`}
-        <select id="sel-account-${prefijo}-${cardId}" class="card-select"></select>
-        <select id="sel-currency-${prefijo}-${cardId}" class="card-select">
-          <option value="UYU">$ UYU</option>
-          <option value="USD">US$ USD</option>
-        </select>
-      </div>
-    `;
   }
-
-  const tieneTrailer = p.youtubeUrl || p.gameplayUrl;
-
-  return `
-    <article class="product-card" data-card-id="${cardId}">
-      <div class="card-badges">${badges}</div>
-      ${imagen}
-      <h3 class="card-title">${escapeHtml(p.title || '(sin título)')}</h3>
-      ${preorderBadge}
-      <div class="card-offer-wrap" id="offer-wrap-${prefijo}-${cardId}"></div>
-      ${selectoresHtml}
-      <div class="card-price-wrap" id="price-wrap-${prefijo}-${cardId}"></div>
-      <div class="card-stock-wrap" id="stock-wrap-${prefijo}-${cardId}"></div>
-      <div class="card-payments">💳 ${escapeHtml(pagosTexto)}</div>
-      <div class="card-countdown" id="countdown-${prefijo}-${cardId}"></div>
-      <a class="btn btn-buy" id="wa-${prefijo}-${cardId}" href="#" target="_blank" rel="noopener">💬 Comprar por WhatsApp</a>
-      ${tieneTrailer ? `<button class="btn btn-secondary" onclick="abrirTrailer('${cardId}')">🎬 Ver Trailer</button>` : ''}
-    </article>
-  `;
-}
-
-// ============================================================
-// SELECTORES DE CUENTA
-// ============================================================
-function actualizarSelectoresCuenta(p, cardId, prefijo) {
-  const selConsole = document.getElementById(`sel-console-${prefijo}-${cardId}`);
-  const selAccount = document.getElementById(`sel-account-${prefijo}-${cardId}`);
-  if (!selConsole || !selAccount) return;
-
-  const catActual = selConsole.value;
-  const esModoOferta = prefijo === 'oferta';
-  const variantesCat = (p.variants || []).filter(v => {
-    if (v.categoria !== catActual) return false;
-    if (esModoOferta) return ofertaVigente(v) !== null;
-    return true;
-  });
-
-  const tipos = [];
-  if (variantesCat.some(v => v.tipo === 'primaria')) tipos.push('primaria');
-  if (variantesCat.some(v => v.tipo === 'secundaria')) tipos.push('secundaria');
-
-  const valorActual = selAccount.value;
-  selAccount.innerHTML = tipos.map(t =>
-    `<option value="${t}" ${t === valorActual ? 'selected' : ''}>${t === 'primaria' ? 'Primaria' : 'Secundaria'}</option>`
-  ).join('');
-  if (tipos.length === 0) selAccount.innerHTML = '<option value="">—</option>';
-}
-
-// ============================================================
-// PRECIO
-// ============================================================
-function actualizarPrecio(p, cardId, prefijo) {
-  const priceWrap = document.getElementById(`price-wrap-${prefijo}-${cardId}`);
-  const stockWrap = document.getElementById(`stock-wrap-${prefijo}-${cardId}`);
-  const offerWrap = document.getElementById(`offer-wrap-${prefijo}-${cardId}`);
-  const countdown = document.getElementById(`countdown-${prefijo}-${cardId}`);
-  const waBtn = document.getElementById(`wa-${prefijo}-${cardId}`);
-  if (!priceWrap) return;
-
-  const selConsole = document.getElementById(`sel-console-${prefijo}-${cardId}`);
-  const selAccount = document.getElementById(`sel-account-${prefijo}-${cardId}`);
-  const selCurrency = document.getElementById(`sel-currency-${prefijo}-${cardId}`);
-  if (!selConsole || !selAccount || !selCurrency) return;
-
-  const cat = selConsole.value;
-  const acc = selAccount.value;
-  const moneda = selCurrency.value;
-  const variante = (p.variants || []).find(v => v.categoria === cat && v.tipo === acc);
-
-  if (!variante) {
-    priceWrap.innerHTML = `<div class="card-price card-price-empty">AGOTADO</div>`;
-    if (stockWrap) stockWrap.innerHTML = `<span class="stock-badge stock-out">Sin stock</span>`;
-    if (offerWrap) offerWrap.innerHTML = '';
-    if (countdown) countdown.textContent = '';
-    if (waBtn) {
-      waBtn.href = `https://wa.me/59896572226?text=${encodeURIComponent(`Hola GamesUy Store! Quiero reservar *${p.title}* cuando vuelva a estar disponible.`)}`;
-      waBtn.innerText = '🔔 Reservar por WhatsApp';
-      waBtn.classList.remove('btn-buy');
-      waBtn.classList.add('btn-secondary');
+  if (!secNoDisp) {
+    const costoSec = parseCosto(secRaw);
+    const disponible = esCostoValido(secRaw);
+    if (tienePS4) {
+      variantes.push({
+        id: 'ps4_secundaria', label: 'PS4 Secundaria', categoria: 'ps4', tipo: 'secundaria',
+        costoARS: costoSec, disponible,
+        gananciaPct: null, precioFinalUYU: null,
+        enOferta: false, ofertaCostoARS: null, ofertaPrecioUYU: null, ofertaHasta: null
+      });
     }
-    return;
+    if (tienePS5) {
+      variantes.push({
+        id: 'ps5_secundaria', label: 'PS5 Secundaria', categoria: 'ps5', tipo: 'secundaria',
+        costoARS: costoSec, disponible,
+        gananciaPct: null, precioFinalUYU: null,
+        enOferta: false, ofertaCostoARS: null, ofertaPrecioUYU: null, ofertaHasta: null
+      });
+    }
   }
+  return variantes;
+}
 
-  const oferta = ofertaVigente(variante);
-  const tieneNormal = Number(variante.costoARS) > 0 && Number(variante.precioFinalUYU) > 0;
-  const esPreventa = prefijo === 'preventa';
+function fusionarVarianteStock(nueva, existente) {
+  if (!existente) return nueva;
+  const costoViejo = Number(existente.costoARS) || 0;
+  const costoNuevo = Number(nueva.costoARS) || 0;
+  const resultado = { ...existente };
+  if (costoViejo === costoNuevo) { resultado.disponible = nueva.disponible; return resultado; }
+  if (costoViejo > 0 && costoNuevo > 0) {
+    const variacion = (costoNuevo / costoViejo) - 1;
+    const precioViejo = Number(resultado.precioFinalUYU) || 0;
+    if (precioViejo > 0) resultado.precioFinalUYU = aplicarVariacion(precioViejo, variacion);
+    resultado.costoARS = costoNuevo;
+    resultado.disponible = true;
+    return resultado;
+  }
+  if (costoViejo === 0 && costoNuevo > 0) { resultado.costoARS = costoNuevo; resultado.disponible = true; return resultado; }
+  if (costoViejo > 0 && costoNuevo === 0) { resultado.costoARS = 0; resultado.disponible = false; return resultado; }
+  return resultado;
+}
 
-  // ========================================
-  // MODO PREVENTA
-  // ========================================
-  if (esPreventa) {
-    // Si tiene precio normal cargado
-    if (tieneNormal) {
-      const precioMostrar = moneda === 'USD'
-        ? formatUSD(calcPrecioUSD(variante.precioFinalUYU, cotizaciones.usdAUYU))
-        : formatUYU(variante.precioFinalUYU);
-      const precioSecundario = moneda === 'USD'
-        ? formatUYU(variante.precioFinalUYU)
-        : '≈ ' + formatUSD(calcPrecioUSD(variante.precioFinalUYU, cotizaciones.usdAUYU));
+async function procesarStock() {
+  const excel = EXCEL.stock;
+  if (!excel) { log('stock-log', '⚠ No hay Excel de Stock cargado.', 'error'); return; }
+  log('stock-log', '⏳ Leyendo productos existentes...');
+  const snap = await getDocs(collection(db, 'products'));
+  const productosMap = {};
+  snap.docs.forEach(d => {
+    const data = d.data();
+    if (data.matchKey) productosMap[data.matchKey] = { id: d.id, ...data };
+  });
+  log('stock-log', `✔ ${snap.size} productos encontrados.`);
 
-      priceWrap.innerHTML = `
-        <div class="card-price-tag">PRECIO DE RESERVA</div>
-        <div class="card-price">${precioMostrar}</div>
-        <div class="card-price-usd">${precioSecundario}</div>
-      `;
+  const filas = excel.rows.slice(5);
+  let creados = 0, actualizados = 0, saltados = 0;
+  let nuevosConStock = 0;
+  const operaciones = [];
+
+  for (const fila of filas) {
+    const titulo = String(fila[0] || '').trim();
+    if (esFilaEncabezado(titulo)) { saltados++; continue; }
+    const matchKey = normalizarTitulo(titulo);
+    const variantesNuevas = construirVariantesStock(fila);
+    if (variantesNuevas.length === 0) { saltados++; continue; }
+    const existente = productosMap[matchKey];
+    if (existente) {
+      const variantesFinales = variantesNuevas.map(vn => {
+        const ve = (existente.variants || []).find(v => v.id === vn.id);
+        const resultado = fusionarVarianteStock(vn, ve);
+        if (ve && Number(ve.costoARS) === 0 && Number(resultado.costoARS) > 0) nuevosConStock++;
+        return resultado;
+      });
+      const idsNuevos = new Set(variantesNuevas.map(v => v.id));
+      (existente.variants || []).forEach(ve => {
+        if (!idsNuevos.has(ve.id)) variantesFinales.push(ve);
+      });
+      const huboCambio = JSON.stringify(variantesFinales) !== JSON.stringify(existente.variants || []);
+      if (huboCambio) {
+        operaciones.push({
+          ref: doc(db, 'products', existente.id),
+          data: { variants: variantesFinales, updatedAt: new Date().toISOString() }
+        });
+        actualizados++;
+      } else { saltados++; }
     } else {
-      // Sin precio → "A CONFIRMAR"
-      priceWrap.innerHTML = `
-        <div class="card-price-tag">PRECIO</div>
-        <div class="card-price card-price-preorder">🔒 A CONFIRMAR</div>
-      `;
+      const categories = [];
+      if (variantesNuevas.some(v => v.categoria === 'ps4')) categories.push('ps4');
+      if (variantesNuevas.some(v => v.categoria === 'ps5')) categories.push('ps5');
+      const promoRaw = String(fila[7] || '').trim().toUpperCase();
+      operaciones.push({
+        ref: doc(collection(db, 'products')),
+        data: {
+          title: titulo, matchKey, categories,
+          coverUrl: '', gameplayUrl: '', youtubeUrl: '', description: '',
+          isPreorder: false, releaseDate: '', visible: true, aplica3x2: promoRaw === 'SI',
+          variants: variantesNuevas,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }
+      });
+      creados++;
     }
-    if (stockWrap) stockWrap.innerHTML = `<span class="stock-badge stock-preorder">🚀 Preventa</span>`;
-    if (offerWrap) offerWrap.innerHTML = '';
-    if (countdown) { countdown.textContent = ''; countdown.style.display = 'none'; }
-    if (waBtn) {
-      const tipoLabel = acc === 'secundaria' ? 'Secundaria' : 'Primaria';
-      const catLabel = cat.toUpperCase();
-      const fecha = p.releaseDate ? ` (estreno: ${formatearFecha(p.releaseDate)})` : '';
-      const precioMsg = tieneNormal ? ` por ${priceWrap.querySelector('.card-price').innerText}` : '';
-      const msg = `Hola GamesUy Store! Quiero RESERVAR *${p.title}* (${catLabel} ${tipoLabel})${fecha}${precioMsg}`;
-      waBtn.href = `https://wa.me/59896572226?text=${encodeURIComponent(msg)}`;
-      waBtn.innerText = '🚀 Reservar Preventa';
-      waBtn.classList.add('btn-preorder');
-      waBtn.classList.remove('btn-buy', 'btn-secondary');
-    }
-    return;
   }
-
-  // ========================================
-  // MODO NORMAL (catálogo / ofertas)
-  // ========================================
-
-  // CASO 1 — Oferta + precio normal → tachado + oferta
-  if (oferta && tieneNormal) {
-    const precioMostrar = moneda === 'USD'
-      ? formatUSD(calcPrecioUSD(oferta.precio, cotizaciones.usdAUYU))
-      : formatUYU(oferta.precio);
-    const precioOriginalMostrar = moneda === 'USD'
-      ? formatUSD(calcPrecioUSD(oferta.original, cotizaciones.usdAUYU))
-      : formatUYU(oferta.original);
-    const precioSecundario = moneda === 'USD'
-      ? formatUYU(oferta.precio)
-      : '≈ ' + formatUSD(calcPrecioUSD(oferta.precio, cotizaciones.usdAUYU));
-
-    priceWrap.innerHTML = `
-      <div class="card-price-original">${precioOriginalMostrar}</div>
-      <div class="card-price card-price-offer">${precioMostrar}</div>
-      <div class="card-price-usd">${precioSecundario}</div>
-    `;
-    if (offerWrap) offerWrap.innerHTML = `<div class="offer-banner-tag">🔥 OFERTA ESPECIAL</div>`;
-    if (stockWrap) stockWrap.innerHTML = `<span class="stock-badge stock-ok">✓ Disponible</span>`;
-    if (countdown) {
-      countdown.dataset.end = oferta.hasta + 'T23:59:59';
-      countdown.style.display = '';
-      actualizarCountdown(countdown);
-    }
-    if (waBtn) {
-      const tipoLabel = acc === 'secundaria' ? 'Secundaria' : 'Primaria';
-      const msg = `Hola GamesUy Store! Quiero comprar *${p.title}* (${cat.toUpperCase()} ${tipoLabel}) en oferta por ${precioMostrar}`;
-      waBtn.href = `https://wa.me/59896572226?text=${encodeURIComponent(msg)}`;
-      waBtn.innerText = '💬 Comprar por WhatsApp';
-      waBtn.classList.add('btn-buy');
-      waBtn.classList.remove('btn-secondary', 'btn-preorder');
-    }
-    return;
+  log('stock-log', `⏳ Guardando ${operaciones.length} operaciones...`);
+  await ejecutarBatches(operaciones, 'stock-log');
+  log('stock-log', '');
+  log('stock-log', '═══════════════════════════════════');
+  log('stock-log', `✅ STOCK PROCESADO`);
+  log('stock-log', `   🆕 Creados:              ${creados}`);
+  log('stock-log', `   🔄 Actualizados:         ${actualizados}`);
+  log('stock-log', `   🟢 Nuevas con stock:     ${nuevosConStock}`);
+  log('stock-log', `   ⏭️  Saltados:             ${saltados}`);
+  log('stock-log', '═══════════════════════════════════');
+  if (nuevosConStock > 0) {
+    log('stock-log', '');
+    log('stock-log', `⚠️  <b>${nuevosConStock} variantes pasaron de SIN STOCK a con stock.</b>`);
+    log('stock-log', `Andá al panel de Precios y cargales el precio.`);
   }
-
-  // CASO 2 — Oferta sin precio normal → "PRECIO ESPECIAL"
-  if (oferta && !tieneNormal) {
-    const precioMostrar = moneda === 'USD'
-      ? formatUSD(calcPrecioUSD(oferta.precio, cotizaciones.usdAUYU))
-      : formatUYU(oferta.precio);
-    const precioSecundario = moneda === 'USD'
-      ? formatUYU(oferta.precio)
-      : '≈ ' + formatUSD(calcPrecioUSD(oferta.precio, cotizaciones.usdAUYU));
-
-    priceWrap.innerHTML = `
-      <div class="card-price-tag">PRECIO ESPECIAL</div>
-      <div class="card-price card-price-offer">${precioMostrar}</div>
-      <div class="card-price-usd">${precioSecundario}</div>
-    `;
-    if (offerWrap) offerWrap.innerHTML = `<div class="offer-banner-tag">🔥 OFERTA ESPECIAL</div>`;
-    if (stockWrap) stockWrap.innerHTML = `<span class="stock-badge stock-ok">✓ Disponible</span>`;
-    if (countdown) {
-      countdown.dataset.end = oferta.hasta + 'T23:59:59';
-      countdown.style.display = '';
-      actualizarCountdown(countdown);
-    }
-    if (waBtn) {
-      const tipoLabel = acc === 'secundaria' ? 'Secundaria' : 'Primaria';
-      const msg = `Hola GamesUy Store! Quiero comprar *${p.title}* (${cat.toUpperCase()} ${tipoLabel}) en oferta por ${precioMostrar}`;
-      waBtn.href = `https://wa.me/59896572226?text=${encodeURIComponent(msg)}`;
-      waBtn.innerText = '💬 Comprar por WhatsApp';
-      waBtn.classList.add('btn-buy');
-      waBtn.classList.remove('btn-secondary', 'btn-preorder');
-    }
-    return;
-  }
-
-  // CASO 3 — Sin oferta, con precio normal
-  if (tieneNormal) {
-    const precioMostrar = moneda === 'USD'
-      ? formatUSD(calcPrecioUSD(variante.precioFinalUYU, cotizaciones.usdAUYU))
-      : formatUYU(variante.precioFinalUYU);
-    const precioSecundario = moneda === 'USD'
-      ? formatUYU(variante.precioFinalUYU)
-      : '≈ ' + formatUSD(calcPrecioUSD(variante.precioFinalUYU, cotizaciones.usdAUYU));
-
-    priceWrap.innerHTML = `
-      <div class="card-price">${precioMostrar}</div>
-      <div class="card-price-usd">${precioSecundario}</div>
-    `;
-    if (offerWrap) offerWrap.innerHTML = '';
-    if (stockWrap) stockWrap.innerHTML = `<span class="stock-badge stock-ok">✓ Disponible</span>`;
-    if (countdown) { countdown.textContent = ''; countdown.style.display = 'none'; }
-    if (waBtn) {
-      const tipoLabel = acc === 'secundaria' ? 'Secundaria' : 'Primaria';
-      const msg = `Hola GamesUy Store! Quiero comprar *${p.title}* (${cat.toUpperCase()} ${tipoLabel}) por ${precioMostrar}`;
-      waBtn.href = `https://wa.me/59896572226?text=${encodeURIComponent(msg)}`;
-      waBtn.innerText = '💬 Comprar por WhatsApp';
-      waBtn.classList.add('btn-buy');
-      waBtn.classList.remove('btn-secondary', 'btn-preorder');
-    }
-    return;
-  }
-
-  // CASO 4 — Sin precio ni oferta → AGOTADO
-  priceWrap.innerHTML = `<div class="card-price card-price-empty">AGOTADO</div>`;
-  if (stockWrap) stockWrap.innerHTML = `<span class="stock-badge stock-out">Sin stock</span>`;
-  if (offerWrap) offerWrap.innerHTML = '';
-  if (countdown) { countdown.textContent = ''; countdown.style.display = 'none'; }
-  if (waBtn) {
-    waBtn.href = `https://wa.me/59896572226?text=${encodeURIComponent(`Hola GamesUy Store! Quiero reservar *${p.title}* cuando vuelva a estar disponible.`)}`;
-    waBtn.innerText = '🔔 Reservar por WhatsApp';
-    waBtn.classList.remove('btn-buy', 'btn-preorder');
-    waBtn.classList.add('btn-secondary');
-  }
+  alert(`✅ Stock procesado\n\nCreados: ${creados}\nActualizados: ${actualizados}\nNuevas con stock: ${nuevosConStock}`);
 }
 
 // ============================================================
-// COUNTDOWN
+// OFERTAS
 // ============================================================
-function actualizarCountdown(el) {
-  if (!el || !el.dataset.end) return;
-  const end = new Date(el.dataset.end).getTime();
-  const diff = end - Date.now();
-  if (diff <= 0) { el.textContent = '⌛ Oferta finalizada'; return; }
-  const d = Math.floor(diff / 86400000);
-  const h = Math.floor((diff % 86400000) / 3600000);
-  const m = Math.floor((diff % 3600000) / 60000);
-  const s = Math.floor((diff % 60000) / 1000);
-  el.textContent = `⌛ Termina en: ${d}d ${h}h ${m}m ${s}s`;
-}
+async function procesarOfertas() {
+  const excel = EXCEL.ofertas;
+  if (!excel) { log('ofertas-log', '⚠ No hay Excel de Ofertas cargado.', 'error'); return; }
+  const fechaHasta = $('oferta-fecha-hasta').value;
+  if (!fechaHasta) { log('ofertas-log', '⚠ Ingresá la fecha de vencimiento.', 'error'); alert('Ingresá la fecha.'); return; }
 
-if (!countdownInterval) {
-  countdownInterval = setInterval(() => {
-    document.querySelectorAll('.card-countdown').forEach(actualizarCountdown);
-  }, 1000);
-}
+  log('ofertas-log', `📅 Válidas hasta: <b>${fechaHasta}</b>`);
+  log('ofertas-log', '⏳ Leyendo productos...');
 
-// ============================================================
-// TRAILER
-// ============================================================
-window.abrirTrailer = function(cardId) {
-  const p = productos.find(x => x.id === cardId);
-  if (!p) return;
-  const modal = document.getElementById('trailer-modal');
-  const title = document.getElementById('trailer-title');
-  const body = document.getElementById('trailer-body');
-  if (!modal || !body) return;
-  if (title) title.textContent = p.title || 'Trailer';
-  let html = '';
-  if (p.youtubeUrl) {
-    const embed = getYouTubeEmbed(p.youtubeUrl);
-    if (embed) html += `<div class="video-container"><iframe src="${embed}" allowfullscreen></iframe></div>`;
-  }
-  if (p.gameplayUrl) {
-    html += `<div style="margin-top:12px;"><h4 style="color:var(--cyan);margin-bottom:8px;">🎮 Gameplay</h4><img src="${safeUrl(p.gameplayUrl)}" style="width:100%;border-radius:12px;border:1px solid var(--border);"></div>`;
-  }
-  if (!html) html = '<p class="empty-message">Sin contenido disponible.</p>';
-  body.innerHTML = html;
-  modal.classList.remove('hidden');
-};
-
-function getYouTubeEmbed(url) {
-  if (!url) return null;
-  const m = url.match(/^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=|shorts\/)([^#\&\?]*).*/);
-  return (m && m[2].length === 11) ? `https://www.youtube.com/embed/${m[2]}` : null;
-}
-
-// ============================================================
-// LISTENERS DE BÚSQUEDA Y CATEGORÍAS
-// ============================================================
-const searchInput = $('search-input');
-if (searchInput) {
-  searchInput.addEventListener('input', (e) => {
-    const val = e.target.value;
-    const enOfertas = $('page-ofertas')?.classList.contains('active-page');
-    const enPreventas = $('page-preventas')?.classList.contains('active-page');
-    if (enOfertas) {
-      ofState.search = val; ofState.pagina = 1; renderOfertas();
-    } else if (enPreventas) {
-      preState.search = val; preState.pagina = 1; renderPreventas();
-    } else {
-      catState.search = val; catState.pagina = 1; renderCatalogo();
+  const snap = await getDocs(collection(db, 'products'));
+  const m1 = {}, m2 = {}, m3 = {};
+  snap.docs.forEach(d => {
+    const data = d.data();
+    if (data.matchKey) {
+      m1[data.matchKey] = { id: d.id, ...data };
+      const r = crearClaveRelajada(data.matchKey);
+      if (!m2[r]) m2[r] = { id: d.id, ...data };
+      const s = crearClaveSúperRelajada(data.matchKey);
+      if (!m3[s]) m3[s] = { id: d.id, ...data };
     }
   });
+  log('ofertas-log', `✔ ${snap.size} productos en Firestore.`);
+
+  let inicioIdx = 0;
+  for (let i = 0; i < Math.min(excel.rows.length, 20); i++) {
+    const fila = excel.rows[i];
+    if (!fila) continue;
+    const titulo = String(fila[0] || '').trim();
+    const costo = parseCosto(fila[1]);
+    if (titulo && costo > 0 && !esFilaEncabezado(titulo)) { inicioIdx = i; break; }
+  }
+  log('ofertas-log', `📌 Datos desde la fila ${inicioIdx + 1}`);
+
+  const filas = excel.rows.slice(inicioIdx);
+  const stats = { exacto: 0, relajado: 0, 'super-relajado': 0, fuzzy: 0, creados: 0 };
+  let sinPrecio = 0, saltadas = 0;
+  const operaciones = [];
+
+  for (const fila of filas) {
+    const tituloRaw = String(fila[0] || '').trim();
+    if (esFilaEncabezado(tituloRaw)) { saltadas++; continue; }
+    const costoOfertaARS = parseCosto(fila[1]);
+    if (!costoOfertaARS) { sinPrecio++; continue; }
+    const { titulo, plataformas } = parsearTituloOferta(tituloRaw);
+    const matchKey = normalizarTitulo(titulo);
+    const { prod, tipo } = buscarProducto(matchKey, m1, m2, m3);
+
+    if (prod) {
+      let modificado = false;
+      const nuevasVariantes = (prod.variants || []).map(v => {
+        if (v.tipo !== 'primaria') return v;
+        if (!plataformas.includes(v.categoria)) return v;
+        modificado = true;
+        return {
+          ...v,
+          enOferta: true,
+          ofertaCostoARS: costoOfertaARS,
+          ofertaPrecioUYU: Number(v.ofertaPrecioUYU) || 0,
+          ofertaHasta: fechaHasta
+        };
+      });
+      plataformas.forEach(plat => {
+        if (!nuevasVariantes.some(v => v.id === `${plat}_primaria`)) {
+          nuevasVariantes.push({
+            id: `${plat}_primaria`, label: `${plat.toUpperCase()} Primaria`,
+            categoria: plat, tipo: 'primaria',
+            costoARS: 0, disponible: false,
+            gananciaPct: null, precioFinalUYU: null,
+            enOferta: true, ofertaCostoARS: costoOfertaARS,
+            ofertaPrecioUYU: 0, ofertaHasta: fechaHasta
+          });
+          modificado = true;
+        }
+      });
+      plataformas.forEach(plat => {
+        const idSec = `${plat}_secundaria`;
+        if (!nuevasVariantes.some(v => v.id === idSec)) {
+          nuevasVariantes.push({
+            id: idSec, label: `${plat.toUpperCase()} Secundaria`,
+            categoria: plat, tipo: 'secundaria',
+            costoARS: 0, disponible: false,
+            gananciaPct: null, precioFinalUYU: null,
+            enOferta: true, ofertaCostoARS: 0,
+            ofertaPrecioUYU: 0, ofertaHasta: fechaHasta
+          });
+          modificado = true;
+        }
+      });
+      if (modificado) {
+        operaciones.push({
+          ref: doc(db, 'products', prod.id),
+          data: { variants: nuevasVariantes, updatedAt: new Date().toISOString() }
+        });
+        stats[tipo] = (stats[tipo] || 0) + 1;
+      }
+    } else {
+      const categories = [...plataformas];
+      const variantesNuevas = [];
+      plataformas.forEach(plat => {
+        variantesNuevas.push({
+          id: `${plat}_primaria`, label: `${plat.toUpperCase()} Primaria`,
+          categoria: plat, tipo: 'primaria',
+          costoARS: 0, disponible: false,
+          gananciaPct: null, precioFinalUYU: null,
+          enOferta: true, ofertaCostoARS: costoOfertaARS,
+          ofertaPrecioUYU: 0, ofertaHasta: fechaHasta
+        });
+        variantesNuevas.push({
+          id: `${plat}_secundaria`, label: `${plat.toUpperCase()} Secundaria`,
+          categoria: plat, tipo: 'secundaria',
+          costoARS: 0, disponible: false,
+          gananciaPct: null, precioFinalUYU: null,
+          enOferta: true, ofertaCostoARS: 0,
+          ofertaPrecioUYU: 0, ofertaHasta: fechaHasta
+        });
+      });
+      operaciones.push({
+        ref: doc(collection(db, 'products')),
+        data: {
+          title: titulo, matchKey, categories,
+          coverUrl: '', gameplayUrl: '', youtubeUrl: '', description: '',
+          isPreorder: false, releaseDate: '', visible: true, soloOferta: true,
+          variants: variantesNuevas,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }
+      });
+      stats.creados++;
+    }
+  }
+
+  log('ofertas-log', `⏳ Guardando ${operaciones.length} operaciones...`);
+  await ejecutarBatches(operaciones, 'ofertas-log');
+  const totalAplicadas = (stats.exacto || 0) + (stats.relajado || 0) + (stats['super-relajado'] || 0) + (stats.fuzzy || 0);
+  log('ofertas-log', '');
+  log('ofertas-log', '═══════════════════════════════════');
+  log('ofertas-log', `✅ OFERTAS PROCESADAS`);
+  log('ofertas-log', `   🎯 Exactas:        ${stats.exacto || 0}`);
+  log('ofertas-log', `   🎯 Relajadas:      ${stats.relajado || 0}`);
+  log('ofertas-log', `   🎯 Súper relajadas: ${stats['super-relajado'] || 0}`);
+  log('ofertas-log', `   🎯 Fuzzy:          ${stats.fuzzy || 0}`);
+  log('ofertas-log', `   ✨ Total aplicadas: ${totalAplicadas}`);
+  log('ofertas-log', `   🆕 Creados nuevos:  ${stats.creados}`);
+  log('ofertas-log', `   ⏭️  Sin precio:      ${sinPrecio}`);
+  log('ofertas-log', `   ⏭️  Saltadas:        ${saltadas}`);
+  log('ofertas-log', '═══════════════════════════════════');
+  alert(`✅ Ofertas procesadas\n\nAplicadas: ${totalAplicadas}\nCreados nuevos: ${stats.creados}`);
 }
 
-document.querySelectorAll('#cat-nav .cat-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('#cat-nav .cat-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    const cat = btn.dataset.cat || 'all';
-    const enOfertas = $('page-ofertas')?.classList.contains('active-page');
-    const enPreventas = $('page-preventas')?.classList.contains('active-page');
-    if (enOfertas) {
-      ofState.cat = cat; ofState.pagina = 1; renderOfertas();
-    } else if (enPreventas) {
-      preState.cat = cat; preState.pagina = 1; renderPreventas();
-    } else {
-      catState.cat = cat; catState.pagina = 1; renderCatalogo();
+// ============================================================
+// PREVENTAS
+// ============================================================
+async function procesarPreventas() {
+  const excel = EXCEL.preventas;
+  if (!excel) { log('preventas-log', '⚠ No hay Excel de Preventas cargado.', 'error'); return; }
+  log('preventas-log', '⏳ Leyendo productos...');
+  const snap = await getDocs(collection(db, 'products'));
+  const m1 = {}, m2 = {}, m3 = {};
+  snap.docs.forEach(d => {
+    const data = d.data();
+    if (data.matchKey) {
+      m1[data.matchKey] = { id: d.id, ...data };
+      const r = crearClaveRelajada(data.matchKey);
+      if (!m2[r]) m2[r] = { id: d.id, ...data };
+      const s = crearClaveSúperRelajada(data.matchKey);
+      if (!m3[s]) m3[s] = { id: d.id, ...data };
     }
   });
+
+  let inicioIdx = 0;
+  for (let i = 0; i < Math.min(excel.rows.length, 20); i++) {
+    const fila = excel.rows[i];
+    if (!fila) continue;
+    const titulo = String(fila[0] || '').trim();
+    const costo = parseCosto(fila[2]);
+    if (titulo && costo > 0 && !esFilaEncabezado(titulo)) { inicioIdx = i; break; }
+  }
+  log('preventas-log', `📌 Datos desde la fila ${inicioIdx + 1}`);
+
+  const filas = excel.rows.slice(inicioIdx);
+  const stats = { exacto: 0, relajado: 0, 'super-relajado': 0, fuzzy: 0, creados: 0 };
+  let sinCosto = 0, saltadas = 0;
+  const operaciones = [];
+  const creadosNuevos = [];
+
+  for (const fila of filas) {
+    const tituloRaw = String(fila[0] || '').trim();
+    if (esFilaEncabezado(tituloRaw)) { saltadas++; continue; }
+
+    const fechaEstreno = parseFechaExcel(fila[1]);
+    const costoPS5Primaria = parseCosto(fila[2]);
+    if (!costoPS5Primaria) { sinCosto++; continue; }
+
+    const { titulo } = parsearTituloOferta(tituloRaw);
+    const matchKey = normalizarTitulo(titulo);
+    const { prod, tipo } = buscarProducto(matchKey, m1, m2, m3);
+
+    if (prod) {
+      const variantesActualizadas = (prod.variants || []).map(v => {
+        if (v.id === 'ps5_primaria') {
+          return { ...v, costoARS: costoPS5Primaria, disponible: true };
+        }
+        return v;
+      });
+      const tienePS5 = (prod.variants || []).some(v => v.id === 'ps5_primaria');
+      if (!tienePS5) {
+        variantesActualizadas.push({
+          id: 'ps5_primaria', label: 'PS5 Primaria', categoria: 'ps5', tipo: 'primaria',
+          costoARS: costoPS5Primaria, disponible: true,
+          gananciaPct: null, precioFinalUYU: null,
+          enOferta: false, ofertaCostoARS: null, ofertaPrecioUYU: null, ofertaHasta: null
+        });
+      }
+      const categories = new Set([...(prod.categories || []), 'ps5']);
+      operaciones.push({
+        ref: doc(db, 'products', prod.id),
+        data: {
+          variants: variantesActualizadas,
+          categories: [...categories],
+          isPreorder: true,
+          releaseDate: fechaEstreno || prod.releaseDate || '',
+          updatedAt: new Date().toISOString()
+        }
+      });
+      stats[tipo] = (stats[tipo] || 0) + 1;
+    } else {
+      const variantesNuevas = [{
+        id: 'ps5_primaria', label: 'PS5 Primaria', categoria: 'ps5', tipo: 'primaria',
+        costoARS: costoPS5Primaria, disponible: true,
+        gananciaPct: null, precioFinalUYU: null,
+        enOferta: false, ofertaCostoARS: null, ofertaPrecioUYU: null, ofertaHasta: null
+      }];
+      operaciones.push({
+        ref: doc(collection(db, 'products')),
+        data: {
+          title: titulo, matchKey, categories: ['ps5'],
+          coverUrl: '', gameplayUrl: '', youtubeUrl: '', description: '',
+          isPreorder: true, releaseDate: fechaEstreno || '',
+          visible: true, soloPreventa: true,
+          variants: variantesNuevas,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }
+      });
+      stats.creados++;
+      creadosNuevos.push(titulo);
+    }
+  }
+
+  log('preventas-log', `⏳ Guardando ${operaciones.length} operaciones...`);
+  await ejecutarBatches(operaciones, 'preventas-log');
+
+  const totalAplicadas = (stats.exacto || 0) + (stats.relajado || 0) + (stats['super-relajado'] || 0) + (stats.fuzzy || 0);
+  log('preventas-log', '');
+  log('preventas-log', '═══════════════════════════════════');
+  log('preventas-log', `✅ PREVENTAS PROCESADAS`);
+  log('preventas-log', `   ✨ Total aplicadas: ${totalAplicadas}`);
+  log('preventas-log', `   🆕 Creados nuevos:  ${stats.creados}`);
+  log('preventas-log', `   ⏭️  Sin costo:       ${sinCosto}`);
+  log('preventas-log', `   ⏭️  Saltadas:        ${saltadas}`);
+  log('preventas-log', '═══════════════════════════════════');
+
+  if (creadosNuevos.length > 0) {
+    log('preventas-log', '');
+    log('preventas-log', `<b>Creados nuevos:</b>`);
+    creadosNuevos.forEach(t => log('preventas-log', `• ${t}`));
+  }
+
+  alert(`✅ Preventas procesadas\n\nAplicadas: ${totalAplicadas}\nCreados nuevos: ${stats.creados}`);
+}
+
+// ============================================================
+// LIMPIAR OFERTAS VENCIDAS
+// ============================================================
+async function limpiarOfertasVencidas() {
+  if (!confirm('¿Limpiar todas las ofertas vencidas?')) return;
+  const hoy = new Date().toISOString().split('T')[0];
+  const snap = await getDocs(collection(db, 'products'));
+  const operaciones = [];
+  snap.docs.forEach(d => {
+    const data = d.data();
+    let modificado = false;
+    const nuevasVariantes = (data.variants || []).map(v => {
+      if (!v.enOferta || !v.ofertaHasta || v.ofertaHasta >= hoy) return v;
+      modificado = true;
+      return { ...v, enOferta: false, ofertaCostoARS: null, ofertaPrecioUYU: null, ofertaHasta: null };
+    });
+    if (modificado) {
+      operaciones.push({
+        ref: doc(db, 'products', d.id),
+        data: { variants: nuevasVariantes, updatedAt: new Date().toISOString() }
+      });
+    }
+  });
+  if (operaciones.length === 0) { alert('No había ofertas vencidas.'); return; }
+  log('ofertas-log', `⏳ Limpiando ${operaciones.length} ofertas vencidas...`);
+  await ejecutarBatches(operaciones, 'ofertas-log');
+  log('ofertas-log', `✅ ${operaciones.length} limpiadas.`);
+  alert(`✅ ${operaciones.length} productos actualizados.`);
+}
+
+// ============================================================
+// BATCHES
+// ============================================================
+async function ejecutarBatches(operaciones, logId) {
+  const TAM = 400;
+  for (let i = 0; i < operaciones.length; i += TAM) {
+    const lote = operaciones.slice(i, i + TAM);
+    const batch = writeBatch(db);
+    lote.forEach(op => batch.set(op.ref, op.data, { merge: true }));
+    await batch.commit();
+    log(logId, `  → Lote ${Math.floor(i / TAM) + 1} guardado (${lote.length} ops).`);
+  }
+}
+
+// ============================================================
+// BOTONES
+// ============================================================
+$('btn-process-stock')?.addEventListener('click', async () => {
+  const btn = $('btn-process-stock');
+  btn.disabled = true; btn.textContent = '⏳ Procesando...';
+  try { await procesarStock(); }
+  catch (err) { log('stock-log', `❌ ${err.message}`, 'error'); console.error(err); }
+  finally { btn.disabled = false; btn.textContent = '📥 Procesar Stock'; }
+});
+$('btn-process-ofertas')?.addEventListener('click', async () => {
+  const btn = $('btn-process-ofertas');
+  btn.disabled = true; btn.textContent = '⏳ Procesando...';
+  try { await procesarOfertas(); }
+  catch (err) { log('ofertas-log', `❌ ${err.message}`, 'error'); console.error(err); }
+  finally { btn.disabled = false; btn.textContent = '🔥 Procesar Ofertas'; }
+});
+$('btn-process-preventas')?.addEventListener('click', async () => {
+  const btn = $('btn-process-preventas');
+  btn.disabled = true; btn.textContent = '⏳ Procesando...';
+  try { await procesarPreventas(); }
+  catch (err) { log('preventas-log', `❌ ${err.message}`, 'error'); console.error(err); }
+  finally { btn.disabled = false; btn.textContent = '🚀 Procesar Preventas'; }
+});
+$('btn-clean-ofertas')?.addEventListener('click', async () => {
+  const btn = $('btn-clean-ofertas');
+  btn.disabled = true; btn.textContent = '⏳ Limpiando...';
+  try { await limpiarOfertasVencidas(); }
+  catch (err) { log('ofertas-log', `❌ ${err.message}`, 'error'); console.error(err); }
+  finally { btn.disabled = false; btn.textContent = '🧹 Limpiar ofertas vencidas'; }
 });
 
-// Detectar cambio de página
-const originalSwitchPage = window.switchPage;
-window.switchPage = function(pageId) {
-  if (originalSwitchPage) originalSwitchPage(pageId);
-  const si = $('search-input');
-  const catActiva = document.querySelector('#cat-nav .cat-btn.active');
-  const cat = catActiva ? (catActiva.dataset.cat || 'all') : 'all';
-
-  if (pageId === 'ofertas') {
-    if (si) ofState.search = si.value;
-    ofState.cat = cat;
-    ofState.pagina = 1;
-    setTimeout(() => renderOfertas(), 50);
-  }
-  if (pageId === 'preventas') {
-    if (si) preState.search = si.value;
-    preState.cat = cat;
-    preState.pagina = 1;
-    setTimeout(() => renderPreventas(), 50);
-  }
-  if (pageId === 'catalogo') {
-    if (si) catState.search = si.value;
-    catState.cat = cat;
-    catState.pagina = 1;
-    setTimeout(() => renderCatalogo(), 50);
-  }
-};
-
-// Cerrar trailer
-document.getElementById('trailer-close')?.addEventListener('click', () => {
-  document.getElementById('trailer-modal')?.classList.add('hidden');
-});
-document.getElementById('trailer-modal')?.addEventListener('click', (e) => {
-  if (e.target.id === 'trailer-modal') document.getElementById('trailer-modal')?.classList.add('hidden');
-});
-
-console.log('[GamesUy] store.js v6.1 cargado (preventas auto)');
+console.log('[GamesUy] excel-importer.js v17 cargado (fuzzy más estricto)');

@@ -2398,3 +2398,108 @@ body::after {
     min-width: 100%;
   }
 }
+
+/* ============================================================
+   FASE 7.1 — Badges de estado en la carga masiva
+   ============================================================ */
+
+/* Leyenda arriba de la lista */
+.masivo-leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  background: var(--bg-0);
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+}
+.masivo-leyenda-item {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+}
+
+/* Badge de estado del juego */
+.masivo-estado-badge {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  margin-right: 6px;
+}
+
+.masivo-estado-stock {
+  color: #001a10;
+  background: var(--green);
+  box-shadow: 0 0 10px rgba(0, 255, 157, 0.3);
+}
+.masivo-estado-oferta {
+  color: #fff;
+  background: linear-gradient(90deg, #ff0055, #ff3377);
+  box-shadow: 0 0 12px rgba(255, 0, 85, 0.4);
+  animation: pulseOffer 1.8s infinite;
+}
+.masivo-estado-preventa {
+  color: #fff;
+  background: linear-gradient(90deg, #0091ff, #00b4d8);
+  box-shadow: 0 0 12px rgba(0, 145, 255, 0.4);
+}
+.masivo-estado-solo-oferta {
+  color: #fff;
+  background: linear-gradient(90deg, #c2185b, #ff8aa8);
+  box-shadow: 0 0 12px rgba(194, 24, 91, 0.4);
+}
+.masivo-estado-sin-stock {
+  color: #fff;
+  background: #5b6688;
+  box-shadow: 0 0 10px rgba(91, 102, 136, 0.4);
+}
+
+/* Borde de la tarjeta según tipo */
+.masivo-juego-stock {
+  border-color: rgba(0, 255, 157, 0.3) !important;
+}
+.masivo-juego-oferta {
+  border-color: rgba(255, 0, 85, 0.5) !important;
+  box-shadow: 0 0 20px rgba(255, 0, 85, 0.1);
+}
+.masivo-juego-preventa {
+  border-color: rgba(0, 145, 255, 0.5) !important;
+  box-shadow: 0 0 20px rgba(0, 145, 255, 0.1);
+}
+.masivo-juego-solo-oferta {
+  border-color: rgba(194, 24, 91, 0.5) !important;
+  box-shadow: 0 0 20px rgba(194, 24, 91, 0.1);
+}
+.masivo-juego-sin-stock {
+  border-color: rgba(91, 102, 136, 0.4) !important;
+  opacity: 0.85;
+}
+
+/* Etiqueta de oferta dentro de la variante */
+.masivo-var-oferta-badge {
+  font-size: 0.85rem;
+  margin-right: 3px;
+}
+.masivo-var-con-oferta {
+  background: rgba(255, 0, 85, 0.05) !important;
+  border-color: rgba(255, 0, 85, 0.3) !important;
+}
+.masivo-var-oferta-info {
+  grid-column: 1 / -1;
+  font-size: 0.75rem;
+  color: #ff4d6d;
+  font-weight: 700;
+  padding: 4px 8px;
+  background: rgba(255, 0, 85, 0.08);
+  border-radius: var(--r-sm);
+  text-align: center;
+  margin-top: 4px;
+}

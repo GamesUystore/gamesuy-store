@@ -1,11 +1,11 @@
 // ============================================================
 // GAMESUY STORE — Carga masiva de precios
-// Edita 20 juegos por página con un solo botón de guardar
+// Fase 7.1: Badges visuales (stock/oferta/preventa/solo-oferta)
 // ============================================================
 
 import { db } from './firebase-config.js';
 import {
-  collection, getDocs, doc, writeBatch
+  collection, getDocs, doc, writeBatch, onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import {
   getCostoUYU, calcGananciaPct, calcPrecioUSD,
@@ -22,15 +22,9 @@ let filtroEstado = 'sin-precio';
 let pagina = 1;
 const POR_PAGINA = 20;
 
-// Cambios pendientes: { productId: { variantId: { costoARS, precioFinalUYU, gananciaPct } } }
 let cambios = {};
 
-console.log('[GamesUy] precios-masivo.js iniciando...');
-
-// ============================================================
-// CARGA DE COTIZACIONES
-// ============================================================
-import { onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+console.log('[GamesUy] precios-masivo.js v2 iniciando...');
 
 onSnapshot(doc(db, 'settings', 'cotizaciones'), (snap) => {
   if (!snap.exists()) return;
@@ -40,9 +34,6 @@ onSnapshot(doc(db, 'settings', 'cotizaciones'), (snap) => {
   render();
 });
 
-// ============================================================
-// CARGA DE PRODUCTOS
-// ============================================================
 async function cargarProductos() {
   try {
     const snap = await getDocs(collection(db, 'products'));
@@ -57,8 +48,12 @@ async function cargarProductos() {
 // ============================================================
 // HELPERS
 // ============================================================
-function varianteTieneStock(v) {
-  return Number(v?.costoARS) > 0 && v?.disponible !== false;
+function tieneStock(v) { return Number(v?.costoARS) > 0 && v?.disponible !== false; }
+
+function ofertaVigente(v) {
+  if (!v.enOferta || !v.ofertaHasta) return false;
+  const hoy = new Date().toISOString().split('T')[0];
+  return v.ofertaHasta >= hoy;
 }
 
 function productoEsPreventa(p) {
@@ -66,6 +61,14 @@ function productoEsPreventa(p) {
   if (!p.releaseDate) return true;
   const hoy = new Date().toISOString().split('T')[0];
   return p.releaseDate > hoy;
+}
+
+function productoTieneOferta(p) {
+  return (p.variants || []).some(v => ofertaVigente(v));
+}
+
+function productoTieneStock(p) {
+  return (p.variants || []).some(tieneStock);
 }
 
 function productoSinPrecio(p) {
@@ -92,6 +95,61 @@ function formatFecha(dateStr) {
   return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : dateStr;
 }
 
+// Devuelve el estado del juego para mostrar el badge correcto
+function obtenerEstadoProducto(p) {
+  const esPreventa = productoEsPreventa(p);
+  const esSoloOferta = p.soloOferta && !p.soloPreventa;
+  const tieneOferta = productoTieneOferta(p);
+  const tieneStock = productoTieneStock(p);
+
+  // Orden de prioridad: Preventa > Solo Oferta > Oferta > Con Stock > Sin Stock
+  if (esPreventa) {
+    return {
+      tipo: 'preventa',
+      icono: '🚀',
+      label: 'PREVENTA',
+      extra: p.releaseDate ? `Estreno: ${formatFecha(p.releaseDate)}` : 'Sin fecha',
+      clase: 'masivo-juego-preventa'
+    };
+  }
+  if (esSoloOferta) {
+    const fechaFin = (p.variants || []).map(v => v.ofertaHasta).filter(Boolean).sort()[0];
+    return {
+      tipo: 'solo-oferta',
+      icono: '🎁',
+      label: 'SOLO OFERTA',
+      extra: fechaFin ? `hasta ${formatFecha(fechaFin)}` : '',
+      clase: 'masivo-juego-solo-oferta'
+    };
+  }
+  if (tieneOferta) {
+    const fechaFin = (p.variants || []).map(v => v.ofertaHasta).filter(Boolean).sort()[0];
+    return {
+      tipo: 'oferta',
+      icono: '🔥',
+      label: 'OFERTA ACTIVA',
+      extra: fechaFin ? `hasta ${formatFecha(fechaFin)}` : '',
+      clase: 'masivo-juego-oferta'
+    };
+  }
+  if (tieneStock) {
+    return {
+      tipo: 'stock',
+      icono: '🟢',
+      label: 'STOCK NORMAL',
+      extra: '',
+      clase: 'masivo-juego-stock'
+    };
+  }
+  return {
+    tipo: 'sin-stock',
+    icono: '⚫',
+    label: 'SIN STOCK',
+    extra: '',
+    clase: 'masivo-juego-sin-stock'
+  };
+}
+
 // ============================================================
 // FILTROS
 // ============================================================
@@ -100,6 +158,8 @@ function filtrarProductos() {
 
   if (filtroEstado === 'sin-precio') lista = lista.filter(productoSinPrecio);
   else if (filtroEstado === 'con-precio') lista = lista.filter(productoConPrecio);
+  else if (filtroEstado === 'ofertas') lista = lista.filter(productoTieneOferta);
+  else if (filtroEstado === 'preventas') lista = lista.filter(productoEsPreventa);
 
   if (filtroCat !== 'all') lista = lista.filter(p => (p.categories || []).includes(filtroCat));
 
@@ -164,20 +224,16 @@ function render() {
   }
 
   list.innerHTML = enPagina.map(p => renderJuego(p)).join('');
-  activarListeners(enPagina);
+  activarListeners();
   actualizarBarraCambios();
 }
 
 function renderJuego(p) {
-  const esPreventa = productoEsPreventa(p);
+  const estado = obtenerEstadoProducto(p);
   const cats = (p.categories || []).map(c => `<span class="badge badge-${c}">${c.toUpperCase()}</span>`).join('');
 
-  // Filtrar variantes que tienen costo > 0
+  // Solo mostramos variantes con costo > 0
   const variantes = (p.variants || []).filter(v => Number(v.costoARS) > 0);
-
-  const preventaBadge = esPreventa
-    ? `<span class="masivo-preventa-badge">🚀 PREVENTA${p.releaseDate ? ` · ${formatFecha(p.releaseDate)}` : ''}</span>`
-    : '';
 
   const variantesHtml = variantes.map(v => {
     const costoARS = Number(v.costoARS) || 0;
@@ -185,9 +241,21 @@ function renderJuego(p) {
     const precioActual = Number(v.precioFinalUYU) || 0;
     const usdPreview = precioActual > 0 ? formatUSD(calcPrecioUSD(precioActual, cotizaciones.usdAUYU)) : '—';
 
+    // ¿Esta variante tiene oferta activa?
+    const tieneOfertaVar = ofertaVigente(v);
+    const ofertaBadge = tieneOfertaVar ? '<span class="masivo-var-oferta-badge">🔥</span>' : '';
+
+    // ¿Esta variante tiene oferta con precio cargado?
+    const ofertaPrecio = Number(v.ofertaPrecioUYU) || 0;
+    const ofertaInfo = tieneOfertaVar && ofertaPrecio > 0
+      ? `<div class="masivo-var-oferta-info">🔥 Oferta: $${ofertaPrecio} UYU</div>`
+      : '';
+
     return `
-      <div class="masivo-variante-row" data-variant="${v.id}">
-        <div class="masivo-var-label">${escapeHtml(v.label)}</div>
+      <div class="masivo-variante-row ${tieneOfertaVar ? 'masivo-var-con-oferta' : ''}" data-variant="${v.id}">
+        <div class="masivo-var-label">
+          ${ofertaBadge}${escapeHtml(v.label)}
+        </div>
 
         <div class="masivo-var-costo">
           <input type="number" class="masivo-input-costo" data-prod="${p.id}" data-variant="${v.id}"
@@ -205,15 +273,26 @@ function renderJuego(p) {
         </div>
 
         <div class="masivo-var-usd" data-usd="${p.id}_${v.id}">${precioActual > 0 ? usdPreview : '≈ —'}</div>
+        ${ofertaInfo}
       </div>
     `;
   }).join('');
 
+  // Badge del estado general
+  const estadoBadge = `
+    <span class="masivo-estado-badge masivo-estado-${estado.tipo}">
+      ${estado.icono} ${estado.label}${estado.extra ? ` · ${estado.extra}` : ''}
+    </span>
+  `;
+
   return `
-    <div class="masivo-juego ${esPreventa ? 'masivo-juego-preventa' : ''}" data-prod-id="${p.id}">
+    <div class="masivo-juego ${estado.clase}" data-prod-id="${p.id}">
       <div class="masivo-juego-header">
         <div class="masivo-juego-title">
-          <div class="masivo-juego-badges">${cats}${preventaBadge}</div>
+          <div class="masivo-juego-badges">
+            ${estadoBadge}
+            ${cats}
+          </div>
           <h4>${escapeHtml(p.title || '(sin título)')}</h4>
         </div>
       </div>
@@ -224,8 +303,7 @@ function renderJuego(p) {
   `;
 }
 
-function activarListeners(lista) {
-  // Inputs de costo
+function activarListeners() {
   document.querySelectorAll('.masivo-input-costo').forEach(inp => {
     inp.addEventListener('input', () => {
       const prodId = inp.dataset.prod;
@@ -238,7 +316,6 @@ function activarListeners(lista) {
     });
   });
 
-  // Inputs de precio
   document.querySelectorAll('.masivo-input-precio').forEach(inp => {
     inp.addEventListener('input', () => {
       const prodId = inp.dataset.prod;
@@ -247,7 +324,6 @@ function activarListeners(lista) {
       const usdEl = document.querySelector(`[data-usd="${prodId}_${variantId}"]`);
       if (usdEl) usdEl.textContent = val > 0 ? '≈ ' + formatUSD(calcPrecioUSD(val, cotizaciones.usdAUYU)) : '≈ —';
 
-      // Calcular ganancia
       const costoInput = document.querySelector(`.masivo-input-costo[data-prod="${prodId}"][data-variant="${variantId}"]`);
       const costoARS = parseFloat(costoInput?.value) || 0;
       let ganancia = null;
@@ -305,7 +381,6 @@ async function guardarTodos() {
       });
     }
 
-    // Guardar en batches de 400
     const TAM = 400;
     for (let i = 0; i < operaciones.length; i += TAM) {
       const lote = operaciones.slice(i, i + TAM);
@@ -314,7 +389,6 @@ async function guardarTodos() {
       await batch.commit();
     }
 
-    // Actualizar productos locales
     for (const op of operaciones) {
       const prod = productos.find(p => p.id === op.ref.id);
       if (prod) prod.variants = op.data.variants;
@@ -369,4 +443,4 @@ $('btn-save-masivo')?.addEventListener('click', guardarTodos);
 // INIT
 // ============================================================
 cargarProductos();
-console.log('[GamesUy] precios-masivo.js cargado');
+console.log('[GamesUy] precios-masivo.js v2 cargado');

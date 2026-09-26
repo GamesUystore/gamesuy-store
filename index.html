@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=27">
+  <link rel="stylesheet" href="styles.css?v=28">
 </head>
 <body>
 
@@ -206,7 +206,7 @@
           <div class="admin-grid">
             <div class="admin-card admin-card-wide">
               <h3>⚡ Carga masiva de precios</h3>
-              <p class="admin-help">Editá varios juegos a la vez. Los cambios se guardan cuando apretás <b>Guardar todo</b>. Podés cargar 20 juegos por página.</p>
+              <p class="admin-help">Editá varios juegos a la vez. Cada juego tiene un badge de color con su tipo: <b>🟢 Stock normal</b>, <b>🔥 Oferta activa</b>, <b>🚀 Preventa</b>, <b>🎁 Solo oferta</b> o <b>⚫ Sin stock</b>.</p>
 
               <div class="masivo-toolbar">
                 <input type="text" id="masivo-search" placeholder="🔍 Buscar juego..." autocomplete="off">
@@ -223,9 +223,19 @@
                 <select id="masivo-estado">
                   <option value="sin-precio">⏳ Sin precio cargado</option>
                   <option value="con-precio">✅ Con precio cargado</option>
+                  <option value="ofertas">🔥 Solo ofertas</option>
+                  <option value="preventas">🚀 Solo preventas</option>
                   <option value="todos">Todos</option>
                 </select>
                 <span class="masivo-count" id="masivo-count">Cargando...</span>
+              </div>
+
+              <div class="masivo-leyenda">
+                <span class="masivo-leyenda-item masivo-estado-stock">🟢 Stock normal</span>
+                <span class="masivo-leyenda-item masivo-estado-oferta">🔥 Oferta activa</span>
+                <span class="masivo-leyenda-item masivo-estado-preventa">🚀 Preventa</span>
+                <span class="masivo-leyenda-item masivo-estado-solo-oferta">🎁 Solo oferta</span>
+                <span class="masivo-leyenda-item masivo-estado-sin-stock">⚫ Sin stock</span>
               </div>
 
               <div class="masivo-save-bar">
@@ -375,7 +385,6 @@
   <footer class="site-footer"><p>© 2026 GamesUy Store — Juegos digitales en Uruguay</p></footer>
   <a href="https://wa.me/59896572226" class="chat-float" target="_blank" rel="noopener">💬</a>
 
-  <!-- MODAL LOGIN -->
   <div id="login-modal" class="admin-modal hidden">
     <div class="modal-content">
       <button class="modal-close" id="login-close" aria-label="Cerrar">✕</button>
@@ -390,7 +399,6 @@
     </div>
   </div>
 
-  <!-- MODAL EDITAR JUEGO -->
   <div id="price-modal" class="admin-modal hidden">
     <div class="modal-content modal-content-large">
       <button class="modal-close" id="price-modal-close" aria-label="Cerrar">✕</button>
@@ -467,7 +475,6 @@
     </div>
   </div>
 
-  <!-- MODAL TRAILER -->
   <div id="trailer-modal" class="admin-modal hidden">
     <div class="modal-content modal-content-large">
       <button class="modal-close" id="trailer-close" aria-label="Cerrar">✕</button>
@@ -519,13 +526,13 @@
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-  <script type="module" src="js/settings.js?v=27"></script>
-  <script type="module" src="js/auth.js?v=27"></script>
-  <script type="module" src="js/admin.js?v=27"></script>
-  <script type="module" src="js/excel-importer.js?v=27"></script>
-  <script type="module" src="js/maintenance.js?v=27"></script>
-  <script type="module" src="js/precios.js?v=27"></script>
-  <script type="module" src="js/precios-masivo.js?v=27"></script>
-  <script type="module" src="js/store.js?v=27"></script>
+  <script type="module" src="js/settings.js?v=28"></script>
+  <script type="module" src="js/auth.js?v=28"></script>
+  <script type="module" src="js/admin.js?v=28"></script>
+  <script type="module" src="js/excel-importer.js?v=28"></script>
+  <script type="module" src="js/maintenance.js?v=28"></script>
+  <script type="module" src="js/precios.js?v=28"></script>
+  <script type="module" src="js/precios-masivo.js?v=28"></script>
+  <script type="module" src="js/store.js?v=28"></script>
 </body>
 </html>

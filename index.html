@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=30">
+  <link rel="stylesheet" href="styles.css?v=31">
 </head>
 <body>
 
@@ -203,9 +203,6 @@
           </div>
         </div>
 
-        <!-- ═══════════════════════════════════════════════════ -->
-        <!-- NUEVA PESTAÑA: CREAR JUEGO MANUAL                  -->
-        <!-- ═══════════════════════════════════════════════════ -->
         <div class="admin-tab-content" data-tab-content="crear">
           <div class="admin-grid">
             <div class="admin-card admin-card-wide">
@@ -251,7 +248,7 @@
               </label>
 
               <h4 class="crear-variantes-titulo">💠 Variantes de este producto</h4>
-              <p class="admin-hint" style="margin-bottom:12px;">Cada variante es una opción que el cliente puede elegir. Por ejemplo: "PS3 Primaria", "PS3 Secundaria" o "Netflix Estándar".</p>
+              <p class="admin-hint" style="margin-bottom:12px;">Cada variante es una opción que el cliente puede elegir.</p>
 
               <div id="crear-variantes-list" class="crear-variantes-list">
                 <p class="crear-empty-msg">Elegí una categoría para ver las variantes disponibles.</p>
@@ -270,7 +267,7 @@
           <div class="admin-grid">
             <div class="admin-card admin-card-wide">
               <h3>⚡ Carga masiva de precios</h3>
-              <p class="admin-help">Editá varios juegos a la vez. Cada juego tiene un badge de color con su tipo.</p>
+              <p class="admin-help">Editá varios juegos a la vez.</p>
 
               <div class="masivo-toolbar">
                 <input type="text" id="masivo-search" placeholder="🔍 Buscar juego..." autocomplete="off">
@@ -324,21 +321,17 @@
           <div class="admin-grid">
             <div class="admin-card admin-card-wide">
               <h3>📥 1. Importar STOCK (mensual)</h3>
-              <p class="admin-help">Este Excel trae todos los juegos con sus costos.</p>
               <input type="file" id="excel-stock" accept=".xlsx,.xls" class="admin-file">
               <div id="stock-log" class="import-log"><em>Esperando archivo...</em></div>
               <div class="admin-actions">
                 <button id="btn-process-stock" class="btn btn-primary" disabled>📥 Procesar Stock</button>
               </div>
             </div>
-
             <div class="admin-card admin-card-wide">
               <h3>🔥 2. Importar OFERTAS (cada 15 días)</h3>
-              <p class="admin-help">El Excel trae ofertas vigentes (solo Primaria).</p>
               <div class="oferta-fecha-row">
                 <label class="admin-label">📅 Válidas hasta:</label>
                 <input type="date" id="oferta-fecha-hasta">
-                <p class="admin-hint">Las ofertas se limpian automáticamente al vencer.</p>
               </div>
               <input type="file" id="excel-ofertas" accept=".xlsx,.xls" class="admin-file">
               <div id="ofertas-log" class="import-log"><em>Esperando archivo...</em></div>
@@ -347,10 +340,8 @@
                 <button id="btn-clean-ofertas" class="btn btn-secondary">🧹 Limpiar ofertas vencidas</button>
               </div>
             </div>
-
             <div class="admin-card admin-card-wide">
               <h3>🚀 3. Importar PREVENTAS</h3>
-              <p class="admin-help">Este Excel trae los juegos próximos a salir (PS5).</p>
               <input type="file" id="excel-preventas" accept=".xlsx,.xls" class="admin-file">
               <div id="preventas-log" class="import-log"><em>Esperando archivo...</em></div>
               <div class="admin-actions">
@@ -373,7 +364,6 @@
               </div>
               <p class="admin-hint" id="admin-cot-updated" style="margin-top:12px;"></p>
             </div>
-
             <div class="admin-card">
               <h3>🖼️ Logo de la tienda</h3>
               <div class="admin-preview">
@@ -389,7 +379,6 @@
                 <button id="btn-clear-logo" class="btn btn-secondary">Quitar logo</button>
               </div>
             </div>
-
             <div class="admin-card">
               <h3>📱 Redes sociales</h3>
               <label class="admin-label">WhatsApp</label>
@@ -404,7 +393,6 @@
                 <button id="btn-save-social" class="btn btn-primary">Guardar redes</button>
               </div>
             </div>
-
             <div class="admin-card admin-card-wide">
               <h3>📢 Banner de anuncio</h3>
               <label class="admin-label">Etiqueta</label>
@@ -467,16 +455,13 @@
     <div class="modal-content modal-content-large">
       <button class="modal-close" id="price-modal-close" aria-label="Cerrar">✕</button>
       <h3 class="modal-title" id="price-modal-title">Editar</h3>
-
       <div class="modal-tabs">
         <button class="modal-tab active" data-mtab="precios" type="button">💰 Precios</button>
         <button class="modal-tab" data-mtab="info" type="button">📷 Información</button>
       </div>
-
       <div class="modal-tab-content active" data-mtab-content="precios">
         <div id="price-modal-precios" class="price-modal-body"></div>
       </div>
-
       <div class="modal-tab-content" data-mtab-content="info">
         <div id="price-modal-info" class="price-modal-body">
           <div class="info-field">
@@ -486,7 +471,6 @@
           <div class="info-field">
             <label class="admin-label">Categorías (separadas por coma)</label>
             <input type="text" id="info-categories" placeholder="ps4, ps5">
-            <p class="admin-hint">Ejemplo: <strong>ps4, ps5</strong></p>
           </div>
           <div class="info-field">
             <label class="admin-label">🖼️ Portada del juego</label>
@@ -590,14 +574,14 @@
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-  <script type="module" src="js/settings.js?v=30"></script>
-  <script type="module" src="js/auth.js?v=30"></script>
-  <script type="module" src="js/admin.js?v=30"></script>
-  <script type="module" src="js/excel-importer.js?v=30"></script>
-  <script type="module" src="js/maintenance.js?v=30"></script>
-  <script type="module" src="js/precios.js?v=30"></script>
-  <script type="module" src="js/precios-masivo.js?v=30"></script>
-  <script type="module" src="js/manual-create.js?v=30"></script>
-  <script type="module" src="js/store.js?v=30"></script>
+  <script type="module" src="js/settings.js?v=31"></script>
+  <script type="module" src="js/auth.js?v=31"></script>
+  <script type="module" src="js/admin.js?v=31"></script>
+  <script type="module" src="js/excel-importer.js?v=31"></script>
+  <script type="module" src="js/maintenance.js?v=31"></script>
+  <script type="module" src="js/precios.js?v=31"></script>
+  <script type="module" src="js/precios-masivo.js?v=31"></script>
+  <script type="module" src="js/manual-create.js?v=31"></script>
+  <script type="module" src="js/store.js?v=31"></script>
 </body>
 </html>

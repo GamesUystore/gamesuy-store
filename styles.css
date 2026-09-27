@@ -2812,3 +2812,207 @@ body::after {
   background: #b71c1c;
   transform: scale(1.03);
 }
+/* ============================================================
+   FASE 10 — PULIDO MÓVIL
+   Ajustes específicos para pantallas chicas (<640px)
+   ============================================================ */
+
+@media (max-width: 640px) {
+
+  /* ---------- HEADER ---------- */
+  .header-inner { padding: 14px 12px 12px; gap: 12px; }
+  .brand { gap: 10px; }
+  .brand-logo, .brand-logo-fallback { width: 56px; height: 56px; }
+  .brand-title { font-size: 1.3rem; letter-spacing: 2px; }
+  .brand-tagline { font-size: 0.78rem; }
+
+  /* Nav superior: scroll horizontal en vez de wrap */
+  .top-nav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    justify-content: flex-start;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    /* Fade a la derecha para indicar que se puede scrollear */
+    mask-image: linear-gradient(90deg, #000 92%, transparent 100%);
+    -webkit-mask-image: linear-gradient(90deg, #000 92%, transparent 100%);
+  }
+  .top-nav::-webkit-scrollbar { display: none; }
+  .nav-btn {
+    flex-shrink: 0;
+    font-size: 0.82rem;
+    padding: 8px 12px;
+    white-space: nowrap;
+  }
+
+  /* Categorías: mismo tratamiento */
+  .categories-nav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    justify-content: flex-start;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    mask-image: linear-gradient(90deg, #000 92%, transparent 100%);
+    -webkit-mask-image: linear-gradient(90deg, #000 92%, transparent 100%);
+  }
+  .categories-nav::-webkit-scrollbar { display: none; }
+  .cat-btn {
+    flex-shrink: 0;
+    font-size: 0.78rem;
+    padding: 6px 14px;
+    white-space: nowrap;
+  }
+
+  .search-input { font-size: 0.95rem; padding: 12px 16px 12px 42px; }
+
+  /* ---------- LAYOUT ---------- */
+  .container { padding: 18px 12px 100px; }
+  .section-title { font-size: 1.2rem; padding-bottom: 8px; }
+  .grid-header { gap: 6px; margin-bottom: 14px; }
+  .section-subtitle { font-size: 0.88rem; margin-bottom: 16px; }
+
+  /* Banner de anuncio */
+  .announcement-banner { padding: 20px 16px; }
+  .announcement-title { font-size: 1.1rem; }
+  .announcement-text { font-size: 0.92rem; }
+
+  /* ---------- GRID DE PRODUCTOS ---------- */
+  .product-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  /* ---------- CARDS ---------- */
+  .product-card { padding: 14px; }
+  .card-title { font-size: 1.05rem; min-height: auto; }
+  .card-price { font-size: 1.25rem; }
+  .card-payments { font-size: 0.75rem; padding: 6px; }
+  .card-badges { top: 10px; right: 10px; }
+
+  /* Selectores en 1 columna para que se lean bien */
+  .card-variant-selectors {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .card-select {
+    font-size: 0.88rem;
+    padding: 10px 10px;
+    width: 100%;
+  }
+
+  /* ---------- BOTÓN WHATSAPP FLOTANTE ---------- */
+  .chat-float {
+    width: 52px;
+    height: 52px;
+    bottom: 16px;
+    right: 16px;
+    font-size: 1.4rem;
+  }
+
+  /* ---------- MODALES ---------- */
+  .admin-modal { padding: 12px; }
+  .modal-content {
+    padding: 24px 18px 20px;
+    max-height: 94vh;
+    border-radius: 14px;
+  }
+  .modal-content-large { max-width: 100%; }
+  .modal-title { font-size: 1rem; padding-right: 36px; }
+  .modal-close { top: 10px; right: 10px; width: 30px; height: 30px; font-size: 0.9rem; }
+
+  /* Tabs del modal de precios */
+  .modal-tabs { gap: 4px; }
+  .modal-tab { padding: 10px 8px; font-size: 0.78rem; letter-spacing: 0.5px; }
+
+  /* Bloques de precio dentro del modal */
+  .variante-bloque { padding: 14px; }
+  .precio-seccion { padding: 12px; }
+  .variante-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .precio-input-wrap { min-width: 100%; }
+  .precio-costo-inputs .variante-input-costo,
+  .precio-costo-inputs .variante-input-costo-oferta { width: 100%; }
+
+  /* ---------- ADMIN ---------- */
+  .admin-header { padding: 14px 16px; gap: 10px; }
+  .admin-logout { width: 100% !important; }
+  .admin-card { padding: 16px; }
+  .admin-card h3 { font-size: 0.92rem; }
+  .admin-actions .btn { min-width: 100%; }
+
+  /* Tabs del admin: scroll horizontal */
+  .admin-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    justify-content: flex-start;
+    padding: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    mask-image: linear-gradient(90deg, #000 94%, transparent 100%);
+    -webkit-mask-image: linear-gradient(90deg, #000 94%, transparent 100%);
+  }
+  .admin-tabs::-webkit-scrollbar { display: none; }
+  .admin-tab {
+    flex-shrink: 0;
+    min-width: auto;
+    padding: 10px 14px;
+    font-size: 0.82rem;
+    white-space: nowrap;
+  }
+
+  /* Stats y filtros de precios */
+  .precios-stats { gap: 8px; }
+  .stat-badge { padding: 6px 12px; font-size: 0.78rem; }
+
+  /* Fila juego */
+  .fila-juego {
+    grid-template-columns: auto 1fr auto;
+    padding: 12px 14px;
+    gap: 10px;
+  }
+  .fila-titulo { font-size: 0.92rem; }
+  .fila-progreso { font-size: 0.75rem; padding: 3px 8px; }
+
+  /* Import log */
+  .import-log { font-size: 0.78rem; padding: 10px; max-height: 240px; }
+
+  /* Paginación */
+  .precios-pagination { flex-direction: column; gap: 8px; }
+  .precios-pagination .btn { width: 100%; }
+  .catalog-pagination { gap: 10px; }
+  .catalog-pagination .pag-btn { min-width: 120px; padding: 10px 14px !important; }
+
+  /* Carga masiva */
+  .masivo-toolbar { grid-template-columns: 1fr; }
+  .masivo-juego-variantes { padding: 10px 12px; }
+  .masivo-var-precio,
+  .masivo-var-costo { width: 100%; }
+  .masivo-var-costo .masivo-input-costo { width: 100%; flex: 1; }
+  .masivo-save-bar { flex-direction: column; align-items: stretch; }
+  .masivo-save-bar .btn { width: 100%; min-width: 100%; }
+
+  /* Banner preventa admin */
+  .preventa-banner-admin { font-size: 0.85rem; padding: 10px 14px; }
+
+  /* ---------- FAQ / TÉRMINOS ---------- */
+  .faq-question { padding: 14px 16px; font-size: 0.95rem; }
+  .faq-answer { padding: 14px 16px; font-size: 0.9rem; }
+  .terms-text { font-size: 0.92rem; }
+
+  .admin-list-item { padding: 12px 14px; }
+  .admin-list-item-content strong { font-size: 0.9rem; }
+  .admin-list-item-text { font-size: 0.82rem; }
+
+  /* ---------- CONTACTO ---------- */
+  .contact-form { max-width: 100%; }
+  .contact-form input,
+  .contact-form textarea { font-size: 0.95rem; padding: 11px 12px; }
+
+  /* ---------- FOOTER ---------- */
+  .site-footer { padding: 20px 14px; font-size: 0.78rem; }
+}

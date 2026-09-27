@@ -2503,3 +2503,186 @@ body::after {
   text-align: center;
   margin-top: 4px;
 }
+
+/* ============================================================
+   FASE 8 — Crear juego manual
+   ============================================================ */
+
+.crear-select {
+  width: 100%;
+  font-family: inherit;
+  font-size: 1rem;
+  color: var(--text);
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.crear-select:focus {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 3px var(--cyan-soft);
+}
+
+.crear-variantes-titulo {
+  margin-top: 24px;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.95rem;
+  letter-spacing: 1px;
+  color: var(--cyan);
+  border-bottom: 1px solid var(--border);
+}
+
+.crear-variantes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.crear-empty-msg {
+  text-align: center;
+  padding: 30px 20px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  background: var(--bg-0);
+  border-radius: var(--r-md);
+  border: 1px dashed var(--border-hi);
+}
+
+.crear-variante-row {
+  background: var(--bg-0);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: border-color 0.2s ease;
+}
+.crear-variante-row:focus-within {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 2px var(--cyan-soft);
+}
+
+.crear-var-header {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.crear-var-label {
+  width: 100%;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--cyan);
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 10px 14px;
+  outline: none;
+}
+.crear-var-label:focus {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 2px var(--cyan-soft);
+}
+.crear-var-delete {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(214, 48, 49, 0.15);
+  border: 1px solid rgba(214, 48, 49, 0.4);
+  border-radius: 50%;
+  color: #ff8aa8;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.crear-var-delete:hover {
+  background: #d63031;
+  color: #fff;
+  border-color: #d63031;
+}
+
+.crear-var-inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.crear-var-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.crear-var-field > label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.crear-var-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 8px 12px;
+}
+.crear-var-input-wrap:focus-within {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 2px var(--cyan-soft);
+}
+.crear-var-input-wrap span {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.crear-var-costo,
+.crear-var-precio {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  text-align: right;
+  outline: none;
+  -moz-appearance: textfield;
+}
+.crear-var-costo::-webkit-outer-spin-button,
+.crear-var-costo::-webkit-inner-spin-button,
+.crear-var-precio::-webkit-outer-spin-button,
+.crear-var-precio::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.crear-var-uyu,
+.crear-var-usd {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--cyan);
+}
+.crear-var-usd {
+  color: var(--text-dim);
+}
+
+@media (max-width: 760px) {
+  .crear-var-inputs {
+    grid-template-columns: 1fr;
+  }
+}

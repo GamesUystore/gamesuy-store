@@ -2686,3 +2686,129 @@ body::after {
     grid-template-columns: 1fr;
   }
 }
+
+/* ============================================================
+   FASE 9 — FAQs + Términos
+   ============================================================ */
+
+/* FAQs público */
+.faq-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.faq-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  transition: border-color 0.2s ease;
+}
+.faq-item:hover {
+  border-color: var(--border-hi);
+}
+.faq-item[open] {
+  border-color: var(--cyan);
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.1);
+}
+
+.faq-question {
+  padding: 16px 20px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  transition: color 0.2s ease;
+}
+.faq-question::-webkit-details-marker { display: none; }
+.faq-question::after {
+  content: '▾';
+  color: var(--cyan);
+  font-size: 1rem;
+  transition: transform 0.25s ease;
+  flex-shrink: 0;
+}
+.faq-item[open] .faq-question {
+  color: var(--cyan);
+  border-bottom: 1px solid var(--border);
+}
+.faq-item[open] .faq-question::after {
+  transform: rotate(180deg);
+}
+
+.faq-answer {
+  padding: 16px 20px;
+  color: var(--text-dim);
+  font-size: 0.95rem;
+  line-height: 1.6;
+  white-space: pre-line;
+}
+
+/* Admin — Lista de FAQs */
+.admin-subtitle {
+  margin-top: 24px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.95rem;
+  letter-spacing: 1px;
+  color: var(--cyan);
+  border-bottom: 1px solid var(--border);
+}
+
+.admin-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--bg-0);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  margin-bottom: 8px;
+}
+.admin-list-item:last-child { margin-bottom: 0; }
+
+.admin-list-item-content {
+  flex: 1;
+  min-width: 0;
+}
+.admin-list-item-content strong {
+  display: block;
+  color: var(--text);
+  font-size: 0.95rem;
+  margin-bottom: 4px;
+  word-break: break-word;
+}
+.admin-list-item-text {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  word-break: break-word;
+  margin: 0;
+}
+
+.admin-delete-btn {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #fff;
+  background: #d63031;
+  border: none;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.admin-delete-btn:hover {
+  background: #b71c1c;
+  transform: scale(1.03);
+}

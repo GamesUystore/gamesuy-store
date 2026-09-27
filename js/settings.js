@@ -1,15 +1,28 @@
 // ============================================================
 // GAMESUY STORE — Carga de configuración desde Firestore
+// (logo, redes, banner, FAQs, términos)
 // ============================================================
 
 import { db } from './firebase-config.js';
-import { doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import {
+  doc,
+  collection,
+  onSnapshot
+} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-// ---------------------------------------------
-// LOGO
-// ---------------------------------------------
+const $ = (id) => document.getElementById(id);
+
+function escapeHtml(str) {
+  return String(str ?? '').replace(/[&<>'"]/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+  }[ch]));
+}
+
+// ============================================================
+// 1. LOGO
+// ============================================================
 function aplicarLogo(logoUrl) {
-  const img = document.getElementById('store-logo');
+  const img = $('store-logo');
   const fallback = document.querySelector('.brand-logo-fallback');
   if (!img || !fallback) return;
 
@@ -28,9 +41,9 @@ onSnapshot(doc(db, 'settings', 'site'), (snap) => {
   aplicarLogo(snap.data().logoUrl || '');
 });
 
-// ---------------------------------------------
-// REDES SOCIALES
-// ---------------------------------------------
+// ============================================================
+// 2. REDES SOCIALES
+// ============================================================
 const REDES_DEFAULT = [
   { key: 'wa', emoji: '💬', label: 'WhatsApp' },
   { key: 'ig', emoji: '📸', label: 'Instagram' },
@@ -39,7 +52,7 @@ const REDES_DEFAULT = [
 ];
 
 function aplicarRedes(redes) {
-  const bar = document.getElementById('social-bar');
+  const bar = $('social-bar');
   if (!bar) return;
 
   const links = REDES_DEFAULT
@@ -59,11 +72,11 @@ onSnapshot(doc(db, 'settings', 'social'), (snap) => {
   aplicarRedes(snap.data());
 });
 
-// ---------------------------------------------
-// BANNER DE ANUNCIO
-// ---------------------------------------------
+// ============================================================
+// 3. BANNER DE ANUNCIO
+// ============================================================
 function aplicarBanner(data) {
-  const banner = document.getElementById('announcement-banner');
+  const banner = $('announcement-banner');
   if (!banner) return;
 
   const label = (data.label || '📢 NOVEDAD').trim();
@@ -117,4 +130,42 @@ onSnapshot(doc(db, 'settings', 'homeAnnouncement'), (snap) => {
   aplicarBanner(snap.data());
 });
 
-console.log('[GamesUy] settings.js cargado');
+// ============================================================
+// 4. FAQs (PÚBLICO)
+// ============================================================
+onSnapshot(collection(db, 'faqs'), (snap) => {
+  const list = $('faq-list');
+  if (!list) return;
+
+  if (snap.empty) {
+    list.innerHTML = '<p class="empty-message">No hay preguntas frecuentes por ahora.</p>';
+    return;
+  }
+
+  const faqs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  faqs.sort((a, b) => String(a.q || '').localeCompare(String(b.q || ''), 'es'));
+
+  list.innerHTML = faqs.map(f => `
+    <details class="faq-item">
+      <summary class="faq-question">❓ ${escapeHtml(f.q || '')}</summary>
+      <div class="faq-answer">${escapeHtml(f.a || '')}</div>
+    </details>
+  `).join('');
+});
+
+// ============================================================
+// 5. TÉRMINOS Y CONDICIONES (PÚBLICO)
+// ============================================================
+onSnapshot(doc(db, 'settings', 'terms'), (snap) => {
+  const el = $('terminos-text');
+  if (!el) return;
+
+  if (!snap.exists() || !snap.data().text) {
+    el.innerHTML = '<p class="empty-message">Los términos y condiciones estarán disponibles pronto.</p>';
+    return;
+  }
+
+  el.textContent = snap.data().text;
+});
+
+console.log('[GamesUy] settings.js cargado (con FAQs y Términos)');

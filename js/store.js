@@ -1,6 +1,6 @@
 // ============================================================
 // GAMESUY STORE — Catálogo público + Ofertas + Preventas
-// Fase 8.1: Soporte para variantes "estandar" (PS Plus, Steam, etc.)
+// Fase 8.2: Selector de variante por label (soporta PS Plus multi-variante)
 // ============================================================
 
 import { db } from './firebase-config.js';
@@ -20,9 +20,6 @@ const POR_PAGINA = 24;
 
 let countdownInterval = null;
 
-// ============================================================
-// CARGA DE DATOS
-// ============================================================
 onSnapshot(doc(db, 'settings', 'cotizaciones'), (snap) => {
   if (!snap.exists()) return;
   const c = snap.data();
@@ -46,7 +43,6 @@ onSnapshot(collection(db, 'products'), (snap) => {
 // HELPERS
 // ============================================================
 function tienePrecioNormal(v) { return Number(v?.precioFinalUYU) > 0; }
-function tienePrecioOferta(v) { return Number(v?.ofertaPrecioUYU) > 0; }
 function tieneCostoNormal(v) { return Number(v?.costoARS) > 0; }
 function tieneCostoOferta(v) { return Number(v?.ofertaCostoARS) > 0; }
 
@@ -111,42 +107,29 @@ function formatearFecha(dateStr) {
 }
 
 // ============================================================
-// LÓGICA DE VARIANTES
+// CATEGORÍAS DISPONIBLES POR PRODUCTO
+// Devuelve las categorías que tienen al menos una variante con datos
 // ============================================================
-
-/**
- * Devuelve los "tipos de cuenta" disponibles en una categoría.
- * Para PS4/PS5 → ['primaria','secundaria']
- * Para Steam/PSPlus/Streaming/Otros → ['estandar']
- * Excluye tipos que no tienen variantes con costo ni precio.
- */
-function getTiposDisponibles(p, categoria, modoOferta) {
-  const variantesCat = (p.variants || []).filter(v => v.categoria === categoria);
-  const tipos = [];
+function consolasDisponiblesDe(p, modoOferta) {
+  const cats = p.categories || [];
   const esOferta = modoOferta === true;
+  return cats.filter(c => {
+    return (p.variants || []).some(v => {
+      if (v.categoria !== c) return false;
+      if (esOferta) return ofertaVigente(v) !== null;
+      return tieneCostoNormal(v) || tieneCostoOferta(v);
+    });
+  });
+}
 
-  // ¿Hay variantes primaria/secundaria con datos?
-  const tienePrim = variantesCat.some(v => v.tipo === 'primaria' && (
-    esOferta ? ofertaVigente(v) !== null : (tieneCostoNormal(v) || tienePrecioNormal(v))
-  ));
-  const tieneSec = variantesCat.some(v => v.tipo === 'secundaria' && (
-    esOferta ? ofertaVigente(v) !== null : (tieneCostoNormal(v) || tienePrecioNormal(v))
-  ));
-  const tieneEst = variantesCat.some(v => v.tipo === 'estandar' && (
-    esOferta ? ofertaVigente(v) !== null : (tieneCostoNormal(v) || tienePrecioNormal(v))
-  ));
-
-  if (tienePrim) tipos.push('primaria');
-  if (tieneSec) tipos.push('secundaria');
-  if (tieneEst) tipos.push('estandar');
-
-  // Si no hay ningún tipo específico, tomar TODOS los tipos disponibles
-  if (tipos.length === 0) {
-    const tiposUnicos = new Set(variantesCat.map(v => v.tipo).filter(Boolean));
-    return Array.from(tiposUnicos);
-  }
-
-  return tipos;
+// Variantes de una categoría que tienen datos (para el selector)
+function variantesConDatos(p, categoria, modoOferta) {
+  const esOferta = modoOferta === true;
+  return (p.variants || []).filter(v => {
+    if (v.categoria !== categoria) return false;
+    if (esOferta) return ofertaVigente(v) !== null;
+    return tieneCostoNormal(v) || tieneCostoOferta(v);
+  });
 }
 
 // ============================================================
@@ -311,12 +294,12 @@ function activarCards(lista, prefijo) {
   lista.forEach(p => {
     const cardId = p.id;
     const selConsole = document.getElementById(`sel-console-${prefijo}-${cardId}`);
-    const selAccount = document.getElementById(`sel-account-${prefijo}-${cardId}`);
+    const selVariant = document.getElementById(`sel-variant-${prefijo}-${cardId}`);
     const selCurrency = document.getElementById(`sel-currency-${prefijo}-${cardId}`);
-    if (selConsole) selConsole.addEventListener('change', () => { actualizarSelectoresCuenta(p, cardId, prefijo); actualizarPrecio(p, cardId, prefijo); });
-    if (selAccount) selAccount.addEventListener('change', () => actualizarPrecio(p, cardId, prefijo));
+    if (selConsole) selConsole.addEventListener('change', () => { actualizarSelectorVariante(p, cardId, prefijo); actualizarPrecio(p, cardId, prefijo); });
+    if (selVariant) selVariant.addEventListener('change', () => actualizarPrecio(p, cardId, prefijo));
     if (selCurrency) selCurrency.addEventListener('change', () => actualizarPrecio(p, cardId, prefijo));
-    if (selConsole) actualizarSelectoresCuenta(p, cardId, prefijo);
+    if (selConsole) actualizarSelectorVariante(p, cardId, prefijo);
     actualizarPrecio(p, cardId, prefijo);
   });
 }
@@ -360,39 +343,19 @@ function renderCard(p, prefijo = 'cat') {
     : '';
 
   const esModoOferta = prefijo === 'oferta';
-
-  // Detectar consolas/categorías disponibles con datos
-  const consolasDisponibles = cats.filter(c => {
-    return (p.variants || []).some(v => {
-      if (v.categoria !== c) return false;
-      if (esModoOferta) return ofertaVigente(v) !== null;
-      return tieneCostoNormal(v) || tieneCostoOferta(v) || esPreventa;
-    });
-  });
-
-  const tieneSelectores = consolasDisponibles.length > 0;
-
-  // Detectar si necesitamos mostrar el selector de tipo de cuenta
-  // (solo si algún tipo es primaria o secundaria)
-  const necesitaSelectorCuenta = consolasDisponibles.some(c => {
-    const tipos = getTiposDisponibles(p, c, esModoOferta);
-    return tipos.length > 1 || tipos.includes('primaria') || tipos.includes('secundaria');
-  });
+  const consolas = consolasDisponiblesDe(p, esModoOferta);
+  const tieneSelectores = consolas.length > 0;
 
   let selectoresHtml = '';
   if (tieneSelectores) {
-    const selectConsolaHtml = consolasDisponibles.length > 1
-      ? `<select id="sel-console-${prefijo}-${cardId}" class="card-select">${consolasDisponibles.map(c => `<option value="${c}">${c.toUpperCase()}</option>`).join('')}</select>`
-      : `<input type="hidden" id="sel-console-${prefijo}-${cardId}" value="${consolasDisponibles[0]}">`;
-
-    const selectCuentaHtml = necesitaSelectorCuenta
-      ? `<select id="sel-account-${prefijo}-${cardId}" class="card-select"></select>`
-      : `<input type="hidden" id="sel-account-${prefijo}-${cardId}" value="">`;
+    const selectConsolaHtml = consolas.length > 1
+      ? `<select id="sel-console-${prefijo}-${cardId}" class="card-select">${consolas.map(c => `<option value="${c}">${c.toUpperCase()}</option>`).join('')}</select>`
+      : `<input type="hidden" id="sel-console-${prefijo}-${cardId}" value="${consolas[0]}">`;
 
     selectoresHtml = `
-      <div class="card-variant-selectors ${!necesitaSelectorCuenta && consolasDisponibles.length === 1 ? 'card-variant-selectors-single' : ''}">
+      <div class="card-variant-selectors">
         ${selectConsolaHtml}
-        ${selectCuentaHtml}
+        <select id="sel-variant-${prefijo}-${cardId}" class="card-select"></select>
         <select id="sel-currency-${prefijo}-${cardId}" class="card-select">
           <option value="UYU">$ UYU</option>
           <option value="USD">US$ USD</option>
@@ -422,36 +385,27 @@ function renderCard(p, prefijo = 'cat') {
 }
 
 // ============================================================
-// SELECTORES DE CUENTA
+// SELECTOR DE VARIANTE (ahora muestra labels reales)
 // ============================================================
-function actualizarSelectoresCuenta(p, cardId, prefijo) {
+function actualizarSelectorVariante(p, cardId, prefijo) {
   const selConsole = document.getElementById(`sel-console-${prefijo}-${cardId}`);
-  const selAccount = document.getElementById(`sel-account-${prefijo}-${cardId}`);
-  if (!selConsole || !selAccount) return;
-
-  // Si es un <input type="hidden">, no hay nada que hacer
-  if (selAccount.tagName === 'INPUT') return;
+  const selVariant = document.getElementById(`sel-variant-${prefijo}-${cardId}`);
+  if (!selConsole || !selVariant || selVariant.tagName === 'INPUT') return;
 
   const catActual = selConsole.value;
   const esModoOferta = prefijo === 'oferta';
-  const tipos = getTiposDisponibles(p, catActual, esModoOferta);
+  const variantes = variantesConDatos(p, catActual, esModoOferta);
 
-  // Etiquetas legibles
-  const labelMap = {
-    'primaria': 'Primaria',
-    'secundaria': 'Secundaria',
-    'estandar': 'Estándar'
-  };
+  const valorActual = selVariant.value;
 
-  const valorActual = selAccount.value;
-  selAccount.innerHTML = tipos.map(t =>
-    `<option value="${t}" ${t === valorActual ? 'selected' : ''}>${labelMap[t] || t}</option>`
-  ).join('');
-
-  // Si no hay tipos, dejar vacío
-  if (tipos.length === 0) {
-    selAccount.innerHTML = '<option value="">—</option>';
+  if (variantes.length === 0) {
+    selVariant.innerHTML = '<option value="">—</option>';
+    return;
   }
+
+  selVariant.innerHTML = variantes.map(v =>
+    `<option value="${v.id}" ${v.id === valorActual ? 'selected' : ''}>${escapeHtml(v.label)}</option>`
+  ).join('');
 }
 
 // ============================================================
@@ -466,21 +420,16 @@ function actualizarPrecio(p, cardId, prefijo) {
   if (!priceWrap) return;
 
   const selConsole = document.getElementById(`sel-console-${prefijo}-${cardId}`);
-  const selAccount = document.getElementById(`sel-account-${prefijo}-${cardId}`);
+  const selVariant = document.getElementById(`sel-variant-${prefijo}-${cardId}`);
   const selCurrency = document.getElementById(`sel-currency-${prefijo}-${cardId}`);
-  if (!selConsole || !selAccount || !selCurrency) return;
+  if (!selConsole || !selVariant || !selCurrency) return;
 
   const cat = selConsole.value;
-  let acc = selAccount.value;
+  const variantId = selVariant.value;
   const moneda = selCurrency.value;
 
-  // Si no hay tipo seleccionado (hidden input o único), detectar el tipo automático
-  if (!acc) {
-    const tipos = getTiposDisponibles(p, cat, prefijo === 'oferta');
-    acc = tipos[0] || 'estandar';
-  }
-
-  const variante = (p.variants || []).find(v => v.categoria === cat && v.tipo === acc);
+  // Buscar la variante por ID
+  const variante = (p.variants || []).find(v => v.id === variantId);
 
   if (!variante) {
     priceWrap.innerHTML = `<div class="card-price card-price-empty">AGOTADO</div>`;
@@ -525,10 +474,10 @@ function actualizarPrecio(p, cardId, prefijo) {
     if (offerWrap) offerWrap.innerHTML = '';
     if (countdown) { countdown.textContent = ''; countdown.style.display = 'none'; }
     if (waBtn) {
-      const tipoLabel = variante.label || 'Estándar';
+      const varianteLabel = variante.label || 'Estándar';
       const catLabel = cat.toUpperCase();
       const fecha = p.releaseDate ? ` (estreno: ${formatearFecha(p.releaseDate)})` : '';
-      const msg = `Hola GamesUy Store! Quiero RESERVAR *${p.title}* (${catLabel} ${tipoLabel})${fecha}`;
+      const msg = `Hola GamesUy Store! Quiero RESERVAR *${p.title}* (${catLabel} - ${varianteLabel})${fecha}`;
       waBtn.href = `https://wa.me/59896572226?text=${encodeURIComponent(msg)}`;
       waBtn.innerText = '🚀 Reservar Preventa';
       waBtn.classList.add('btn-preorder');
@@ -537,7 +486,7 @@ function actualizarPrecio(p, cardId, prefijo) {
     return;
   }
 
-  // MODO NORMAL: OFERTA + PRECIO NORMAL
+  // MODO OFERTA + PRECIO NORMAL
   if (oferta && tieneNormal) {
     const precioMostrar = moneda === 'USD'
       ? formatUSD(calcPrecioUSD(oferta.precio, cotizaciones.usdAUYU))
@@ -562,8 +511,8 @@ function actualizarPrecio(p, cardId, prefijo) {
       actualizarCountdown(countdown);
     }
     if (waBtn) {
-      const tipoLabel = variante.label || 'Estándar';
-      const msg = `Hola GamesUy Store! Quiero comprar *${p.title}* (${cat.toUpperCase()} ${tipoLabel}) en oferta por ${precioMostrar}`;
+      const varianteLabel = variante.label || '';
+      const msg = `Hola GamesUy Store! Quiero comprar *${p.title}* (${cat.toUpperCase()} - ${varianteLabel}) en oferta por ${precioMostrar}`;
       waBtn.href = `https://wa.me/59896572226?text=${encodeURIComponent(msg)}`;
       waBtn.innerText = '💬 Comprar por WhatsApp';
       waBtn.classList.add('btn-buy');
@@ -572,7 +521,7 @@ function actualizarPrecio(p, cardId, prefijo) {
     return;
   }
 
-  // MODO NORMAL: SOLO OFERTA
+  // MODO SOLO OFERTA
   if (oferta && !tieneNormal) {
     const precioMostrar = moneda === 'USD'
       ? formatUSD(calcPrecioUSD(oferta.precio, cotizaciones.usdAUYU))
@@ -594,8 +543,8 @@ function actualizarPrecio(p, cardId, prefijo) {
       actualizarCountdown(countdown);
     }
     if (waBtn) {
-      const tipoLabel = variante.label || 'Estándar';
-      const msg = `Hola GamesUy Store! Quiero comprar *${p.title}* (${cat.toUpperCase()} ${tipoLabel}) en oferta por ${precioMostrar}`;
+      const varianteLabel = variante.label || '';
+      const msg = `Hola GamesUy Store! Quiero comprar *${p.title}* (${cat.toUpperCase()} - ${varianteLabel}) en oferta por ${precioMostrar}`;
       waBtn.href = `https://wa.me/59896572226?text=${encodeURIComponent(msg)}`;
       waBtn.innerText = '💬 Comprar por WhatsApp';
       waBtn.classList.add('btn-buy');
@@ -604,7 +553,7 @@ function actualizarPrecio(p, cardId, prefijo) {
     return;
   }
 
-  // MODO NORMAL: SOLO PRECIO NORMAL
+  // MODO SOLO PRECIO NORMAL
   if (tieneNormal) {
     const precioMostrar = moneda === 'USD'
       ? formatUSD(calcPrecioUSD(variante.precioFinalUYU, cotizaciones.usdAUYU))
@@ -621,8 +570,8 @@ function actualizarPrecio(p, cardId, prefijo) {
     if (stockWrap) stockWrap.innerHTML = `<span class="stock-badge stock-ok">✓ Disponible</span>`;
     if (countdown) { countdown.textContent = ''; countdown.style.display = 'none'; }
     if (waBtn) {
-      const tipoLabel = variante.label || 'Estándar';
-      const msg = `Hola GamesUy Store! Quiero comprar *${p.title}* (${cat.toUpperCase()} ${tipoLabel}) por ${precioMostrar}`;
+      const varianteLabel = variante.label || '';
+      const msg = `Hola GamesUy Store! Quiero comprar *${p.title}* (${cat.toUpperCase()} - ${varianteLabel}) por ${precioMostrar}`;
       waBtn.href = `https://wa.me/59896572226?text=${encodeURIComponent(msg)}`;
       waBtn.innerText = '💬 Comprar por WhatsApp';
       waBtn.classList.add('btn-buy');
@@ -765,4 +714,4 @@ document.getElementById('trailer-modal')?.addEventListener('click', (e) => {
   if (e.target.id === 'trailer-modal') document.getElementById('trailer-modal')?.classList.add('hidden');
 });
 
-console.log('[GamesUy] store.js v7 cargado (soporte estandar)');
+console.log('[GamesUy] store.js v8 cargado (selector por variante)');

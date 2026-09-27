@@ -36,6 +36,7 @@
         <button class="nav-btn nav-btn-new" data-page="preventas">🚀 Preventas</button>
         <button class="nav-btn" data-page="faq">Preguntas</button>
         <button class="nav-btn" data-page="terminos">Términos</button>
+        <button class="nav-btn" data-page="resenas">⭐ Reseñas</button>
         <button class="nav-btn" data-page="contacto">Contacto</button>
         <button class="nav-btn nav-btn-admin" data-page="admin">[ Admin ]</button>
       </nav>
@@ -114,6 +115,19 @@
       <div id="terminos-text" class="terms-text"><p class="empty-message">Cargando...</p></div>
     </section>
 
+    <!-- NUEVO: Sección pública de reseñas -->
+    <section id="page-resenas" class="page-section">
+      <div class="grid-header">
+        <h2 class="section-title">⭐ Reseñas de clientes</h2>
+        <span class="results-count" id="resenas-count">Cargando...</span>
+      </div>
+      <p class="section-subtitle">Experiencias reales de personas que compraron en GamesUy Store.</p>
+      <button class="btn btn-primary" onclick="abrirModalResena()" style="max-width:320px;margin-bottom:24px;">✍️ Dejar mi reseña</button>
+      <div id="resenas-list" class="resenas-list">
+        <p class="empty-message">Cargando reseñas...</p>
+      </div>
+    </section>
+
     <section id="page-contacto" class="page-section">
       <h2 class="section-title">Contacto</h2>
       <form action="https://formsubmit.co/17ca1995d3890685f2876de110de75a6" method="POST" class="contact-form">
@@ -156,6 +170,7 @@
           <button class="admin-tab" data-tab="crear">➕ Crear juego</button>
           <button class="admin-tab" data-tab="masivo">⚡ Carga masiva</button>
           <button class="admin-tab" data-tab="contenido">📄 Contenido</button>
+          <button class="admin-tab" data-tab="resenas">⭐ Reseñas</button>
           <button class="admin-tab" data-tab="excel">📥 Importar Excel</button>
           <button class="admin-tab" data-tab="config">⚙️ Configuración</button>
           <button class="admin-tab" data-tab="mantenimiento">🧹 Mantenimiento</button>
@@ -353,6 +368,34 @@
 
               <div class="admin-actions">
                 <button id="btn-save-terms" class="btn btn-primary">💾 Guardar Términos</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- NUEVO: Tab de reseñas en el admin -->
+        <div class="admin-tab-content" data-tab-content="resenas">
+          <div class="admin-grid">
+            <div class="admin-card admin-card-wide">
+              <h3>⏳ Reseñas pendientes de aprobación</h3>
+              <p class="admin-help">Revisá cada reseña antes de publicarla. Las pendientes NO aparecen en la web.</p>
+
+              <div class="admin-resenas-stats">
+                <span class="stat-badge stat-pending">⏳ Pendientes: <strong id="admin-resenas-stat-pend">0</strong></span>
+                <span class="stat-badge stat-done">✅ Aprobadas: <strong id="admin-resenas-stat-apro">0</strong></span>
+              </div>
+
+              <div id="admin-resenas-pendientes" class="admin-resenas-list">
+                <p style="color:var(--text-muted);text-align:center;padding:20px;">Cargando...</p>
+              </div>
+            </div>
+
+            <div class="admin-card admin-card-wide">
+              <h3>✅ Reseñas aprobadas (visibles en la web)</h3>
+              <p class="admin-help">Podés destacar (van primero), ocultar o eliminar reseñas.</p>
+
+              <div id="admin-resenas-aprobadas" class="admin-resenas-list">
+                <p style="color:var(--text-muted);text-align:center;padding:20px;">Cargando...</p>
               </div>
             </div>
           </div>
@@ -572,6 +615,47 @@
     </div>
   </div>
 
+  <!-- NUEVO: Modal para dejar reseña -->
+  <div id="resena-modal" class="admin-modal hidden">
+    <div class="modal-content modal-content-large">
+      <button class="modal-close" onclick="cerrarModalResena()" aria-label="Cerrar">✕</button>
+      <h3 class="modal-title">✍️ Dejá tu reseña</h3>
+      <p class="modal-subtitle">Contanos tu experiencia comprando en GamesUy Store</p>
+      <form id="resena-form" class="contact-form">
+
+        <label>Tu nombre o usuario *</label>
+        <input type="text" id="resena-nombre" placeholder="Ej: JuanP92" required maxlength="40">
+
+        <label>Juego o suscripción que compraste</label>
+        <input type="text" id="resena-juego" placeholder="Ej: EA FC 25 / PS Plus Extra" maxlength="80">
+
+        <label>Puntuación *</label>
+        <select id="resena-estrellas" class="card-select">
+          <option value="5">⭐⭐⭐⭐⭐ Excelente</option>
+          <option value="4">⭐⭐⭐⭐ Muy bueno</option>
+          <option value="3">⭐⭐⭐ Bueno</option>
+          <option value="2">⭐⭐ Regular</option>
+          <option value="1">⭐ Malo</option>
+        </select>
+
+        <label>Tu reseña * (mínimo 20 caracteres)</label>
+        <textarea id="resena-texto" rows="4" placeholder="Contanos cómo fue tu experiencia..." required></textarea>
+
+        <label>Captura de pantalla (opcional, máx 300 KB)</label>
+        <input type="file" id="resena-captura-file" accept="image/*" class="admin-file">
+        <div id="resena-captura-preview-wrap" class="upload-preview hidden">
+          <img id="resena-captura-preview" alt="Captura" class="upload-preview-img">
+          <button type="button" id="resena-captura-clear" class="upload-preview-clear">✕ Quitar</button>
+        </div>
+        <div id="resena-captura-status" class="upload-status"></div>
+
+        <button type="submit" id="resena-submit" class="btn btn-primary">📩 Enviar reseña</button>
+        <p id="resena-error" class="login-error hidden"></p>
+        <p id="resena-exito" class="admin-toast success hidden" style="margin-top:12px;"></p>
+      </form>
+    </div>
+  </div>
+
   <script>
     window.switchPage = function(pageId) {
       document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active-page'));
@@ -624,6 +708,7 @@
   <script type="module" src="js/precios-masivo.js?v=34"></script>
   <script type="module" src="js/manual-create.js?v=34"></script>
   <script type="module" src="js/contenido.js?v=34"></script>
+  <script type="module" src="js/resenas.js?v=34"></script>
   <script type="module" src="js/store.js?v=34"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 // ============================================================
 // GAMESUY STORE — Catálogo público + Ofertas + Preventas
-// Fase 6.1: Preventas separadas + auto-activación al estreno
+// Fase 8.1: Soporte para variantes "estandar" (PS Plus, Steam, etc.)
 // ============================================================
 
 import { db } from './firebase-config.js';
@@ -108,6 +108,45 @@ function formatearFecha(dateStr) {
   if (!dateStr) return '';
   const parts = String(dateStr).split('-');
   return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : dateStr;
+}
+
+// ============================================================
+// LÓGICA DE VARIANTES
+// ============================================================
+
+/**
+ * Devuelve los "tipos de cuenta" disponibles en una categoría.
+ * Para PS4/PS5 → ['primaria','secundaria']
+ * Para Steam/PSPlus/Streaming/Otros → ['estandar']
+ * Excluye tipos que no tienen variantes con costo ni precio.
+ */
+function getTiposDisponibles(p, categoria, modoOferta) {
+  const variantesCat = (p.variants || []).filter(v => v.categoria === categoria);
+  const tipos = [];
+  const esOferta = modoOferta === true;
+
+  // ¿Hay variantes primaria/secundaria con datos?
+  const tienePrim = variantesCat.some(v => v.tipo === 'primaria' && (
+    esOferta ? ofertaVigente(v) !== null : (tieneCostoNormal(v) || tienePrecioNormal(v))
+  ));
+  const tieneSec = variantesCat.some(v => v.tipo === 'secundaria' && (
+    esOferta ? ofertaVigente(v) !== null : (tieneCostoNormal(v) || tienePrecioNormal(v))
+  ));
+  const tieneEst = variantesCat.some(v => v.tipo === 'estandar' && (
+    esOferta ? ofertaVigente(v) !== null : (tieneCostoNormal(v) || tienePrecioNormal(v))
+  ));
+
+  if (tienePrim) tipos.push('primaria');
+  if (tieneSec) tipos.push('secundaria');
+  if (tieneEst) tipos.push('estandar');
+
+  // Si no hay ningún tipo específico, tomar TODOS los tipos disponibles
+  if (tipos.length === 0) {
+    const tiposUnicos = new Set(variantesCat.map(v => v.tipo).filter(Boolean));
+    return Array.from(tiposUnicos);
+  }
+
+  return tipos;
 }
 
 // ============================================================
@@ -321,6 +360,8 @@ function renderCard(p, prefijo = 'cat') {
     : '';
 
   const esModoOferta = prefijo === 'oferta';
+
+  // Detectar consolas/categorías disponibles con datos
   const consolasDisponibles = cats.filter(c => {
     return (p.variants || []).some(v => {
       if (v.categoria !== c) return false;
@@ -330,14 +371,28 @@ function renderCard(p, prefijo = 'cat') {
   });
 
   const tieneSelectores = consolasDisponibles.length > 0;
+
+  // Detectar si necesitamos mostrar el selector de tipo de cuenta
+  // (solo si algún tipo es primaria o secundaria)
+  const necesitaSelectorCuenta = consolasDisponibles.some(c => {
+    const tipos = getTiposDisponibles(p, c, esModoOferta);
+    return tipos.length > 1 || tipos.includes('primaria') || tipos.includes('secundaria');
+  });
+
   let selectoresHtml = '';
   if (tieneSelectores) {
+    const selectConsolaHtml = consolasDisponibles.length > 1
+      ? `<select id="sel-console-${prefijo}-${cardId}" class="card-select">${consolasDisponibles.map(c => `<option value="${c}">${c.toUpperCase()}</option>`).join('')}</select>`
+      : `<input type="hidden" id="sel-console-${prefijo}-${cardId}" value="${consolasDisponibles[0]}">`;
+
+    const selectCuentaHtml = necesitaSelectorCuenta
+      ? `<select id="sel-account-${prefijo}-${cardId}" class="card-select"></select>`
+      : `<input type="hidden" id="sel-account-${prefijo}-${cardId}" value="">`;
+
     selectoresHtml = `
-      <div class="card-variant-selectors">
-        ${consolasDisponibles.length > 1
-          ? `<select id="sel-console-${prefijo}-${cardId}" class="card-select">${consolasDisponibles.map(c => `<option value="${c}">${c.toUpperCase()}</option>`).join('')}</select>`
-          : `<input type="hidden" id="sel-console-${prefijo}-${cardId}" value="${consolasDisponibles[0]}">`}
-        <select id="sel-account-${prefijo}-${cardId}" class="card-select"></select>
+      <div class="card-variant-selectors ${!necesitaSelectorCuenta && consolasDisponibles.length === 1 ? 'card-variant-selectors-single' : ''}">
+        ${selectConsolaHtml}
+        ${selectCuentaHtml}
         <select id="sel-currency-${prefijo}-${cardId}" class="card-select">
           <option value="UYU">$ UYU</option>
           <option value="USD">US$ USD</option>
@@ -374,23 +429,29 @@ function actualizarSelectoresCuenta(p, cardId, prefijo) {
   const selAccount = document.getElementById(`sel-account-${prefijo}-${cardId}`);
   if (!selConsole || !selAccount) return;
 
+  // Si es un <input type="hidden">, no hay nada que hacer
+  if (selAccount.tagName === 'INPUT') return;
+
   const catActual = selConsole.value;
   const esModoOferta = prefijo === 'oferta';
-  const variantesCat = (p.variants || []).filter(v => {
-    if (v.categoria !== catActual) return false;
-    if (esModoOferta) return ofertaVigente(v) !== null;
-    return true;
-  });
+  const tipos = getTiposDisponibles(p, catActual, esModoOferta);
 
-  const tipos = [];
-  if (variantesCat.some(v => v.tipo === 'primaria')) tipos.push('primaria');
-  if (variantesCat.some(v => v.tipo === 'secundaria')) tipos.push('secundaria');
+  // Etiquetas legibles
+  const labelMap = {
+    'primaria': 'Primaria',
+    'secundaria': 'Secundaria',
+    'estandar': 'Estándar'
+  };
 
   const valorActual = selAccount.value;
   selAccount.innerHTML = tipos.map(t =>
-    `<option value="${t}" ${t === valorActual ? 'selected' : ''}>${t === 'primaria' ? 'Primaria' : 'Secundaria'}</option>`
+    `<option value="${t}" ${t === valorActual ? 'selected' : ''}>${labelMap[t] || t}</option>`
   ).join('');
-  if (tipos.length === 0) selAccount.innerHTML = '<option value="">—</option>';
+
+  // Si no hay tipos, dejar vacío
+  if (tipos.length === 0) {
+    selAccount.innerHTML = '<option value="">—</option>';
+  }
 }
 
 // ============================================================
@@ -410,8 +471,15 @@ function actualizarPrecio(p, cardId, prefijo) {
   if (!selConsole || !selAccount || !selCurrency) return;
 
   const cat = selConsole.value;
-  const acc = selAccount.value;
+  let acc = selAccount.value;
   const moneda = selCurrency.value;
+
+  // Si no hay tipo seleccionado (hidden input o único), detectar el tipo automático
+  if (!acc) {
+    const tipos = getTiposDisponibles(p, cat, prefijo === 'oferta');
+    acc = tipos[0] || 'estandar';
+  }
+
   const variante = (p.variants || []).find(v => v.categoria === cat && v.tipo === acc);
 
   if (!variante) {
@@ -422,7 +490,7 @@ function actualizarPrecio(p, cardId, prefijo) {
     if (waBtn) {
       waBtn.href = `https://wa.me/59896572226?text=${encodeURIComponent(`Hola GamesUy Store! Quiero reservar *${p.title}* cuando vuelva a estar disponible.`)}`;
       waBtn.innerText = '🔔 Reservar por WhatsApp';
-      waBtn.classList.remove('btn-buy');
+      waBtn.classList.remove('btn-buy', 'btn-preorder');
       waBtn.classList.add('btn-secondary');
     }
     return;
@@ -457,7 +525,7 @@ function actualizarPrecio(p, cardId, prefijo) {
     if (offerWrap) offerWrap.innerHTML = '';
     if (countdown) { countdown.textContent = ''; countdown.style.display = 'none'; }
     if (waBtn) {
-      const tipoLabel = acc === 'secundaria' ? 'Secundaria' : 'Primaria';
+      const tipoLabel = variante.label || 'Estándar';
       const catLabel = cat.toUpperCase();
       const fecha = p.releaseDate ? ` (estreno: ${formatearFecha(p.releaseDate)})` : '';
       const msg = `Hola GamesUy Store! Quiero RESERVAR *${p.title}* (${catLabel} ${tipoLabel})${fecha}`;
@@ -494,7 +562,7 @@ function actualizarPrecio(p, cardId, prefijo) {
       actualizarCountdown(countdown);
     }
     if (waBtn) {
-      const tipoLabel = acc === 'secundaria' ? 'Secundaria' : 'Primaria';
+      const tipoLabel = variante.label || 'Estándar';
       const msg = `Hola GamesUy Store! Quiero comprar *${p.title}* (${cat.toUpperCase()} ${tipoLabel}) en oferta por ${precioMostrar}`;
       waBtn.href = `https://wa.me/59896572226?text=${encodeURIComponent(msg)}`;
       waBtn.innerText = '💬 Comprar por WhatsApp';
@@ -504,7 +572,7 @@ function actualizarPrecio(p, cardId, prefijo) {
     return;
   }
 
-  // MODO NORMAL: SOLO OFERTA (sin precio normal)
+  // MODO NORMAL: SOLO OFERTA
   if (oferta && !tieneNormal) {
     const precioMostrar = moneda === 'USD'
       ? formatUSD(calcPrecioUSD(oferta.precio, cotizaciones.usdAUYU))
@@ -526,7 +594,7 @@ function actualizarPrecio(p, cardId, prefijo) {
       actualizarCountdown(countdown);
     }
     if (waBtn) {
-      const tipoLabel = acc === 'secundaria' ? 'Secundaria' : 'Primaria';
+      const tipoLabel = variante.label || 'Estándar';
       const msg = `Hola GamesUy Store! Quiero comprar *${p.title}* (${cat.toUpperCase()} ${tipoLabel}) en oferta por ${precioMostrar}`;
       waBtn.href = `https://wa.me/59896572226?text=${encodeURIComponent(msg)}`;
       waBtn.innerText = '💬 Comprar por WhatsApp';
@@ -553,7 +621,7 @@ function actualizarPrecio(p, cardId, prefijo) {
     if (stockWrap) stockWrap.innerHTML = `<span class="stock-badge stock-ok">✓ Disponible</span>`;
     if (countdown) { countdown.textContent = ''; countdown.style.display = 'none'; }
     if (waBtn) {
-      const tipoLabel = acc === 'secundaria' ? 'Secundaria' : 'Primaria';
+      const tipoLabel = variante.label || 'Estándar';
       const msg = `Hola GamesUy Store! Quiero comprar *${p.title}* (${cat.toUpperCase()} ${tipoLabel}) por ${precioMostrar}`;
       waBtn.href = `https://wa.me/59896572226?text=${encodeURIComponent(msg)}`;
       waBtn.innerText = '💬 Comprar por WhatsApp';
@@ -697,4 +765,4 @@ document.getElementById('trailer-modal')?.addEventListener('click', (e) => {
   if (e.target.id === 'trailer-modal') document.getElementById('trailer-modal')?.classList.add('hidden');
 });
 
-console.log('[GamesUy] store.js v6.1 cargado (preventas auto)');
+console.log('[GamesUy] store.js v7 cargado (soporte estandar)');

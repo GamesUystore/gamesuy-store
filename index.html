@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=29">
+  <link rel="stylesheet" href="styles.css?v=30">
 </head>
 <body>
 
@@ -149,6 +149,7 @@
 
         <div class="admin-tabs">
           <button class="admin-tab active" data-tab="precios">💰 Precios</button>
+          <button class="admin-tab" data-tab="crear">➕ Crear juego</button>
           <button class="admin-tab" data-tab="masivo">⚡ Carga masiva</button>
           <button class="admin-tab" data-tab="excel">📥 Importar Excel</button>
           <button class="admin-tab" data-tab="config">⚙️ Configuración</button>
@@ -202,11 +203,74 @@
           </div>
         </div>
 
+        <!-- ═══════════════════════════════════════════════════ -->
+        <!-- NUEVA PESTAÑA: CREAR JUEGO MANUAL                  -->
+        <!-- ═══════════════════════════════════════════════════ -->
+        <div class="admin-tab-content" data-tab-content="crear">
+          <div class="admin-grid">
+            <div class="admin-card admin-card-wide">
+              <h3>➕ Crear juego / producto manual</h3>
+              <p class="admin-help">Cargá juegos manualmente para categorías que no vienen del Excel (PS3, Steam, PS Plus, Streaming, Otros). También podés crear juegos de PS4/PS5 manualmente.</p>
+
+              <label class="admin-label">Categoría del producto *</label>
+              <select id="crear-categoria" class="crear-select">
+                <option value="">— Elegí una categoría —</option>
+                <option value="ps4">🎮 PS4</option>
+                <option value="ps5">🎮 PS5</option>
+                <option value="ps4_ps5">🎮 PS4 y PS5</option>
+                <option value="ps3">🎮 PS3</option>
+                <option value="steam">💻 Steam</option>
+                <option value="psplus">💠 PS Plus (Essential / Extra / Deluxe)</option>
+                <option value="streaming">📺 Streaming (Netflix, HBO, etc.)</option>
+                <option value="otros">📦 Otros</option>
+              </select>
+
+              <label class="admin-label">Título del producto *</label>
+              <input type="text" id="crear-titulo" placeholder="Ej: Netflix Premium 1 mes / PS Plus Extra">
+
+              <label class="admin-label">🖼️ Portada (opcional, máx 300 KB)</label>
+              <div class="upload-group">
+                <input type="file" id="crear-cover-file" accept="image/*" class="admin-file">
+                <span class="upload-or">o</span>
+                <input type="text" id="crear-cover-url" placeholder="Pegar URL..." class="upload-url">
+              </div>
+              <div id="crear-cover-preview-wrap" class="upload-preview hidden">
+                <img id="crear-cover-preview" alt="Portada" class="upload-preview-img">
+                <button type="button" class="upload-preview-clear" data-clear="crear">✕ Quitar</button>
+              </div>
+              <div id="crear-cover-status" class="upload-status"></div>
+
+              <label class="admin-label">🎬 Trailer de YouTube (opcional)</label>
+              <input type="text" id="crear-youtube" placeholder="https://youtube.com/watch?v=...">
+
+              <label class="admin-label">📝 Descripción (opcional)</label>
+              <textarea id="crear-descripcion" rows="3" placeholder="Descripción del producto"></textarea>
+
+              <label class="check-label" style="margin-top:12px;">
+                <input type="checkbox" id="crear-visible" checked> Mostrar en la tienda pública
+              </label>
+
+              <h4 class="crear-variantes-titulo">💠 Variantes de este producto</h4>
+              <p class="admin-hint" style="margin-bottom:12px;">Cada variante es una opción que el cliente puede elegir. Por ejemplo: "PS3 Primaria", "PS3 Secundaria" o "Netflix Estándar".</p>
+
+              <div id="crear-variantes-list" class="crear-variantes-list">
+                <p class="crear-empty-msg">Elegí una categoría para ver las variantes disponibles.</p>
+              </div>
+
+              <div class="admin-actions">
+                <button type="button" id="btn-add-variante" class="btn btn-secondary" disabled>➕ Agregar variante</button>
+                <button type="button" id="btn-crear-juego" class="btn btn-primary" disabled>💾 Crear producto</button>
+                <button type="button" id="btn-reset-crear" class="btn btn-secondary">🔄 Limpiar formulario</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="admin-tab-content" data-tab-content="masivo">
           <div class="admin-grid">
             <div class="admin-card admin-card-wide">
               <h3>⚡ Carga masiva de precios</h3>
-              <p class="admin-help">Editá varios juegos a la vez. Cada juego tiene un badge de color con su tipo: <b>🟢 Stock normal</b>, <b>🔥 Oferta activa</b>, <b>🚀 Preventa</b>, <b>🎁 Solo oferta</b> o <b>⚫ Sin stock</b>.</p>
+              <p class="admin-help">Editá varios juegos a la vez. Cada juego tiene un badge de color con su tipo.</p>
 
               <div class="masivo-toolbar">
                 <input type="text" id="masivo-search" placeholder="🔍 Buscar juego..." autocomplete="off">
@@ -260,7 +324,7 @@
           <div class="admin-grid">
             <div class="admin-card admin-card-wide">
               <h3>📥 1. Importar STOCK (mensual)</h3>
-              <p class="admin-help">Este Excel trae todos los juegos con sus costos. Los juegos SIN STOCK se crean igual, pero quedan marcados.</p>
+              <p class="admin-help">Este Excel trae todos los juegos con sus costos.</p>
               <input type="file" id="excel-stock" accept=".xlsx,.xls" class="admin-file">
               <div id="stock-log" class="import-log"><em>Esperando archivo...</em></div>
               <div class="admin-actions">
@@ -270,7 +334,7 @@
 
             <div class="admin-card admin-card-wide">
               <h3>🔥 2. Importar OFERTAS (cada 15 días)</h3>
-              <p class="admin-help">El Excel trae ofertas vigentes (solo Primaria). Se crean las 4 variantes automáticamente.</p>
+              <p class="admin-help">El Excel trae ofertas vigentes (solo Primaria).</p>
               <div class="oferta-fecha-row">
                 <label class="admin-label">📅 Válidas hasta:</label>
                 <input type="date" id="oferta-fecha-hasta">
@@ -286,7 +350,7 @@
 
             <div class="admin-card admin-card-wide">
               <h3>🚀 3. Importar PREVENTAS</h3>
-              <p class="admin-help">Este Excel trae los juegos próximos a salir (PS5, solo Primaria).</p>
+              <p class="admin-help">Este Excel trae los juegos próximos a salir (PS5).</p>
               <input type="file" id="excel-preventas" accept=".xlsx,.xls" class="admin-file">
               <div id="preventas-log" class="import-log"><em>Esperando archivo...</em></div>
               <div class="admin-actions">
@@ -526,13 +590,14 @@
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-  <script type="module" src="js/settings.js?v=29"></script>
-  <script type="module" src="js/auth.js?v=29"></script>
-  <script type="module" src="js/admin.js?v=29"></script>
-  <script type="module" src="js/excel-importer.js?v=29"></script>
-  <script type="module" src="js/maintenance.js?v=29"></script>
-  <script type="module" src="js/precios.js?v=29"></script>
-  <script type="module" src="js/precios-masivo.js?v=29"></script>
-  <script type="module" src="js/store.js?v=29"></script>
+  <script type="module" src="js/settings.js?v=30"></script>
+  <script type="module" src="js/auth.js?v=30"></script>
+  <script type="module" src="js/admin.js?v=30"></script>
+  <script type="module" src="js/excel-importer.js?v=30"></script>
+  <script type="module" src="js/maintenance.js?v=30"></script>
+  <script type="module" src="js/precios.js?v=30"></script>
+  <script type="module" src="js/precios-masivo.js?v=30"></script>
+  <script type="module" src="js/manual-create.js?v=30"></script>
+  <script type="module" src="js/store.js?v=30"></script>
 </body>
 </html>

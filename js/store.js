@@ -1,6 +1,6 @@
 // ============================================================
 // GAMESUY STORE — Catálogo público + Ofertas + Preventas
-// Fase 8.2: Selector de variante por label (soporta PS Plus multi-variante)
+// Fase 8.3: Ocultar variantes/consolas agotadas del selector
 // ============================================================
 
 import { db } from './firebase-config.js';
@@ -58,6 +58,18 @@ function ofertaVigente(v) {
   };
 }
 
+/**
+ * ¿La variante está disponible para comprar?
+ * - Disponible en stock + con precio cargado → SÍ
+ * - O con oferta vigente → SÍ
+ * - Con disponible: false → NO
+ */
+function varianteConStock(v) {
+  if (v.disponible === false) return false;
+  if (ofertaVigente(v) !== null) return true;
+  return tieneCostoNormal(v) && tienePrecioNormal(v);
+}
+
 function esPreventaActiva(p) {
   if (p.visible === false) return false;
   if (p.isPreorder !== true) return false;
@@ -66,18 +78,13 @@ function esPreventaActiva(p) {
   return p.releaseDate > hoy;
 }
 
-function varianteVendible(v) {
-  if (v.disponible === false) return false;
-  return ofertaVigente(v) !== null || (tieneCostoNormal(v) && tienePrecioNormal(v));
-}
-
 function productoVisible(p) {
   if (p.visible === false) return false;
   if (esPreventaActiva(p)) return false;
   if (p.soloOferta && !p.soloPreventa) {
     return (p.variants || []).some(v => ofertaVigente(v));
   }
-  return (p.variants || []).some(varianteVendible);
+  return (p.variants || []).some(varianteConStock);
 }
 
 function productoTieneOferta(p) {
@@ -107,29 +114,60 @@ function formatearFecha(dateStr) {
 }
 
 // ============================================================
-// CATEGORÍAS DISPONIBLES POR PRODUCTO
-// Devuelve las categorías que tienen al menos una variante con datos
+// CATEGORÍAS DISPONIBLES
+// Solo devuelve categorías donde AL MENOS una variante tiene stock.
+// Si NINGUNA categoría tiene stock, devuelve todas (para reserva).
 // ============================================================
 function consolasDisponiblesDe(p, modoOferta) {
   const cats = p.categories || [];
   const esOferta = modoOferta === true;
-  return cats.filter(c => {
+
+  // Filtrar solo categorías con al menos una variante con stock
+  const conStock = cats.filter(c => {
     return (p.variants || []).some(v => {
       if (v.categoria !== c) return false;
       if (esOferta) return ofertaVigente(v) !== null;
-      return tieneCostoNormal(v) || tieneCostoOferta(v);
+      return varianteConStock(v);
+    });
+  });
+
+  // Si hay al menos una con stock, mostrar solo esas
+  if (conStock.length > 0) return conStock;
+
+  // Fallback: si NINGUNA tiene stock, devolver todas para que se vea AGOTADO
+  return cats.filter(c => {
+    return (p.variants || []).some(v => {
+      if (v.categoria !== c) return false;
+      return Number(v.costoARS) > 0 || v.disponible === false;
     });
   });
 }
 
-// Variantes de una categoría que tienen datos (para el selector)
-function variantesConDatos(p, categoria, modoOferta) {
+// ============================================================
+// VARIANTES DE UNA CATEGORÍA
+// Solo devuelve las variantes con stock.
+// Si NINGUNA tiene stock, devuelve todas las que existen.
+// ============================================================
+function variantesDeCategoria(p, categoria, modoOferta) {
   const esOferta = modoOferta === true;
-  return (p.variants || []).filter(v => {
+
+  const todas = (p.variants || []).filter(v => {
     if (v.categoria !== categoria) return false;
-    if (esOferta) return ofertaVigente(v) !== null;
-    return tieneCostoNormal(v) || tieneCostoOferta(v);
+    // Evitar mostrar variantes vacías (sin costo y sin oferta)
+    return Number(v.costoARS) > 0 || Number(v.ofertaCostoARS) > 0 || v.disponible === false;
   });
+
+  // Filtrar las que tienen stock
+  const conStock = todas.filter(v => {
+    if (esOferta) return ofertaVigente(v) !== null;
+    return varianteConStock(v);
+  });
+
+  // Si hay al menos una con stock, mostrar solo esas
+  if (conStock.length > 0) return conStock;
+
+  // Fallback: mostrar todas las que existen (todas sin stock)
+  return todas;
 }
 
 // ============================================================
@@ -385,7 +423,7 @@ function renderCard(p, prefijo = 'cat') {
 }
 
 // ============================================================
-// SELECTOR DE VARIANTE (ahora muestra labels reales)
+// SELECTOR DE VARIANTE
 // ============================================================
 function actualizarSelectorVariante(p, cardId, prefijo) {
   const selConsole = document.getElementById(`sel-console-${prefijo}-${cardId}`);
@@ -394,7 +432,7 @@ function actualizarSelectorVariante(p, cardId, prefijo) {
 
   const catActual = selConsole.value;
   const esModoOferta = prefijo === 'oferta';
-  const variantes = variantesConDatos(p, catActual, esModoOferta);
+  const variantes = variantesDeCategoria(p, catActual, esModoOferta);
 
   const valorActual = selVariant.value;
 
@@ -428,7 +466,6 @@ function actualizarPrecio(p, cardId, prefijo) {
   const variantId = selVariant.value;
   const moneda = selCurrency.value;
 
-  // Buscar la variante por ID
   const variante = (p.variants || []).find(v => v.id === variantId);
 
   if (!variante) {
@@ -714,4 +751,4 @@ document.getElementById('trailer-modal')?.addEventListener('click', (e) => {
   if (e.target.id === 'trailer-modal') document.getElementById('trailer-modal')?.classList.add('hidden');
 });
 
-console.log('[GamesUy] store.js v8 cargado (selector por variante)');
+console.log('[GamesUy] store.js v9 cargado (ocultar agotados)');

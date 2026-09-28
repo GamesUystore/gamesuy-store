@@ -1,10 +1,11 @@
 // ============================================================
 // GAMESUY STORE — Catálogo público + Ofertas + Preventas
-// Fase 8.3: Ocultar variantes/consolas agotadas del selector
+// Fase 8.4: Botón editar para admin en las cards
 // ============================================================
 
-import { db } from './firebase-config.js';
+import { db, auth } from './firebase-config.js';
 import { collection, onSnapshot, doc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { calcPrecioUSD, formatUYU, formatUSD } from './data-model.js';
 
 const $ = (id) => document.getElementById(id);
@@ -12,6 +13,7 @@ const $ = (id) => document.getElementById(id);
 let productos = [];
 let cotizaciones = { arsAUYU: 0.055, usdAUYU: 39.50 };
 let pagosTexto = 'Prex / Mercado Pago / BROU';
+let isAdmin = false;
 
 let catState = { search: '', cat: 'all', pagina: 1 };
 let ofState = { search: '', cat: 'all', pagina: 1 };
@@ -19,6 +21,12 @@ let preState = { search: '', cat: 'all', pagina: 1 };
 const POR_PAGINA = 24;
 
 let countdownInterval = null;
+
+// Detectar si el usuario es admin
+onAuthStateChanged(auth, (user) => {
+  isAdmin = !!user;
+  renderAll();
+});
 
 onSnapshot(doc(db, 'settings', 'cotizaciones'), (snap) => {
   if (!snap.exists()) return;
@@ -58,12 +66,6 @@ function ofertaVigente(v) {
   };
 }
 
-/**
- * ¿La variante está disponible para comprar?
- * - Disponible en stock + con precio cargado → SÍ
- * - O con oferta vigente → SÍ
- * - Con disponible: false → NO
- */
 function varianteConStock(v) {
   if (v.disponible === false) return false;
   if (ofertaVigente(v) !== null) return true;
@@ -115,14 +117,11 @@ function formatearFecha(dateStr) {
 
 // ============================================================
 // CATEGORÍAS DISPONIBLES
-// Solo devuelve categorías donde AL MENOS una variante tiene stock.
-// Si NINGUNA categoría tiene stock, devuelve todas (para reserva).
 // ============================================================
 function consolasDisponiblesDe(p, modoOferta) {
   const cats = p.categories || [];
   const esOferta = modoOferta === true;
 
-  // Filtrar solo categorías con al menos una variante con stock
   const conStock = cats.filter(c => {
     return (p.variants || []).some(v => {
       if (v.categoria !== c) return false;
@@ -131,10 +130,8 @@ function consolasDisponiblesDe(p, modoOferta) {
     });
   });
 
-  // Si hay al menos una con stock, mostrar solo esas
   if (conStock.length > 0) return conStock;
 
-  // Fallback: si NINGUNA tiene stock, devolver todas para que se vea AGOTADO
   return cats.filter(c => {
     return (p.variants || []).some(v => {
       if (v.categoria !== c) return false;
@@ -143,30 +140,20 @@ function consolasDisponiblesDe(p, modoOferta) {
   });
 }
 
-// ============================================================
-// VARIANTES DE UNA CATEGORÍA
-// Solo devuelve las variantes con stock.
-// Si NINGUNA tiene stock, devuelve todas las que existen.
-// ============================================================
 function variantesDeCategoria(p, categoria, modoOferta) {
   const esOferta = modoOferta === true;
 
   const todas = (p.variants || []).filter(v => {
     if (v.categoria !== categoria) return false;
-    // Evitar mostrar variantes vacías (sin costo y sin oferta)
     return Number(v.costoARS) > 0 || Number(v.ofertaCostoARS) > 0 || v.disponible === false;
   });
 
-  // Filtrar las que tienen stock
   const conStock = todas.filter(v => {
     if (esOferta) return ofertaVigente(v) !== null;
     return varianteConStock(v);
   });
 
-  // Si hay al menos una con stock, mostrar solo esas
   if (conStock.length > 0) return conStock;
-
-  // Fallback: mostrar todas las que existen (todas sin stock)
   return todas;
 }
 
@@ -404,8 +391,14 @@ function renderCard(p, prefijo = 'cat') {
 
   const tieneTrailer = p.youtubeUrl || p.gameplayUrl;
 
+  // Botón editar visible SOLO si es admin
+  const editBtn = isAdmin
+    ? `<button class="card-admin-edit" title="Editar este juego" onclick="abrirEditarDesdeCatalogo('${cardId}')">✏️ Editar</button>`
+    : '';
+
   return `
     <article class="product-card" data-card-id="${cardId}">
+      ${editBtn}
       <div class="card-badges">${badges}</div>
       ${imagen}
       <h3 class="card-title">${escapeHtml(p.title || '(sin título)')}</h3>
@@ -421,6 +414,17 @@ function renderCard(p, prefijo = 'cat') {
     </article>
   `;
 }
+
+// ============================================================
+// ABRIR EDITAR DESDE EL CATÁLOGO
+// ============================================================
+window.abrirEditarDesdeCatalogo = function(id) {
+  if (typeof window.abrirEditarProducto === 'function') {
+    window.abrirEditarProducto(id);
+  } else {
+    alert('No se pudo abrir el editor. Recargá la página e intentá de nuevo.');
+  }
+};
 
 // ============================================================
 // SELECTOR DE VARIANTE
@@ -486,7 +490,6 @@ function actualizarPrecio(p, cardId, prefijo) {
   const tieneNormal = Number(variante.costoARS) > 0 && Number(variante.precioFinalUYU) > 0;
   const esPreventa = prefijo === 'preventa';
 
-  // MODO PREVENTA
   if (esPreventa) {
     if (tieneNormal) {
       const precioMostrar = moneda === 'USD'
@@ -523,7 +526,6 @@ function actualizarPrecio(p, cardId, prefijo) {
     return;
   }
 
-  // MODO OFERTA + PRECIO NORMAL
   if (oferta && tieneNormal) {
     const precioMostrar = moneda === 'USD'
       ? formatUSD(calcPrecioUSD(oferta.precio, cotizaciones.usdAUYU))
@@ -558,7 +560,6 @@ function actualizarPrecio(p, cardId, prefijo) {
     return;
   }
 
-  // MODO SOLO OFERTA
   if (oferta && !tieneNormal) {
     const precioMostrar = moneda === 'USD'
       ? formatUSD(calcPrecioUSD(oferta.precio, cotizaciones.usdAUYU))
@@ -590,7 +591,6 @@ function actualizarPrecio(p, cardId, prefijo) {
     return;
   }
 
-  // MODO SOLO PRECIO NORMAL
   if (tieneNormal) {
     const precioMostrar = moneda === 'USD'
       ? formatUSD(calcPrecioUSD(variante.precioFinalUYU, cotizaciones.usdAUYU))
@@ -617,7 +617,6 @@ function actualizarPrecio(p, cardId, prefijo) {
     return;
   }
 
-  // FALLBACK: AGOTADO
   priceWrap.innerHTML = `<div class="card-price card-price-empty">AGOTADO</div>`;
   if (stockWrap) stockWrap.innerHTML = `<span class="stock-badge stock-out">Sin stock</span>`;
   if (offerWrap) offerWrap.innerHTML = '';
@@ -751,4 +750,4 @@ document.getElementById('trailer-modal')?.addEventListener('click', (e) => {
   if (e.target.id === 'trailer-modal') document.getElementById('trailer-modal')?.classList.add('hidden');
 });
 
-console.log('[GamesUy] store.js v9 cargado (ocultar agotados)');
+console.log('[GamesUy] store.js v11 cargado (con botón editar admin)');

@@ -2067,7 +2067,6 @@ body::after {
   box-shadow: 0 8px 24px rgba(0, 145, 255, 0.5);
 }
 
-/* Preorder badge más visible */
 .card-preorder-badge {
   display: inline-block;
   background: linear-gradient(90deg, #0091ff, #00b4d8);
@@ -2084,7 +2083,6 @@ body::after {
   text-align: center;
 }
 
-/* Título preventas */
 #page-preventas .section-title {
   color: #00b4d8;
   text-shadow: 0 0 20px rgba(0, 180, 216, 0.4);
@@ -2403,7 +2401,6 @@ body::after {
    FASE 7.1 — Badges de estado en la carga masiva
    ============================================================ */
 
-/* Leyenda arriba de la lista */
 .masivo-leyenda {
   display: flex;
   flex-wrap: wrap;
@@ -2423,7 +2420,6 @@ body::after {
   border: 1px solid var(--border);
 }
 
-/* Badge de estado del juego */
 .masivo-estado-badge {
   display: inline-block;
   font-size: 0.68rem;
@@ -2462,7 +2458,6 @@ body::after {
   box-shadow: 0 0 10px rgba(91, 102, 136, 0.4);
 }
 
-/* Borde de la tarjeta según tipo */
 .masivo-juego-stock {
   border-color: rgba(0, 255, 157, 0.3) !important;
 }
@@ -2483,7 +2478,6 @@ body::after {
   opacity: 0.85;
 }
 
-/* Etiqueta de oferta dentro de la variante */
 .masivo-var-oferta-badge {
   font-size: 0.85rem;
   margin-right: 3px;
@@ -2691,7 +2685,6 @@ body::after {
    FASE 9 — FAQs + Términos
    ============================================================ */
 
-/* FAQs público */
 .faq-list {
   display: flex;
   flex-direction: column;
@@ -2750,7 +2743,6 @@ body::after {
   white-space: pre-line;
 }
 
-/* Admin — Lista de FAQs */
 .admin-subtitle {
   margin-top: 24px;
   margin-bottom: 12px;
@@ -2812,21 +2804,19 @@ body::after {
   background: #b71c1c;
   transform: scale(1.03);
 }
+
 /* ============================================================
    FASE 10 — PULIDO MÓVIL
-   Ajustes específicos para pantallas chicas (<640px)
    ============================================================ */
 
 @media (max-width: 640px) {
 
-  /* ---------- HEADER ---------- */
   .header-inner { padding: 14px 12px 12px; gap: 12px; }
   .brand { gap: 10px; }
   .brand-logo, .brand-logo-fallback { width: 56px; height: 56px; }
   .brand-title { font-size: 1.3rem; letter-spacing: 2px; }
   .brand-tagline { font-size: 0.78rem; }
 
-  /* Nav superior: scroll horizontal en vez de wrap */
   .top-nav {
     flex-wrap: nowrap;
     overflow-x: auto;
@@ -2834,7 +2824,6 @@ body::after {
     padding-bottom: 4px;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
-    /* Fade a la derecha para indicar que se puede scrollear */
     mask-image: linear-gradient(90deg, #000 92%, transparent 100%);
     -webkit-mask-image: linear-gradient(90deg, #000 92%, transparent 100%);
   }
@@ -2846,7 +2835,6 @@ body::after {
     white-space: nowrap;
   }
 
-  /* Categorías: mismo tratamiento */
   .categories-nav {
     flex-wrap: nowrap;
     overflow-x: auto;
@@ -2867,31 +2855,26 @@ body::after {
 
   .search-input { font-size: 0.95rem; padding: 12px 16px 12px 42px; }
 
-  /* ---------- LAYOUT ---------- */
   .container { padding: 18px 12px 100px; }
   .section-title { font-size: 1.2rem; padding-bottom: 8px; }
   .grid-header { gap: 6px; margin-bottom: 14px; }
   .section-subtitle { font-size: 0.88rem; margin-bottom: 16px; }
 
-  /* Banner de anuncio */
   .announcement-banner { padding: 20px 16px; }
   .announcement-title { font-size: 1.1rem; }
   .announcement-text { font-size: 0.92rem; }
 
-  /* ---------- GRID DE PRODUCTOS ---------- */
   .product-grid {
     grid-template-columns: 1fr;
     gap: 14px;
   }
 
-  /* ---------- CARDS ---------- */
   .product-card { padding: 14px; }
   .card-title { font-size: 1.05rem; min-height: auto; }
   .card-price { font-size: 1.25rem; }
   .card-payments { font-size: 0.75rem; padding: 6px; }
   .card-badges { top: 10px; right: 10px; }
 
-  /* Selectores en 1 columna para que se lean bien */
   .card-variant-selectors {
     grid-template-columns: 1fr;
     gap: 8px;
@@ -2902,7 +2885,6 @@ body::after {
     width: 100%;
   }
 
-  /* ---------- BOTÓN WHATSAPP FLOTANTE ---------- */
   .chat-float {
     width: 52px;
     height: 52px;
@@ -2911,7 +2893,6 @@ body::after {
     font-size: 1.4rem;
   }
 
-  /* ---------- MODALES ---------- */
   .admin-modal { padding: 12px; }
   .modal-content {
     padding: 24px 18px 20px;
@@ -2922,11 +2903,9 @@ body::after {
   .modal-title { font-size: 1rem; padding-right: 36px; }
   .modal-close { top: 10px; right: 10px; width: 30px; height: 30px; font-size: 0.9rem; }
 
-  /* Tabs del modal de precios */
   .modal-tabs { gap: 4px; }
   .modal-tab { padding: 10px 8px; font-size: 0.78rem; letter-spacing: 0.5px; }
 
-  /* Bloques de precio dentro del modal */
   .variante-bloque { padding: 14px; }
   .precio-seccion { padding: 12px; }
   .variante-header {
@@ -2938,14 +2917,12 @@ body::after {
   .precio-costo-inputs .variante-input-costo,
   .precio-costo-inputs .variante-input-costo-oferta { width: 100%; }
 
-  /* ---------- ADMIN ---------- */
   .admin-header { padding: 14px 16px; gap: 10px; }
   .admin-logout { width: 100% !important; }
   .admin-card { padding: 16px; }
   .admin-card h3 { font-size: 0.92rem; }
   .admin-actions .btn { min-width: 100%; }
 
-  /* Tabs del admin: scroll horizontal */
   .admin-tabs {
     flex-wrap: nowrap;
     overflow-x: auto;
@@ -2965,11 +2942,9 @@ body::after {
     white-space: nowrap;
   }
 
-  /* Stats y filtros de precios */
   .precios-stats { gap: 8px; }
   .stat-badge { padding: 6px 12px; font-size: 0.78rem; }
 
-  /* Fila juego */
   .fila-juego {
     grid-template-columns: auto 1fr auto;
     padding: 12px 14px;
@@ -2978,16 +2953,13 @@ body::after {
   .fila-titulo { font-size: 0.92rem; }
   .fila-progreso { font-size: 0.75rem; padding: 3px 8px; }
 
-  /* Import log */
   .import-log { font-size: 0.78rem; padding: 10px; max-height: 240px; }
 
-  /* Paginación */
   .precios-pagination { flex-direction: column; gap: 8px; }
   .precios-pagination .btn { width: 100%; }
   .catalog-pagination { gap: 10px; }
   .catalog-pagination .pag-btn { min-width: 120px; padding: 10px 14px !important; }
 
-  /* Carga masiva */
   .masivo-toolbar { grid-template-columns: 1fr; }
   .masivo-juego-variantes { padding: 10px 12px; }
   .masivo-var-precio,
@@ -2996,10 +2968,8 @@ body::after {
   .masivo-save-bar { flex-direction: column; align-items: stretch; }
   .masivo-save-bar .btn { width: 100%; min-width: 100%; }
 
-  /* Banner preventa admin */
   .preventa-banner-admin { font-size: 0.85rem; padding: 10px 14px; }
 
-  /* ---------- FAQ / TÉRMINOS ---------- */
   .faq-question { padding: 14px 16px; font-size: 0.95rem; }
   .faq-answer { padding: 14px 16px; font-size: 0.9rem; }
   .terms-text { font-size: 0.92rem; }
@@ -3008,19 +2978,17 @@ body::after {
   .admin-list-item-content strong { font-size: 0.9rem; }
   .admin-list-item-text { font-size: 0.82rem; }
 
-  /* ---------- CONTACTO ---------- */
   .contact-form { max-width: 100%; }
   .contact-form input,
   .contact-form textarea { font-size: 0.95rem; padding: 11px 12px; }
 
-  /* ---------- FOOTER ---------- */
   .site-footer { padding: 20px 14px; font-size: 0.78rem; }
 }
+
 /* ============================================================
    FASE 11 — RESEÑAS
    ============================================================ */
 
-/* ---------- SECCIÓN PÚBLICA ---------- */
 .resenas-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -3156,7 +3124,7 @@ body::after {
   transform: scale(1.02);
 }
 
-/* ---------- ADMIN: RESEÑAS ---------- */
+/* ADMIN: RESEÑAS */
 .admin-resenas-stats {
   display: flex;
   flex-wrap: wrap;
@@ -3256,7 +3224,6 @@ body::after {
   min-width: 120px;
 }
 
-/* ---------- MODAL DE RESEÑA ---------- */
 #resena-modal .contact-form {
   max-width: 100%;
 }
@@ -3270,7 +3237,6 @@ body::after {
   margin-bottom: 6px;
 }
 
-/* ---------- RESPONSIVE MÓVIL ---------- */
 @media (max-width: 640px) {
   .resenas-list {
     grid-template-columns: 1fr;
@@ -3307,5 +3273,75 @@ body::after {
   .admin-resena-acciones .btn {
     width: 100%;
     min-width: 100%;
+  }
+}
+
+/* ============================================================
+   FASE 12 — Botones editar (card) + eliminar (carga masiva)
+   ============================================================ */
+
+.card-admin-edit {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 5;
+  padding: 5px 11px;
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  background: linear-gradient(135deg, var(--gold), #ffdd77);
+  color: #000;
+  border: none;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  box-shadow: 0 0 14px rgba(255, 184, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.4);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.card-admin-edit:hover {
+  transform: scale(1.06);
+  box-shadow: 0 0 20px rgba(255, 184, 0, 0.8), 0 4px 10px rgba(0, 0, 0, 0.5);
+}
+
+.masivo-juego-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.masivo-juego-delete {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  background: rgba(214, 48, 49, 0.12);
+  border: 1px solid rgba(214, 48, 49, 0.4);
+  border-radius: 50%;
+  color: #ff8aa8;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.masivo-juego-delete:hover {
+  background: #d63031;
+  color: #fff;
+  border-color: #d63031;
+  transform: scale(1.08);
+  box-shadow: 0 0 16px rgba(214, 48, 49, 0.6);
+}
+
+@media (max-width: 640px) {
+  .card-admin-edit {
+    top: 10px;
+    left: 10px;
+    padding: 4px 8px;
+    font-size: 0.68rem;
+  }
+  .masivo-juego-delete {
+    width: 34px;
+    height: 34px;
+    font-size: 1rem;
   }
 }

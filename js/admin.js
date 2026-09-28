@@ -240,6 +240,24 @@ $('btn-save-banner')?.addEventListener('click', async () => {
   }
 });
 
+// Quitar solo la imagen del banner
+$('btn-clear-banner-img')?.addEventListener('click', async () => {
+  if (!confirm('¿Quitar solo la imagen del banner?\n\nEl texto, título y etiqueta se mantienen.')) return;
+  try {
+    await setDoc(doc(db, 'settings', 'homeAnnouncement'), { imageUrl: '' }, { merge: true });
+    const imgInput = $('admin-banner-img');
+    if (imgInput) imgInput.value = '';
+    const fileInput = $('admin-banner-file');
+    if (fileInput) fileInput.value = '';
+    const imgEl = $('admin-banner-img');
+    if (imgEl) delete imgEl.dataset.dirty;
+    mostrarToast('✅ Imagen del banner eliminada');
+  } catch (err) {
+    console.error('[GamesUy] Error al quitar imagen:', err);
+    mostrarToast('❌ ' + err.message, 'error');
+  }
+});
+
 $('btn-clear-banner')?.addEventListener('click', async () => {
   if (!confirm('¿Ocultar el banner de la página de inicio?')) return;
   await setDoc(doc(db, 'settings', 'homeAnnouncement'), {

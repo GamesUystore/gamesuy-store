@@ -1,6 +1,6 @@
 // ============================================================
 // GAMESUY STORE — Gestor de precios
-// Fase 6.2: Badge de preventa en el admin
+// Fase 6.3: Expone función para editar desde catálogo público
 // ============================================================
 
 import { db } from './firebase-config.js';
@@ -24,7 +24,7 @@ let pagina = 1;
 const POR_PAGINA = 30;
 let productoActivo = null;
 
-console.log('[GamesUy] precios.js v16 iniciando...');
+console.log('[GamesUy] precios.js v17 iniciando...');
 
 onSnapshot(doc(db, 'settings', 'cotizaciones'), (snap) => {
   if (!snap.exists()) return;
@@ -234,7 +234,6 @@ function renderModalPrecios(prod) {
     return;
   }
 
-  // Banner de preventa arriba del todo
   const preventaBanner = productoEsPreventa(prod) ? `
     <div class="preventa-banner-admin">
       🚀 <strong>PREVENTA</strong>
@@ -600,5 +599,11 @@ $('precios-estado')?.addEventListener('change', (e) => { filtroEstado = e.target
 $('precios-prev')?.addEventListener('click', () => { if (pagina > 1) { pagina--; render(); } });
 $('precios-next')?.addEventListener('click', () => { pagina++; render(); });
 
+// ============================================================
+// EXPONER FUNCIÓN PARA EL CATÁLOGO PÚBLICO
+// Permite abrir el modal de edición desde el botón ✏️ de las cards
+// ============================================================
+window.abrirEditarProducto = abrirModal;
+
 cargarProductos();
-console.log('[GamesUy] precios.js v16 cargado');
+console.log('[GamesUy] precios.js v17 cargado');

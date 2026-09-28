@@ -107,7 +107,7 @@ function aplicarBanner(data) {
     if (!imgEl) {
       imgEl = document.createElement('img');
       imgEl.className = 'announcement-image';
-      imgEl.style.cssText = 'width:100%;max-height:280px;object-fit:cover;border-radius:12px;margin-bottom:16px;border:1px solid rgba(0,240,255,.3);';
+      imgEl.style.cssText = 'width:100%;max-height:180px;object-fit:cover;border-radius:12px;margin-bottom:16px;border:1px solid rgba(0,240,255,.3);';
       banner.querySelector('.announcement-content').prepend(imgEl);
     }
     imgEl.src = img;

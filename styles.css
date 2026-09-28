@@ -3345,3 +3345,15 @@ body::after {
     font-size: 1rem;
   }
 }
+/* ============================================================
+   FASE 13.1 — FIX: mantener los botones admin dentro del contenedor
+   ============================================================ */
+
+.card-admin-actions .card-admin-edit,
+.card-admin-actions .card-admin-delete {
+  position: static !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+}

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=34">
+  <link rel="stylesheet" href="styles.css?v=35">
 </head>
 <body>
 
@@ -115,7 +115,6 @@
       <div id="terminos-text" class="terms-text"><p class="empty-message">Cargando...</p></div>
     </section>
 
-    <!-- NUEVO: Sección pública de reseñas -->
     <section id="page-resenas" class="page-section">
       <div class="grid-header">
         <h2 class="section-title">⭐ Reseñas de clientes</h2>
@@ -373,7 +372,6 @@
           </div>
         </div>
 
-        <!-- NUEVO: Tab de reseñas en el admin -->
         <div class="admin-tab-content" data-tab-content="resenas">
           <div class="admin-grid">
             <div class="admin-card admin-card-wide">
@@ -488,6 +486,9 @@
               <label class="admin-label">Imagen (opcional)</label>
               <input type="file" id="admin-banner-file" accept="image/*" class="admin-file">
               <input type="text" id="admin-banner-img" placeholder="O pegar URL de imagen">
+              <div class="admin-actions" style="margin-top:10px;">
+                <button id="btn-clear-banner-img" class="btn btn-secondary" type="button">🖼️ Quitar solo la imagen</button>
+              </div>
               <label class="admin-label">Link (opcional)</label>
               <input type="text" id="admin-banner-link" placeholder="https://...">
               <div class="admin-actions">
@@ -615,7 +616,6 @@
     </div>
   </div>
 
-  <!-- NUEVO: Modal para dejar reseña -->
   <div id="resena-modal" class="admin-modal hidden">
     <div class="modal-content modal-content-large">
       <button class="modal-close" onclick="cerrarModalResena()" aria-label="Cerrar">✕</button>
@@ -699,16 +699,16 @@
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-  <script type="module" src="js/settings.js?v=34"></script>
-  <script type="module" src="js/auth.js?v=34"></script>
-  <script type="module" src="js/admin.js?v=34"></script>
-  <script type="module" src="js/excel-importer.js?v=34"></script>
-  <script type="module" src="js/maintenance.js?v=34"></script>
-  <script type="module" src="js/precios.js?v=34"></script>
-  <script type="module" src="js/precios-masivo.js?v=34"></script>
-  <script type="module" src="js/manual-create.js?v=34"></script>
-  <script type="module" src="js/contenido.js?v=34"></script>
-  <script type="module" src="js/resenas.js?v=34"></script>
-  <script type="module" src="js/store.js?v=34"></script>
+  <script type="module" src="js/settings.js?v=35"></script>
+  <script type="module" src="js/auth.js?v=35"></script>
+  <script type="module" src="js/admin.js?v=35"></script>
+  <script type="module" src="js/excel-importer.js?v=35"></script>
+  <script type="module" src="js/maintenance.js?v=35"></script>
+  <script type="module" src="js/precios.js?v=35"></script>
+  <script type="module" src="js/precios-masivo.js?v=35"></script>
+  <script type="module" src="js/manual-create.js?v=35"></script>
+  <script type="module" src="js/contenido.js?v=35"></script>
+  <script type="module" src="js/resenas.js?v=35"></script>
+  <script type="module" src="js/store.js?v=35"></script>
 </body>
 </html>

@@ -1,10 +1,12 @@
 // ============================================================
 // GAMESUY STORE — Catálogo público + Ofertas + Preventas
-// Fase 8.4: Botón editar para admin en las cards
+// Fase 8.5: Botones Editar + Eliminar para admin
 // ============================================================
 
 import { db, auth } from './firebase-config.js';
-import { collection, onSnapshot, doc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import {
+  collection, onSnapshot, doc, deleteDoc
+} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { calcPrecioUSD, formatUYU, formatUSD } from './data-model.js';
 
@@ -391,14 +393,19 @@ function renderCard(p, prefijo = 'cat') {
 
   const tieneTrailer = p.youtubeUrl || p.gameplayUrl;
 
-  // Botón editar visible SOLO si es admin
-  const editBtn = isAdmin
-    ? `<button class="card-admin-edit" title="Editar este juego" onclick="abrirEditarDesdeCatalogo('${cardId}')">✏️ Editar</button>`
+  // Botones admin (editar + eliminar) — solo visibles si es admin
+  const adminBtns = isAdmin
+    ? `<div class="card-admin-actions">
+         <button class="card-admin-btn card-admin-edit" title="Editar este juego"
+                 onclick="abrirEditarDesdeCatalogo('${cardId}')">✏️ Editar</button>
+         <button class="card-admin-btn card-admin-delete" title="Eliminar este juego"
+                 onclick="eliminarDesdeCatalogo('${cardId}')">🗑️ Eliminar</button>
+       </div>`
     : '';
 
   return `
     <article class="product-card" data-card-id="${cardId}">
-      ${editBtn}
+      ${adminBtns}
       <div class="card-badges">${badges}</div>
       ${imagen}
       <h3 class="card-title">${escapeHtml(p.title || '(sin título)')}</h3>
@@ -423,6 +430,44 @@ window.abrirEditarDesdeCatalogo = function(id) {
     window.abrirEditarProducto(id);
   } else {
     alert('No se pudo abrir el editor. Recargá la página e intentá de nuevo.');
+  }
+};
+
+// ============================================================
+// ELIMINAR DESDE EL CATÁLOGO
+// ============================================================
+window.eliminarDesdeCatalogo = async function(id) {
+  if (!auth.currentUser) {
+    alert('Debés iniciar sesión como administrador.');
+    return;
+  }
+
+  const prod = productos.find(p => p.id === id);
+  const titulo = prod ? (prod.title || '(sin título)') : 'este juego';
+
+  const primera = confirm(
+    `⚠️ ¿ELIMINAR ESTE JUEGO?\n\n` +
+    `"${titulo}"\n\n` +
+    `Esta acción NO se puede deshacer.`
+  );
+  if (!primera) return;
+
+  const segunda = confirm(
+    `⚠️ CONFIRMACIÓN FINAL\n\n` +
+    `Se van a borrar TODAS las variantes de este juego.\n\n` +
+    `¿Estás completamente seguro?`
+  );
+  if (!segunda) return;
+
+  try {
+    await deleteDoc(doc(db, 'products', id));
+    productos = productos.filter(p => p.id !== id);
+    console.log('[GamesUy] Juego eliminado:', titulo);
+    alert(`✅ Juego eliminado:\n\n${titulo}`);
+    renderAll();
+  } catch (err) {
+    console.error('[GamesUy] Error al eliminar:', err);
+    alert('❌ Error: ' + err.message);
   }
 };
 
@@ -750,4 +795,4 @@ document.getElementById('trailer-modal')?.addEventListener('click', (e) => {
   if (e.target.id === 'trailer-modal') document.getElementById('trailer-modal')?.classList.add('hidden');
 });
 
-console.log('[GamesUy] store.js v11 cargado (con botón editar admin)');
+console.log('[GamesUy] store.js v12 cargado (con botón eliminar admin)');

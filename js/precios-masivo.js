@@ -1,11 +1,11 @@
 // ============================================================
 // GAMESUY STORE — Carga masiva de precios
-// Fase 7.1: Badges visuales (stock/oferta/preventa/solo-oferta)
+// Fase 7.2: Badges + Eliminar juegos duplicados
 // ============================================================
 
 import { db } from './firebase-config.js';
 import {
-  collection, getDocs, doc, writeBatch, onSnapshot
+  collection, getDocs, doc, writeBatch, onSnapshot, deleteDoc
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import {
   getCostoUYU, calcGananciaPct, calcPrecioUSD,
@@ -24,7 +24,7 @@ const POR_PAGINA = 20;
 
 let cambios = {};
 
-console.log('[GamesUy] precios-masivo.js v2 iniciando...');
+console.log('[GamesUy] precios-masivo.js v3 iniciando...');
 
 onSnapshot(doc(db, 'settings', 'cotizaciones'), (snap) => {
   if (!snap.exists()) return;
@@ -102,7 +102,6 @@ function obtenerEstadoProducto(p) {
   const tieneOferta = productoTieneOferta(p);
   const tieneStock = productoTieneStock(p);
 
-  // Orden de prioridad: Preventa > Solo Oferta > Oferta > Con Stock > Sin Stock
   if (esPreventa) {
     return {
       tipo: 'preventa',
@@ -232,7 +231,6 @@ function renderJuego(p) {
   const estado = obtenerEstadoProducto(p);
   const cats = (p.categories || []).map(c => `<span class="badge badge-${c}">${c.toUpperCase()}</span>`).join('');
 
-  // Solo mostramos variantes con costo > 0
   const variantes = (p.variants || []).filter(v => Number(v.costoARS) > 0);
 
   const variantesHtml = variantes.map(v => {
@@ -241,11 +239,9 @@ function renderJuego(p) {
     const precioActual = Number(v.precioFinalUYU) || 0;
     const usdPreview = precioActual > 0 ? formatUSD(calcPrecioUSD(precioActual, cotizaciones.usdAUYU)) : '—';
 
-    // ¿Esta variante tiene oferta activa?
     const tieneOfertaVar = ofertaVigente(v);
     const ofertaBadge = tieneOfertaVar ? '<span class="masivo-var-oferta-badge">🔥</span>' : '';
 
-    // ¿Esta variante tiene oferta con precio cargado?
     const ofertaPrecio = Number(v.ofertaPrecioUYU) || 0;
     const ofertaInfo = tieneOfertaVar && ofertaPrecio > 0
       ? `<div class="masivo-var-oferta-info">🔥 Oferta: $${ofertaPrecio} UYU</div>`
@@ -278,12 +274,13 @@ function renderJuego(p) {
     `;
   }).join('');
 
-  // Badge del estado general
   const estadoBadge = `
     <span class="masivo-estado-badge masivo-estado-${estado.tipo}">
       ${estado.icono} ${estado.label}${estado.extra ? ` · ${estado.extra}` : ''}
     </span>
   `;
+
+  const tituloEscapado = String(p.title || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
 
   return `
     <div class="masivo-juego ${estado.clase}" data-prod-id="${p.id}">
@@ -295,6 +292,8 @@ function renderJuego(p) {
           </div>
           <h4>${escapeHtml(p.title || '(sin título)')}</h4>
         </div>
+        <button class="masivo-juego-delete" title="Eliminar este juego"
+                onclick="window.eliminarJuegoMasivo('${p.id}', '${tituloEscapado}')">🗑️</button>
       </div>
       <div class="masivo-juego-variantes">
         ${variantesHtml}
@@ -336,6 +335,36 @@ function activarListeners() {
     });
   });
 }
+
+// ============================================================
+// ELIMINAR JUEGO
+// ============================================================
+window.eliminarJuegoMasivo = async function(id, titulo) {
+  const primera = confirm(
+    `⚠️ ¿ELIMINAR ESTE JUEGO?\n\n` +
+    `"${titulo}"\n\n` +
+    `Esta acción NO se puede deshacer.`
+  );
+  if (!primera) return;
+
+  const segunda = confirm(
+    `⚠️ CONFIRMACIÓN FINAL\n\n` +
+    `Se van a borrar TODAS las variantes de este juego.\n\n` +
+    `¿Estás completamente seguro?`
+  );
+  if (!segunda) return;
+
+  try {
+    await deleteDoc(doc(db, 'products', id));
+    productos = productos.filter(p => p.id !== id);
+    delete cambios[id];
+    alert(`✅ Juego eliminado:\n\n${titulo}`);
+    render();
+  } catch (err) {
+    console.error('[GamesUy] Error al eliminar juego:', err);
+    alert('❌ Error: ' + err.message);
+  }
+};
 
 // ============================================================
 // GUARDAR TODOS LOS CAMBIOS
@@ -443,4 +472,4 @@ $('btn-save-masivo')?.addEventListener('click', guardarTodos);
 // INIT
 // ============================================================
 cargarProductos();
-console.log('[GamesUy] precios-masivo.js v2 cargado');
+console.log('[GamesUy] precios-masivo.js v3 cargado (con eliminar juegos)');

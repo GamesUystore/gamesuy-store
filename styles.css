@@ -3357,3 +3357,7 @@ body::after {
   right: auto !important;
   bottom: auto !important;
 }
+/* Ocultar el mensaje de catálogo vacío */
+.catalog-empty {
+    display: none !important;
+}

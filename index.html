@@ -43,7 +43,7 @@
 
       <div class="search-bar">
         <span class="search-icon">🔍</span>
-        <input type="text" id="search-input" class="search-input"
+        <input type="search" id="search-input" class="search-input"
                placeholder="Buscar juego, suscripción, servicio..."
                autocomplete="new-password" name="buscador-tienda" spellcheck="false">
       </div>
@@ -694,6 +694,14 @@
     };
     document.querySelectorAll('.modal-tab').forEach(tab => {
       tab.addEventListener('click', () => window.switchModalTab(tab.dataset.mtab));
+    });
+
+    // Limpiar el buscador al cargar la página para evitar autocompletado del navegador
+    window.addEventListener('DOMContentLoaded', function() {
+      var searchInput = document.getElementById('search-input');
+      if (searchInput) {
+        searchInput.value = '';
+      }
     });
   </script>
 

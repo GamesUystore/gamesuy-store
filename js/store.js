@@ -1,6 +1,6 @@
 // ============================================================
 // GAMESUY STORE — Catálogo público + Ofertas + Preventas
-// Fase 8.8: Compartir juego por WhatsApp + Copiar link
+// Fase 8.9: Tracking de estadísticas internas
 // ============================================================
 
 import { db, auth } from './firebase-config.js';
@@ -50,10 +50,14 @@ onSnapshot(collection(db, 'products'), (snap) => {
   console.log('[GamesUy] Catálogo:', productos.length, 'productos');
   renderAll();
 
-  // Procesar hash de URL (link compartido) solo la primera vez que cargan
   if (!hashProcesado) {
     hashProcesado = true;
     setTimeout(procesarHashInicial, 300);
+  }
+
+  // Tracking: registrar vista del catálogo (1 vez por sesión)
+  if (typeof window.__estRegistrarVista === 'function') {
+    window.__estRegistrarVista();
   }
 });
 
@@ -336,6 +340,17 @@ function activarCards(lista, prefijo) {
     if (selCurrency) selCurrency.addEventListener('change', () => actualizarPrecio(p, cardId, prefijo));
     if (selConsole) actualizarSelectorVariante(p, cardId, prefijo);
     actualizarPrecio(p, cardId, prefijo);
+
+    // Tracking: click en "Comprar por WhatsApp"
+    const waBtn = document.getElementById(`wa-${prefijo}-${cardId}`);
+    if (waBtn && !waBtn.dataset.tracked) {
+      waBtn.dataset.tracked = '1';
+      waBtn.addEventListener('click', () => {
+        if (typeof window.__estRegistrarWhatsApp === 'function') {
+          window.__estRegistrarWhatsApp(p.id, p.title || '');
+        }
+      });
+    }
   });
 }
 
@@ -477,7 +492,6 @@ window.compartirWhatsapp = function(cardId, prefijo = 'cat') {
   const prod = productos.find(p => p.id === cardId);
   if (!prod) return;
 
-  // Obtener variante y moneda actuales de la card
   const selConsole = document.getElementById(`sel-console-${prefijo}-${cardId}`);
   const selVariant = document.getElementById(`sel-variant-${prefijo}-${cardId}`);
   const selCurrency = document.getElementById(`sel-currency-${prefijo}-${cardId}`);
@@ -551,8 +565,6 @@ window.copiarLinkJuego = async function(cardId) {
       }, 2000);
     }
   } catch (err) {
-    // Fallback para navegadores sin clipboard API
-    console.warn('[GamesUy] Clipboard API no disponible, usando prompt');
     const input = document.createElement('input');
     input.value = url;
     document.body.appendChild(input);
@@ -586,19 +598,16 @@ function procesarHashInicial() {
 
   console.log('[GamesUy] Procesando link compartido para:', cardId);
 
-  // Buscar el producto
   const prod = productos.find(p => p.id === cardId);
   if (!prod) {
     console.log('[GamesUy] Producto no encontrado en el catálogo:', cardId);
     return;
   }
 
-  // Ir al catálogo
   if (typeof window.switchPage === 'function') {
     window.switchPage('catalogo');
   }
 
-  // Buscar la página donde está el producto
   const filtrados = filtrarProductos();
   const index = filtrados.findIndex(p => p.id === cardId);
 
@@ -611,24 +620,19 @@ function procesarHashInicial() {
   catState.pagina = pag;
   renderCatalogo();
 
-  // Esperar a que el DOM esté listo y hacer scroll
   setTimeout(() => {
     const card = document.querySelector(`.product-card[data-card-id="${cardId}"]`);
     if (!card) return;
 
     card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-    // Agregar clase de destacado
     card.classList.add('card-destacada');
 
-    // Quitar el destacado después de 4 segundos
     setTimeout(() => {
       card.classList.remove('card-destacada');
     }, 4000);
   }, 400);
 }
 
-// Re-procesar hash si cambia (ej: cuando alguien pega un link estando ya en la web)
 window.addEventListener('hashchange', () => {
   procesarHashInicial();
 });
@@ -908,11 +912,17 @@ if (!countdownInterval) {
 }
 
 // ============================================================
-// TRAILER
+// TRAILER (con tracking)
 // ============================================================
 window.abrirTrailer = function(cardId) {
   const p = productos.find(x => x.id === cardId);
   if (!p) return;
+
+  // Tracking
+  if (typeof window.__estRegistrarTrailer === 'function') {
+    window.__estRegistrarTrailer(p.id, p.title || '');
+  }
+
   const modal = document.getElementById('trailer-modal');
   const title = document.getElementById('trailer-title');
   const body = document.getElementById('trailer-body');
@@ -938,14 +948,17 @@ function getYouTubeEmbed(url) {
 }
 
 // ============================================================
-// LISTENERS
+// LISTENERS (con tracking de búsquedas vacías y categorías)
 // ============================================================
 const searchInput = $('search-input');
 if (searchInput) {
+  let timeoutBusqueda = null;
+
   searchInput.addEventListener('input', (e) => {
     const val = e.target.value;
     const enOfertas = $('page-ofertas')?.classList.contains('active-page');
     const enPreventas = $('page-preventas')?.classList.contains('active-page');
+
     if (enOfertas) {
       ofState.search = val; ofState.pagina = 1; renderOfertas();
     } else if (enPreventas) {
@@ -953,6 +966,21 @@ if (searchInput) {
     } else {
       catState.search = val; catState.pagina = 1; renderCatalogo();
     }
+
+    // Tracking: búsqueda sin resultados (con delay para no spamear)
+    clearTimeout(timeoutBusqueda);
+    timeoutBusqueda = setTimeout(() => {
+      const q = String(val || '').trim();
+      if (q.length < 3) return;
+      if (enOfertas || enPreventas) return;
+
+      const resultados = filtrarProductos();
+      if (resultados.length === 0) {
+        if (typeof window.__estRegistrarBusquedaVacia === 'function') {
+          window.__estRegistrarBusquedaVacia(q);
+        }
+      }
+    }, 1500);
   });
 }
 
@@ -963,6 +991,12 @@ document.querySelectorAll('#cat-nav .cat-btn').forEach(btn => {
     const cat = btn.dataset.cat || 'all';
     const enOfertas = $('page-ofertas')?.classList.contains('active-page');
     const enPreventas = $('page-preventas')?.classList.contains('active-page');
+
+    // Tracking: click en categoría
+    if (cat !== 'all' && typeof window.__estRegistrarCategoria === 'function') {
+      window.__estRegistrarCategoria(cat);
+    }
+
     if (enOfertas) {
       ofState.cat = cat; ofState.pagina = 1; renderOfertas();
     } else if (enPreventas) {
@@ -1007,4 +1041,4 @@ document.getElementById('trailer-modal')?.addEventListener('click', (e) => {
   if (e.target.id === 'trailer-modal') document.getElementById('trailer-modal')?.classList.add('hidden');
 });
 
-console.log('[GamesUy] store.js v15 cargado (con compartir juego)');
+console.log('[GamesUy] store.js v16 cargado (con tracking de estadísticas)');

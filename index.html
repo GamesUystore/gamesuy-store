@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=35">
+  <link rel="stylesheet" href="styles.css?v=36">
 </head>
 <body>
 
@@ -43,9 +43,9 @@
 
       <div class="search-bar">
         <span class="search-icon">🔍</span>
-        <input type="search" id="search-input" class="search-input"
+        <input type="text" id="search-input" class="search-input"
                placeholder="Buscar juego, suscripción, servicio..."
-               autocomplete="new-password" name="buscador-tienda" spellcheck="false">
+               autocomplete="off" spellcheck="false">
       </div>
 
       <nav class="categories-nav" id="cat-nav">
@@ -170,6 +170,7 @@
           <button class="admin-tab" data-tab="masivo">⚡ Carga masiva</button>
           <button class="admin-tab" data-tab="contenido">📄 Contenido</button>
           <button class="admin-tab" data-tab="resenas">⭐ Reseñas</button>
+          <button class="admin-tab" data-tab="reportes">📢 Reportes</button>
           <button class="admin-tab" data-tab="excel">📥 Importar Excel</button>
           <button class="admin-tab" data-tab="config">⚙️ Configuración</button>
           <button class="admin-tab" data-tab="mantenimiento">🧹 Mantenimiento</button>
@@ -399,6 +400,49 @@
           </div>
         </div>
 
+        <!-- NUEVO: Tab Reportes -->
+        <div class="admin-tab-content" data-tab-content="reportes">
+          <div class="admin-grid">
+            <div class="admin-card admin-card-wide">
+              <h3>⚠️ Problemas reportados</h3>
+              <p class="admin-help">Reportes de precio incorrecto u otros problemas con juegos.</p>
+
+              <div class="admin-resenas-stats">
+                <span class="stat-badge stat-pending">⏳ Pendientes: <strong id="admin-reportes-stat-pend">0</strong></span>
+                <span class="stat-badge stat-done">✅ Resueltos: <strong id="admin-reportes-stat-res">0</strong></span>
+              </div>
+
+              <div id="admin-reportes-pendientes" class="admin-resenas-list">
+                <p style="color:var(--text-muted);text-align:center;padding:20px;">Cargando...</p>
+              </div>
+
+              <h4 class="admin-subtitle" style="margin-top:24px;">✅ Resueltos</h4>
+              <div id="admin-reportes-resueltos" class="admin-resenas-list">
+                <p style="color:var(--text-muted);text-align:center;padding:20px;">Cargando...</p>
+              </div>
+            </div>
+
+            <div class="admin-card admin-card-wide">
+              <h3>🔍 Juegos solicitados</h3>
+              <p class="admin-help">Juegos o suscripciones que los clientes buscan y no encuentran.</p>
+
+              <div class="admin-resenas-stats">
+                <span class="stat-badge stat-pending">⏳ Pendientes: <strong id="admin-pedidos-stat-pend">0</strong></span>
+                <span class="stat-badge stat-done">✅ Resueltos: <strong id="admin-pedidos-stat-res">0</strong></span>
+              </div>
+
+              <div id="admin-pedidos-pendientes" class="admin-resenas-list">
+                <p style="color:var(--text-muted);text-align:center;padding:20px;">Cargando...</p>
+              </div>
+
+              <h4 class="admin-subtitle" style="margin-top:24px;">✅ Resueltos</h4>
+              <div id="admin-pedidos-resueltos" class="admin-resenas-list">
+                <p style="color:var(--text-muted);text-align:center;padding:20px;">Cargando...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="admin-tab-content" data-tab-content="excel">
           <div class="admin-grid">
             <div class="admin-card admin-card-wide">
@@ -520,7 +564,12 @@
   </main>
 
   <footer class="site-footer"><p>© 2026 GamesUy Store — Juegos digitales en Uruguay</p></footer>
-  <a href="https://wa.me/59896572226" class="chat-float" target="_blank" rel="noopener">💬</a>
+
+  <!-- Botón flotante WhatsApp -->
+  <a href="https://wa.me/59896572226" class="chat-float" target="_blank" rel="noopener" title="Contactar por WhatsApp">💬</a>
+
+  <!-- NUEVO: Botón flotante Pedir juego -->
+  <button class="report-float" onclick="abrirModalPedido()" title="¿No encontrás un juego? Pedilo acá">🔍</button>
 
   <div id="login-modal" class="admin-modal hidden">
     <div class="modal-content">
@@ -656,6 +705,72 @@
     </div>
   </div>
 
+  <!-- NUEVO: Modal Reportar problema -->
+  <div id="reporte-modal" class="admin-modal hidden">
+    <div class="modal-content modal-content-large">
+      <button class="modal-close" onclick="cerrarModalReporte()" aria-label="Cerrar">✕</button>
+      <h3 class="modal-title">⚠️ Reportar problema</h3>
+      <p class="modal-subtitle">Ayudanos a mejorar. Contanos qué encontraste mal.</p>
+      <form id="reporte-form" class="contact-form">
+
+        <label>Juego reportado</label>
+        <input type="text" id="reporte-juego" placeholder="Título del juego" readonly style="opacity:0.75;cursor:not-allowed;">
+
+        <label>Tipo de problema *</label>
+        <select id="reporte-tipo" class="card-select" required>
+          <option value="">— Elegí una opción —</option>
+          <option value="precio">💵 Precio incorrecto</option>
+          <option value="no-funciona">🔧 El juego no funciona</option>
+          <option value="descripcion">📝 Error en la descripción o imagen</option>
+          <option value="otro">❓ Otro</option>
+        </select>
+
+        <label>Contanos el problema *</label>
+        <textarea id="reporte-descripcion" rows="4" placeholder="Ej: El precio de PS4 Primaria debería ser $500, no $1500..." required maxlength="500"></textarea>
+
+        <label>Tu email (opcional)</label>
+        <input type="email" id="reporte-email" placeholder="tu@correo.com" maxlength="80">
+
+        <label>Tu WhatsApp (opcional)</label>
+        <input type="text" id="reporte-whatsapp" placeholder="Ej: 099123456" maxlength="20">
+
+        <button type="submit" id="reporte-submit" class="btn btn-primary">📩 Enviar reporte</button>
+        <p id="reporte-error" class="login-error hidden"></p>
+        <p id="reporte-exito" class="admin-toast success hidden" style="margin-top:12px;"></p>
+      </form>
+    </div>
+  </div>
+
+  <!-- NUEVO: Modal Pedir juego -->
+  <div id="pedido-modal" class="admin-modal hidden">
+    <div class="modal-content modal-content-large">
+      <button class="modal-close" onclick="cerrarModalPedido()" aria-label="Cerrar">✕</button>
+      <h3 class="modal-title">🔍 Pedir juego o suscripción</h3>
+      <p class="modal-subtitle">¿No encontrás lo que buscás? Pedilo y vemos si lo conseguimos.</p>
+      <form id="pedido-form" class="contact-form">
+
+        <label>¿Qué juego o suscripción buscás? *</label>
+        <input type="text" id="pedido-juego" placeholder="Ej: EA FC 26, Netflix, PS Plus..." required maxlength="100">
+
+        <label>Consola o plataforma (opcional)</label>
+        <input type="text" id="pedido-plataforma" placeholder="Ej: PS5, PS4, Steam, PC..." maxlength="60">
+
+        <label>Aclaración (opcional)</label>
+        <textarea id="pedido-descripcion" rows="3" placeholder="Ej: Lo necesito para el viernes, versión digital..." maxlength="300"></textarea>
+
+        <label>Tu email (opcional)</label>
+        <input type="email" id="pedido-email" placeholder="tu@correo.com" maxlength="80">
+
+        <label>Tu WhatsApp (opcional)</label>
+        <input type="text" id="pedido-whatsapp" placeholder="Ej: 099123456" maxlength="20">
+
+        <button type="submit" id="pedido-submit" class="btn btn-primary">📩 Enviar pedido</button>
+        <p id="pedido-error" class="login-error hidden"></p>
+        <p id="pedido-exito" class="admin-toast success hidden" style="margin-top:12px;"></p>
+      </form>
+    </div>
+  </div>
+
   <script>
     window.switchPage = function(pageId) {
       document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active-page'));
@@ -695,28 +810,21 @@
     document.querySelectorAll('.modal-tab').forEach(tab => {
       tab.addEventListener('click', () => window.switchModalTab(tab.dataset.mtab));
     });
-
-    // Limpiar el buscador al cargar la página para evitar autocompletado del navegador
-    window.addEventListener('DOMContentLoaded', function() {
-      var searchInput = document.getElementById('search-input');
-      if (searchInput) {
-        searchInput.value = '';
-      }
-    });
   </script>
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-  <script type="module" src="js/settings.js?v=35"></script>
-  <script type="module" src="js/auth.js?v=35"></script>
-  <script type="module" src="js/admin.js?v=35"></script>
-  <script type="module" src="js/excel-importer.js?v=35"></script>
-  <script type="module" src="js/maintenance.js?v=35"></script>
-  <script type="module" src="js/precios.js?v=35"></script>
-  <script type="module" src="js/precios-masivo.js?v=35"></script>
-  <script type="module" src="js/manual-create.js?v=35"></script>
-  <script type="module" src="js/contenido.js?v=35"></script>
-  <script type="module" src="js/resenas.js?v=35"></script>
-  <script type="module" src="js/store.js?v=35"></script>
+  <script type="module" src="js/settings.js?v=36"></script>
+  <script type="module" src="js/auth.js?v=36"></script>
+  <script type="module" src="js/admin.js?v=36"></script>
+  <script type="module" src="js/excel-importer.js?v=36"></script>
+  <script type="module" src="js/maintenance.js?v=36"></script>
+  <script type="module" src="js/precios.js?v=36"></script>
+  <script type="module" src="js/precios-masivo.js?v=36"></script>
+  <script type="module" src="js/manual-create.js?v=36"></script>
+  <script type="module" src="js/contenido.js?v=36"></script>
+  <script type="module" src="js/resenas.js?v=36"></script>
+  <script type="module" src="js/reportes.js?v=36"></script>
+  <script type="module" src="js/store.js?v=36"></script>
 </body>
 </html>

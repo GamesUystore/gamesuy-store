@@ -3894,3 +3894,111 @@ body::after {
     font-size: 0.9rem;
   }
 }
+/* ============================================================
+   FASE 17 — Compartir juego (WhatsApp + Copiar link)
+   ============================================================ */
+
+/* ---------- CONTENEDOR DE BOTONES DE COMPARTIR ---------- */
+.card-share-btns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* ---------- BOTÓN COMPARTIR BASE ---------- */
+.btn-share {
+  background: rgba(255, 255, 255, 0.03) !important;
+  color: var(--text-dim) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: none !important;
+  font-size: 0.78rem !important;
+  padding: 9px 10px !important;
+  letter-spacing: 0.5px !important;
+}
+
+.btn-share:hover {
+  color: var(--cyan) !important;
+  border-color: var(--cyan) !important;
+  background: var(--cyan-soft) !important;
+  box-shadow: 0 4px 14px rgba(0, 240, 255, 0.2) !important;
+  transform: translateY(-2px);
+}
+
+/* ---------- BOTÓN COPIAR CUANDO YA SE COPIÓ ---------- */
+.btn-copiado {
+  color: #000 !important;
+  background: linear-gradient(135deg, var(--green), #00d988) !important;
+  border-color: var(--green) !important;
+  box-shadow: 0 0 16px rgba(0, 255, 157, 0.5) !important;
+  animation: pulseCopiado 0.5s ease;
+}
+
+@keyframes pulseCopiado {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+/* ---------- CARD DESTACADA (cuando alguien abre un link compartido) ---------- */
+.card-destacada {
+  animation: destacarCard 2s ease infinite;
+  border-color: var(--cyan) !important;
+  box-shadow:
+    0 0 30px rgba(0, 240, 255, 0.5),
+    0 0 60px rgba(0, 240, 255, 0.25),
+    0 18px 50px rgba(0, 0, 0, 0.7) !important;
+  transform: translateY(-4px);
+  z-index: 5;
+  position: relative;
+}
+
+.card-destacada::before {
+  content: '🎯 Juego compartido';
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, var(--cyan), #00b4d8);
+  color: #000;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  padding: 5px 12px;
+  border-radius: var(--r-pill);
+  box-shadow: 0 0 16px rgba(0, 240, 255, 0.7);
+  white-space: nowrap;
+  z-index: 10;
+  text-transform: uppercase;
+}
+
+@keyframes destacarCard {
+  0%, 100% {
+    box-shadow:
+      0 0 30px rgba(0, 240, 255, 0.5),
+      0 0 60px rgba(0, 240, 255, 0.25),
+      0 18px 50px rgba(0, 0, 0, 0.7);
+  }
+  50% {
+    box-shadow:
+      0 0 45px rgba(0, 240, 255, 0.8),
+      0 0 90px rgba(0, 240, 255, 0.4),
+      0 18px 50px rgba(0, 0, 0, 0.7);
+  }
+}
+
+/* ---------- RESPONSIVE MÓVIL ---------- */
+@media (max-width: 640px) {
+  .card-share-btns {
+    gap: 6px;
+  }
+  .btn-share {
+    font-size: 0.72rem !important;
+    padding: 8px 8px !important;
+  }
+  .card-destacada::before {
+    font-size: 0.62rem;
+    padding: 4px 10px;
+  }
+}

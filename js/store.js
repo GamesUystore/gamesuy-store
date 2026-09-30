@@ -2,6 +2,7 @@
 // GAMESUY STORE — Catálogo público + Ofertas + Preventas
 // Fase 8.9: Tracking de estadísticas internas
 // Fase 2 SEO: título dinámico por página
+// Fase 3 Perf: cache + countdown optimizado
 // ============================================================
 
 import { db, auth } from './firebase-config.js';
@@ -24,7 +25,69 @@ let ofState = { search: '', cat: 'all', pagina: 1 };
 let preState = { search: '', cat: 'all', pagina: 1 };
 const POR_PAGINA = 24;
 
+// ============================================================
+// PERFORMANCE — Cache de productos en localStorage
+// ============================================================
+const CACHE_KEY = 'gamesuy_products_cache_v1';
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+
+function leerCacheProductos() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const { data, timestamp } = JSON.parse(raw);
+    if (!Array.isArray(data) || data.length === 0) return null;
+    if (Date.now() - timestamp > CACHE_TTL) return null;
+    return data;
+  } catch (e) {
+    return null;
+  }
+}
+
+function guardarCacheProductos(data) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({
+      data,
+      timestamp: Date.now()
+    }));
+  } catch (e) {
+    // localStorage lleno o bloqueado, ignoramos
+  }
+}
+
+// ============================================================
+// PERFORMANCE — Countdown optimizado
+// ============================================================
 let countdownInterval = null;
+
+function iniciarCountdowns() {
+  detenerCountdowns();
+
+  // Solo arranca si hay al menos un countdown activo en el DOM
+  const hay = document.querySelector('.card-countdown[data-end]');
+  if (!hay) return;
+
+  countdownInterval = setInterval(() => {
+    if (document.hidden) return; // pausa si la pestaña no está visible
+    document.querySelectorAll('.card-countdown[data-end]').forEach(actualizarCountdown);
+  }, 1000);
+}
+
+function detenerCountdowns() {
+  if (countdownInterval) {
+    clearInterval(countdownInterval);
+    countdownInterval = null;
+  }
+}
+
+// Pausar/reanudar countdowns según visibilidad de la pestaña
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    detenerCountdowns();
+  } else {
+    iniciarCountdowns();
+  }
+});
 
 // ============================================================
 // SEO — Títulos dinámicos por página
@@ -87,10 +150,21 @@ onSnapshot(doc(db, 'settings', 'payments'), (snap) => {
   renderAll();
 });
 
+// Mostrar cache primero (render instantáneo)
+const productosCache = leerCacheProductos();
+if (productosCache) {
+  productos = productosCache;
+  window.__productosCache = productos;
+  console.log('[GamesUy] Mostrando cache:', productos.length, 'productos');
+  renderAll();
+}
+
+// Después escuchar cambios reales desde Firestore
 onSnapshot(collection(db, 'products'), (snap) => {
   productos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   window.__productosCache = productos;
-  console.log('[GamesUy] Catálogo:', productos.length, 'productos');
+  guardarCacheProductos(productos);
+  console.log('[GamesUy] Catálogo desde Firestore:', productos.length, 'productos');
   renderAll();
 
   if (!hashProcesado) {
@@ -298,6 +372,7 @@ function renderCatalogo() {
   grid.innerHTML = enPagina.map(p => renderCard(p, 'cat')).join('');
   activarCards(enPagina, 'cat');
   renderPaginacion('catalog-pagination', catState.pagina, totalPaginas, (p) => { catState.pagina = p; renderCatalogo(); });
+  iniciarCountdowns();
 }
 
 // ============================================================
@@ -332,6 +407,7 @@ function renderOfertas() {
   grid.innerHTML = enPagina.map(p => renderCard(p, 'oferta')).join('');
   activarCards(enPagina, 'oferta');
   renderPaginacion('ofertas-pagination', ofState.pagina, totalPaginas, (p) => { ofState.pagina = p; renderOfertas(); });
+  iniciarCountdowns();
 }
 
 // ============================================================
@@ -461,7 +537,7 @@ function renderCard(p, prefijo = 'cat') {
     .map(c => `<span class="badge badge-${c}">${c.toUpperCase()}</span>`).join('');
 
   const imagen = p.coverUrl
-    ? `<div class="card-image"><img src="${safeUrl(p.coverUrl)}" alt="${escapeHtml(p.title || '')}" class="card-image-img" loading="lazy"></div>`
+    ? `<div class="card-image"><img src="${safeUrl(p.coverUrl)}" alt="${escapeHtml(p.title || '')}" class="card-image-img" loading="lazy" decoding="async"></div>`
     : `<div class="card-image card-image-empty"><span class="card-image-placeholder">🎮</span></div>`;
 
   const esPreventa = prefijo === 'preventa';
@@ -719,6 +795,7 @@ window.eliminarDesdeCatalogo = async function(id) {
     await deleteDoc(doc(db, 'products', id));
     productos = productos.filter(p => p.id !== id);
     window.__productosCache = productos;
+    guardarCacheProductos(productos);
     console.log('[GamesUy] Juego eliminado:', titulo);
     alert(`✅ Juego eliminado:\n\n${titulo}`);
     renderAll();
@@ -778,7 +855,7 @@ function actualizarPrecio(p, cardId, prefijo) {
     priceWrap.innerHTML = `<div class="card-price card-price-empty">AGOTADO</div>`;
     if (stockWrap) stockWrap.innerHTML = `<span class="stock-badge stock-out">Sin stock</span>`;
     if (offerWrap) offerWrap.innerHTML = '';
-    if (countdown) countdown.textContent = '';
+    if (countdown) { countdown.textContent = ''; delete countdown.dataset.end; }
     if (waBtn) {
       waBtn.href = `https://wa.me/59896572226?text=${encodeURIComponent(`Hola GamesUy Store! Quiero reservar *${p.title}* cuando vuelva a estar disponible.`)}`;
       waBtn.innerText = '🔔 Reservar por WhatsApp';
@@ -814,7 +891,7 @@ function actualizarPrecio(p, cardId, prefijo) {
     }
     if (stockWrap) stockWrap.innerHTML = `<span class="stock-badge stock-preorder">🚀 Preventa</span>`;
     if (offerWrap) offerWrap.innerHTML = '';
-    if (countdown) { countdown.textContent = ''; countdown.style.display = 'none'; }
+    if (countdown) { countdown.textContent = ''; delete countdown.dataset.end; countdown.style.display = 'none'; }
     if (waBtn) {
       const varianteLabel = variante.label || 'Estándar';
       const catLabel = cat.toUpperCase();
@@ -907,7 +984,7 @@ function actualizarPrecio(p, cardId, prefijo) {
     `;
     if (offerWrap) offerWrap.innerHTML = '';
     if (stockWrap) stockWrap.innerHTML = `<span class="stock-badge stock-ok">✓ Disponible</span>`;
-    if (countdown) { countdown.textContent = ''; countdown.style.display = 'none'; }
+    if (countdown) { countdown.textContent = ''; delete countdown.dataset.end; countdown.style.display = 'none'; }
     if (waBtn) {
       const varianteLabel = variante.label || '';
       const msg = `Hola GamesUy Store! Quiero comprar *${p.title}* (${cat.toUpperCase()} - ${varianteLabel}) por ${precioMostrar}`;
@@ -922,7 +999,7 @@ function actualizarPrecio(p, cardId, prefijo) {
   priceWrap.innerHTML = `<div class="card-price card-price-empty">AGOTADO</div>`;
   if (stockWrap) stockWrap.innerHTML = `<span class="stock-badge stock-out">Sin stock</span>`;
   if (offerWrap) offerWrap.innerHTML = '';
-  if (countdown) { countdown.textContent = ''; countdown.style.display = 'none'; }
+  if (countdown) { countdown.textContent = ''; delete countdown.dataset.end; countdown.style.display = 'none'; }
   if (waBtn) {
     waBtn.href = `https://wa.me/59896572226?text=${encodeURIComponent(`Hola GamesUy Store! Quiero reservar *${p.title}* cuando vuelva a estar disponible.`)}`;
     waBtn.innerText = '🔔 Reservar por WhatsApp';
@@ -944,12 +1021,6 @@ function actualizarCountdown(el) {
   const m = Math.floor((diff % 3600000) / 60000);
   const s = Math.floor((diff % 60000) / 1000);
   el.textContent = `⌛ Termina en: ${d}d ${h}h ${m}m ${s}s`;
-}
-
-if (!countdownInterval) {
-  countdownInterval = setInterval(() => {
-    document.querySelectorAll('.card-countdown').forEach(actualizarCountdown);
-  }, 1000);
 }
 
 // ============================================================
@@ -974,7 +1045,7 @@ window.abrirTrailer = function(cardId) {
     if (embed) html += `<div class="video-container"><iframe src="${embed}" allowfullscreen></iframe></div>`;
   }
   if (p.gameplayUrl) {
-    html += `<div style="margin-top:12px;"><h4 style="color:var(--cyan);margin-bottom:8px;">🎮 Gameplay</h4><img src="${safeUrl(p.gameplayUrl)}" style="width:100%;border-radius:12px;border:1px solid var(--border);"></div>`;
+    html += `<div style="margin-top:12px;"><h4 style="color:var(--cyan);margin-bottom:8px;">🎮 Gameplay</h4><img src="${safeUrl(p.gameplayUrl)}" style="width:100%;border-radius:12px;border:1px solid var(--border);" loading="lazy"></div>`;
   }
   if (!html) html = '<p class="empty-message">Sin contenido disponible.</p>';
   body.innerHTML = html;
@@ -1052,7 +1123,6 @@ const originalSwitchPage = window.switchPage;
 window.switchPage = function(pageId) {
   if (originalSwitchPage) originalSwitchPage(pageId);
 
-  // SEO: actualizar título y meta description
   actualizarSEOPagina(pageId);
 
   const si = $('search-input');
@@ -1086,4 +1156,4 @@ document.getElementById('trailer-modal')?.addEventListener('click', (e) => {
   if (e.target.id === 'trailer-modal') document.getElementById('trailer-modal')?.classList.add('hidden');
 });
 
-console.log('[GamesUy] store.js v17 cargado (con SEO dinámico)');
+console.log('[GamesUy] store.js v18 cargado (con cache + countdown optimizado)');

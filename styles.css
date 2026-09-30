@@ -3361,3 +3361,122 @@ body::after {
 .catalog-empty {
     display: none !important;
 }
+/* ============================================================
+   FASE 14 — Paginación mejorada (números clickeables)
+   ============================================================ */
+
+.catalog-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  margin-top: 30px;
+  flex-wrap: wrap;
+  padding: 8px 0;
+}
+
+.pag-btn {
+  min-width: 40px;
+  height: 40px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.pag-btn:hover:not(:disabled) {
+  color: var(--cyan);
+  border-color: var(--cyan);
+  background: var(--cyan-soft);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 240, 255, 0.2);
+}
+
+.pag-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.pag-num {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.pag-active {
+  color: #000 !important;
+  background: linear-gradient(135deg, var(--cyan), #00b4d8) !important;
+  border-color: var(--cyan) !important;
+  box-shadow: 0 0 16px rgba(0, 240, 255, 0.55) !important;
+  cursor: default !important;
+  transform: none !important;
+}
+
+.pag-active:hover {
+  transform: none !important;
+}
+
+.pag-nav {
+  font-size: 1rem;
+  font-weight: 900;
+  color: var(--cyan);
+  background: var(--bg-0);
+  border-color: var(--border-hi);
+}
+
+.pag-ellipsis {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 40px;
+  color: var(--text-muted);
+  font-weight: 700;
+  font-size: 1rem;
+  user-select: none;
+}
+
+/* Móvil */
+@media (max-width: 640px) {
+  .catalog-pagination {
+    gap: 4px;
+    margin-top: 20px;
+  }
+  .pag-btn {
+    min-width: 36px;
+    height: 36px;
+    font-size: 0.82rem;
+    padding: 0 8px;
+  }
+  .pag-num {
+    font-size: 0.78rem;
+  }
+  .pag-nav {
+    font-size: 0.9rem;
+  }
+  .pag-ellipsis {
+    min-width: 18px;
+    height: 36px;
+    font-size: 0.85rem;
+  }
+}
+
+/* Móvil muy chico: solo flechas + actual */
+@media (max-width: 420px) {
+  .pag-num:not(.pag-active) {
+    display: none;
+  }
+  .pag-ellipsis {
+    display: none;
+  }
+}

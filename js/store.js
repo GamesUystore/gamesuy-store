@@ -1,6 +1,6 @@
 // ============================================================
 // GAMESUY STORE — Catálogo público + Ofertas + Preventas
-// Fase 8.5: Botones Editar + Eliminar para admin
+// Fase 8.6: Paginación con números clickeables
 // ============================================================
 
 import { db, auth } from './firebase-config.js';
@@ -332,21 +332,67 @@ function activarCards(lista, prefijo) {
 }
 
 // ============================================================
-// PAGINACIÓN
+// PAGINACIÓN MEJORADA — Números clickeables
 // ============================================================
 function renderPaginacion(contId, actual, total, onPage) {
   const cont = document.getElementById(contId);
   if (!cont) return;
-  if (total <= 1) { cont.innerHTML = ''; return; }
-  cont.innerHTML = `
-    <button class="btn btn-secondary pag-btn" ${actual <= 1 ? 'disabled' : ''} data-pag="${actual - 1}">← Anterior</button>
-    <span class="pag-info">Página ${actual} de ${total}</span>
-    <button class="btn btn-secondary pag-btn" ${actual >= total ? 'disabled' : ''} data-pag="${actual + 1}">Siguiente →</button>
-  `;
+
+  if (total <= 1) {
+    cont.innerHTML = '';
+    return;
+  }
+
+  // Recolectar números a mostrar
+  const paginas = new Set();
+  paginas.add(1);
+  if (total >= 2) paginas.add(2);
+  paginas.add(actual - 1);
+  paginas.add(actual);
+  paginas.add(actual + 1);
+  if (total >= 3) paginas.add(total - 1);
+  paginas.add(total);
+
+  const listaNumeros = Array.from(paginas)
+    .filter(n => n >= 1 && n <= total)
+    .sort((a, b) => a - b);
+
+  // Construir HTML
+  let html = '';
+
+  // Botón « (primera)
+  html += `<button class="pag-btn pag-nav" data-pag="1" ${actual <= 1 ? 'disabled' : ''} title="Primera página">«</button>`;
+
+  // Botón ← (anterior)
+  html += `<button class="pag-btn pag-nav" data-pag="${actual - 1}" ${actual <= 1 ? 'disabled' : ''} title="Anterior">←</button>`;
+
+  // Números con "…"
+  let previo = 0;
+  listaNumeros.forEach(p => {
+    if (previo && p - previo > 1) {
+      html += `<span class="pag-ellipsis">…</span>`;
+    }
+    const activa = p === actual ? 'pag-active' : '';
+    html += `<button class="pag-btn pag-num ${activa}" data-pag="${p}">${p}</button>`;
+    previo = p;
+  });
+
+  // Botón → (siguiente)
+  html += `<button class="pag-btn pag-nav" data-pag="${actual + 1}" ${actual >= total ? 'disabled' : ''} title="Siguiente">→</button>`;
+
+  // Botón » (última)
+  html += `<button class="pag-btn pag-nav" data-pag="${total}" ${actual >= total ? 'disabled' : ''} title="Última página">»</button>`;
+
+  cont.innerHTML = html;
+
+  // Listeners
   cont.querySelectorAll('.pag-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      const p = parseInt(btn.dataset.pag);
-      if (!isNaN(p) && p >= 1 && p <= total) { onPage(p); window.scrollTo({ top: 200, behavior: 'smooth' }); }
+      const p = parseInt(btn.dataset.pag, 10);
+      if (!isNaN(p) && p >= 1 && p <= total && p !== actual) {
+        onPage(p);
+        window.scrollTo({ top: 200, behavior: 'smooth' });
+      }
     });
   });
 }
@@ -795,4 +841,4 @@ document.getElementById('trailer-modal')?.addEventListener('click', (e) => {
   if (e.target.id === 'trailer-modal') document.getElementById('trailer-modal')?.classList.add('hidden');
 });
 
-console.log('[GamesUy] store.js v12 cargado (con botón eliminar admin)');
+console.log('[GamesUy] store.js v13 cargado (con paginación mejorada)');

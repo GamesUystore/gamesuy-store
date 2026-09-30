@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=37">
+  <link rel="stylesheet" href="styles.css?v=38">
 </head>
 <body>
 
@@ -172,6 +172,7 @@
           <button class="admin-tab" data-tab="resenas">⭐ Reseñas</button>
           <button class="admin-tab" data-tab="reportes">📢 Reportes</button>
           <button class="admin-tab" data-tab="visitas">📊 Visitas</button>
+          <button class="admin-tab" data-tab="estadisticas">📈 Estadísticas</button>
           <button class="admin-tab" data-tab="excel">📥 Importar Excel</button>
           <button class="admin-tab" data-tab="config">⚙️ Configuración</button>
           <button class="admin-tab" data-tab="mantenimiento">🧹 Mantenimiento</button>
@@ -443,7 +444,6 @@
           </div>
         </div>
 
-        <!-- NUEVO: Tab Visitas -->
         <div class="admin-tab-content" data-tab-content="visitas">
           <div class="admin-grid">
             <div class="admin-card admin-card-wide">
@@ -471,6 +471,55 @@
 
               <h4 class="admin-subtitle" style="margin-top:24px;">Últimos 7 días</h4>
               <div id="visitas-ultimos" class="visitas-ultimos">
+                <p style="color:var(--text-muted);text-align:center;padding:20px;">Cargando...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- NUEVO: Tab Estadísticas -->
+        <div class="admin-tab-content" data-tab-content="estadisticas">
+          <div class="admin-grid">
+            <div class="admin-card admin-card-wide">
+              <h3>📈 Resumen general</h3>
+              <p class="admin-help">Métricas de uso de la tienda. Se actualizan automáticamente.</p>
+
+              <div class="estadisticas-resumen">
+                <div class="estadistica-card-grande estadistica-catalogo">
+                  <span class="estadistica-label">👁️ Vistas del catálogo</span>
+                  <span class="estadistica-valor" id="est-total-vistas">0</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="admin-card admin-card-wide">
+              <h3>🎬 Juegos más vistos (trailers abiertos)</h3>
+              <p class="admin-help">Qué juegos genera más interés al ver el trailer.</p>
+              <div id="est-top-trailers" class="estadisticas-lista">
+                <p style="color:var(--text-muted);text-align:center;padding:20px;">Cargando...</p>
+              </div>
+            </div>
+
+            <div class="admin-card admin-card-wide">
+              <h3>💬 Juegos más consultados por WhatsApp</h3>
+              <p class="admin-help">Qué juegos generan más clicks en "Comprar por WhatsApp".</p>
+              <div id="est-top-whatsapp" class="estadisticas-lista">
+                <p style="color:var(--text-muted);text-align:center;padding:20px;">Cargando...</p>
+              </div>
+            </div>
+
+            <div class="admin-card">
+              <h3>📂 Categorías más usadas</h3>
+              <p class="admin-help">Filtros más clickeados por los clientes.</p>
+              <div id="est-top-categorias" class="estadisticas-lista">
+                <p style="color:var(--text-muted);text-align:center;padding:20px;">Cargando...</p>
+              </div>
+            </div>
+
+            <div class="admin-card">
+              <h3>🔍 Búsquedas sin resultados</h3>
+              <p class="admin-help">Qué buscan y no encuentran. Útil para saber qué juegos agregar.</p>
+              <div id="est-top-busquedas" class="estadisticas-lista">
                 <p style="color:var(--text-muted);text-align:center;padding:20px;">Cargando...</p>
               </div>
             </div>
@@ -846,18 +895,19 @@
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-  <script type="module" src="js/settings.js?v=37"></script>
-  <script type="module" src="js/auth.js?v=37"></script>
-  <script type="module" src="js/admin.js?v=37"></script>
-  <script type="module" src="js/excel-importer.js?v=37"></script>
-  <script type="module" src="js/maintenance.js?v=37"></script>
-  <script type="module" src="js/precios.js?v=37"></script>
-  <script type="module" src="js/precios-masivo.js?v=37"></script>
-  <script type="module" src="js/manual-create.js?v=37"></script>
-  <script type="module" src="js/contenido.js?v=37"></script>
-  <script type="module" src="js/resenas.js?v=37"></script>
-  <script type="module" src="js/reportes.js?v=37"></script>
-  <script type="module" src="js/visitas.js?v=37"></script>
-  <script type="module" src="js/store.js?v=37"></script>
+  <script type="module" src="js/settings.js?v=38"></script>
+  <script type="module" src="js/auth.js?v=38"></script>
+  <script type="module" src="js/admin.js?v=38"></script>
+  <script type="module" src="js/excel-importer.js?v=38"></script>
+  <script type="module" src="js/maintenance.js?v=38"></script>
+  <script type="module" src="js/precios.js?v=38"></script>
+  <script type="module" src="js/precios-masivo.js?v=38"></script>
+  <script type="module" src="js/manual-create.js?v=38"></script>
+  <script type="module" src="js/contenido.js?v=38"></script>
+  <script type="module" src="js/resenas.js?v=38"></script>
+  <script type="module" src="js/reportes.js?v=38"></script>
+  <script type="module" src="js/visitas.js?v=38"></script>
+  <script type="module" src="js/estadisticas.js?v=38"></script>
+  <script type="module" src="js/store.js?v=38"></script>
 </body>
 </html>

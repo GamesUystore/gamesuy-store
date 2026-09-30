@@ -1,6 +1,7 @@
 // ============================================================
 // GAMESUY STORE — Catálogo público + Ofertas + Preventas
 // Fase 8.9: Tracking de estadísticas internas
+// Fase 2 SEO: título dinámico por página
 // ============================================================
 
 import { db, auth } from './firebase-config.js';
@@ -24,6 +25,48 @@ let preState = { search: '', cat: 'all', pagina: 1 };
 const POR_PAGINA = 24;
 
 let countdownInterval = null;
+
+// ============================================================
+// SEO — Títulos dinámicos por página
+// ============================================================
+const SEO_TITULOS = {
+  'catalogo':   'Catálogo de Juegos Digitales',
+  'ofertas':    '🔥 Ofertas Especiales',
+  'preventas':  '🚀 Preventas',
+  'faq':        'Preguntas Frecuentes',
+  'terminos':   'Términos y Condiciones',
+  'resenas':    '⭐ Reseñas de Clientes',
+  'contacto':   'Contacto',
+  'admin':      'Panel de Administración'
+};
+
+const SEO_DESCRIPCIONES = {
+  'catalogo':   'Catálogo completo de juegos digitales para PS5, PS4, PS3, Steam, PS Plus y streaming en Uruguay. Entrega inmediata y los mejores precios.',
+  'ofertas':    'Ofertas especiales en juegos digitales y suscripciones. Descuentos por tiempo limitado en GamesUy Store.',
+  'preventas':  'Reservá los próximos lanzamientos antes que nadie. Preventas de juegos digitales en Uruguay.',
+  'faq':        'Preguntas frecuentes sobre cómo comprar juegos digitales en GamesUy Store.',
+  'terminos':   'Términos y condiciones de compra en GamesUy Store.',
+  'resenas':    'Reseñas reales de clientes que compraron juegos digitales en GamesUy Store.',
+  'contacto':   'Contactate con GamesUy Store. Atención personalizada por WhatsApp.'
+};
+
+function actualizarSEOPagina(pageId) {
+  const base = 'GamesUy Store';
+  const titulo = SEO_TITULOS[pageId];
+  document.title = titulo ? `${titulo} | ${base}` : `${base} | Tienda Digital Gamer en Uruguay`;
+
+  const desc = SEO_DESCRIPCIONES[pageId];
+  if (desc) {
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) metaDesc.setAttribute('content', desc);
+
+    const ogTitle = document.querySelector('meta[property="og:title"]');
+    if (ogTitle && titulo) ogTitle.setAttribute('content', `${titulo} | ${base}`);
+
+    const ogDesc = document.querySelector('meta[property="og:description"]');
+    if (ogDesc) ogDesc.setAttribute('content', desc);
+  }
+}
 
 // Detectar si el usuario es admin
 onAuthStateChanged(auth, (user) => {
@@ -55,7 +98,6 @@ onSnapshot(collection(db, 'products'), (snap) => {
     setTimeout(procesarHashInicial, 300);
   }
 
-  // Tracking: registrar vista del catálogo (1 vez por sesión)
   if (typeof window.__estRegistrarVista === 'function') {
     window.__estRegistrarVista();
   }
@@ -341,7 +383,6 @@ function activarCards(lista, prefijo) {
     if (selConsole) actualizarSelectorVariante(p, cardId, prefijo);
     actualizarPrecio(p, cardId, prefijo);
 
-    // Tracking: click en "Comprar por WhatsApp"
     const waBtn = document.getElementById(`wa-${prefijo}-${cardId}`);
     if (waBtn && !waBtn.dataset.tracked) {
       waBtn.dataset.tracked = '1';
@@ -918,7 +959,6 @@ window.abrirTrailer = function(cardId) {
   const p = productos.find(x => x.id === cardId);
   if (!p) return;
 
-  // Tracking
   if (typeof window.__estRegistrarTrailer === 'function') {
     window.__estRegistrarTrailer(p.id, p.title || '');
   }
@@ -967,7 +1007,6 @@ if (searchInput) {
       catState.search = val; catState.pagina = 1; renderCatalogo();
     }
 
-    // Tracking: búsqueda sin resultados (con delay para no spamear)
     clearTimeout(timeoutBusqueda);
     timeoutBusqueda = setTimeout(() => {
       const q = String(val || '').trim();
@@ -992,7 +1031,6 @@ document.querySelectorAll('#cat-nav .cat-btn').forEach(btn => {
     const enOfertas = $('page-ofertas')?.classList.contains('active-page');
     const enPreventas = $('page-preventas')?.classList.contains('active-page');
 
-    // Tracking: click en categoría
     if (cat !== 'all' && typeof window.__estRegistrarCategoria === 'function') {
       window.__estRegistrarCategoria(cat);
     }
@@ -1007,9 +1045,16 @@ document.querySelectorAll('#cat-nav .cat-btn').forEach(btn => {
   });
 });
 
+// ============================================================
+// SEO — Override switchPage con título dinámico
+// ============================================================
 const originalSwitchPage = window.switchPage;
 window.switchPage = function(pageId) {
   if (originalSwitchPage) originalSwitchPage(pageId);
+
+  // SEO: actualizar título y meta description
+  actualizarSEOPagina(pageId);
+
   const si = $('search-input');
   const catActiva = document.querySelector('#cat-nav .cat-btn.active');
   const cat = catActiva ? (catActiva.dataset.cat || 'all') : 'all';
@@ -1041,4 +1086,4 @@ document.getElementById('trailer-modal')?.addEventListener('click', (e) => {
   if (e.target.id === 'trailer-modal') document.getElementById('trailer-modal')?.classList.add('hidden');
 });
 
-console.log('[GamesUy] store.js v16 cargado (con tracking de estadísticas)');
+console.log('[GamesUy] store.js v17 cargado (con SEO dinámico)');

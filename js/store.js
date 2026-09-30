@@ -1,6 +1,6 @@
 // ============================================================
 // GAMESUY STORE — Catálogo público + Ofertas + Preventas
-// Fase 8.7: Botón Reportar problema en cada card
+// Fase 8.8: Compartir juego por WhatsApp + Copiar link
 // ============================================================
 
 import { db, auth } from './firebase-config.js';
@@ -16,6 +16,7 @@ let productos = [];
 let cotizaciones = { arsAUYU: 0.055, usdAUYU: 39.50 };
 let pagosTexto = 'Prex / Mercado Pago / BROU';
 let isAdmin = false;
+let hashProcesado = false;
 
 let catState = { search: '', cat: 'all', pagina: 1 };
 let ofState = { search: '', cat: 'all', pagina: 1 };
@@ -45,10 +46,15 @@ onSnapshot(doc(db, 'settings', 'payments'), (snap) => {
 
 onSnapshot(collection(db, 'products'), (snap) => {
   productos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  // Exponer cache global para que reportes.js pueda acceder
   window.__productosCache = productos;
   console.log('[GamesUy] Catálogo:', productos.length, 'productos');
   renderAll();
+
+  // Procesar hash de URL (link compartido) solo la primera vez que cargan
+  if (!hashProcesado) {
+    hashProcesado = true;
+    setTimeout(procesarHashInicial, 300);
+  }
 });
 
 // ============================================================
@@ -334,7 +340,7 @@ function activarCards(lista, prefijo) {
 }
 
 // ============================================================
-// PAGINACIÓN MEJORADA — Números clickeables
+// PAGINACIÓN MEJORADA
 // ============================================================
 function renderPaginacion(contId, actual, total, onPage) {
   const cont = document.getElementById(contId);
@@ -431,7 +437,6 @@ function renderCard(p, prefijo = 'cat') {
 
   const tieneTrailer = p.youtubeUrl || p.gameplayUrl;
 
-  // Botones admin (editar + eliminar) — solo visibles si es admin
   const adminBtns = isAdmin
     ? `<div class="card-admin-actions">
          <button class="card-admin-btn card-admin-edit" title="Editar este juego"
@@ -456,10 +461,177 @@ function renderCard(p, prefijo = 'cat') {
       <div class="card-countdown" id="countdown-${prefijo}-${cardId}"></div>
       <a class="btn btn-buy" id="wa-${prefijo}-${cardId}" href="#" target="_blank" rel="noopener">💬 Comprar por WhatsApp</a>
       ${tieneTrailer ? `<button class="btn btn-secondary" onclick="abrirTrailer('${cardId}')">🎬 Ver Trailer</button>` : ''}
+      <div class="card-share-btns">
+        <button class="btn btn-share" onclick="compartirWhatsapp('${cardId}', '${prefijo}')" title="Compartir por WhatsApp">📱 WhatsApp</button>
+        <button class="btn btn-share" data-share-copy="${cardId}" onclick="copiarLinkJuego('${cardId}')" title="Copiar link del juego">🔗 Copiar link</button>
+      </div>
       <button class="btn btn-reporte" onclick="abrirModalReporte('${cardId}')">⚠️ Reportar problema</button>
     </article>
   `;
 }
+
+// ============================================================
+// COMPARTIR POR WHATSAPP
+// ============================================================
+window.compartirWhatsapp = function(cardId, prefijo = 'cat') {
+  const prod = productos.find(p => p.id === cardId);
+  if (!prod) return;
+
+  // Obtener variante y moneda actuales de la card
+  const selConsole = document.getElementById(`sel-console-${prefijo}-${cardId}`);
+  const selVariant = document.getElementById(`sel-variant-${prefijo}-${cardId}`);
+  const selCurrency = document.getElementById(`sel-currency-${prefijo}-${cardId}`);
+
+  let precioTexto = '';
+  let varianteLabel = '';
+  let categoriaLabel = '';
+
+  if (selConsole && selVariant && selCurrency) {
+    const variante = (prod.variants || []).find(v => v.id === selVariant.value);
+    if (variante) {
+      const oferta = ofertaVigente(variante);
+      const tieneNormal = Number(variante.costoARS) > 0 && Number(variante.precioFinalUYU) > 0;
+      const moneda = selCurrency.value;
+
+      varianteLabel = variante.label || '';
+      categoriaLabel = (selConsole.value || '').toUpperCase();
+
+      if (oferta && tieneNormal) {
+        const precioMostrar = moneda === 'USD'
+          ? formatUSD(calcPrecioUSD(oferta.precio, cotizaciones.usdAUYU))
+          : formatUYU(oferta.precio);
+        const precioOriginal = moneda === 'USD'
+          ? formatUSD(calcPrecioUSD(oferta.original, cotizaciones.usdAUYU))
+          : formatUYU(oferta.original);
+        precioTexto = `🔥 *${precioMostrar}* (antes ${precioOriginal})`;
+      } else if (oferta && !tieneNormal) {
+        const precioMostrar = moneda === 'USD'
+          ? formatUSD(calcPrecioUSD(oferta.precio, cotizaciones.usdAUYU))
+          : formatUYU(oferta.precio);
+        precioTexto = `🔥 ${precioMostrar}`;
+      } else if (tieneNormal) {
+        const precioMostrar = moneda === 'USD'
+          ? formatUSD(calcPrecioUSD(variante.precioFinalUYU, cotizaciones.usdAUYU))
+          : formatUYU(variante.precioFinalUYU);
+        precioTexto = precioMostrar;
+      }
+    }
+  }
+
+  const url = `${window.location.origin}${window.location.pathname}#producto=${cardId}`;
+
+  let mensaje = `¡Mirá este juego en GamesUy Store!\n\n`;
+  mensaje += `🎮 *${prod.title}*`;
+  if (categoriaLabel) mensaje += `\n📦 ${categoriaLabel}`;
+  if (varianteLabel) mensaje += ` · ${varianteLabel}`;
+  if (precioTexto) mensaje += `\n💰 ${precioTexto}`;
+  mensaje += `\n\n${url}`;
+
+  const wa = `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
+  window.open(wa, '_blank', 'noopener');
+};
+
+// ============================================================
+// COPIAR LINK DEL JUEGO
+// ============================================================
+window.copiarLinkJuego = async function(cardId) {
+  const url = `${window.location.origin}${window.location.pathname}#producto=${cardId}`;
+
+  const btn = document.querySelector(`[data-share-copy="${cardId}"]`);
+  const originalHtml = btn ? btn.innerHTML : '';
+
+  try {
+    await navigator.clipboard.writeText(url);
+    if (btn) {
+      btn.innerHTML = '✅ ¡Copiado!';
+      btn.classList.add('btn-copiado');
+      setTimeout(() => {
+        btn.innerHTML = originalHtml;
+        btn.classList.remove('btn-copiado');
+      }, 2000);
+    }
+  } catch (err) {
+    // Fallback para navegadores sin clipboard API
+    console.warn('[GamesUy] Clipboard API no disponible, usando prompt');
+    const input = document.createElement('input');
+    input.value = url;
+    document.body.appendChild(input);
+    input.select();
+    try {
+      document.execCommand('copy');
+      if (btn) {
+        btn.innerHTML = '✅ ¡Copiado!';
+        btn.classList.add('btn-copiado');
+        setTimeout(() => {
+          btn.innerHTML = originalHtml;
+          btn.classList.remove('btn-copiado');
+        }, 2000);
+      }
+    } catch (e) {
+      prompt('Copiá este link:', url);
+    }
+    document.body.removeChild(input);
+  }
+};
+
+// ============================================================
+// PROCESAR HASH DE URL (link compartido)
+// ============================================================
+function procesarHashInicial() {
+  const hash = window.location.hash;
+  if (!hash || !hash.startsWith('#producto=')) return;
+
+  const cardId = hash.replace('#producto=', '').split('&')[0];
+  if (!cardId) return;
+
+  console.log('[GamesUy] Procesando link compartido para:', cardId);
+
+  // Buscar el producto
+  const prod = productos.find(p => p.id === cardId);
+  if (!prod) {
+    console.log('[GamesUy] Producto no encontrado en el catálogo:', cardId);
+    return;
+  }
+
+  // Ir al catálogo
+  if (typeof window.switchPage === 'function') {
+    window.switchPage('catalogo');
+  }
+
+  // Buscar la página donde está el producto
+  const filtrados = filtrarProductos();
+  const index = filtrados.findIndex(p => p.id === cardId);
+
+  if (index === -1) {
+    console.log('[GamesUy] Producto no está en la lista filtrada');
+    return;
+  }
+
+  const pag = Math.floor(index / POR_PAGINA) + 1;
+  catState.pagina = pag;
+  renderCatalogo();
+
+  // Esperar a que el DOM esté listo y hacer scroll
+  setTimeout(() => {
+    const card = document.querySelector(`.product-card[data-card-id="${cardId}"]`);
+    if (!card) return;
+
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    // Agregar clase de destacado
+    card.classList.add('card-destacada');
+
+    // Quitar el destacado después de 4 segundos
+    setTimeout(() => {
+      card.classList.remove('card-destacada');
+    }, 4000);
+  }, 400);
+}
+
+// Re-procesar hash si cambia (ej: cuando alguien pega un link estando ya en la web)
+window.addEventListener('hashchange', () => {
+  procesarHashInicial();
+});
 
 // ============================================================
 // ABRIR EDITAR DESDE EL CATÁLOGO
@@ -835,4 +1007,4 @@ document.getElementById('trailer-modal')?.addEventListener('click', (e) => {
   if (e.target.id === 'trailer-modal') document.getElementById('trailer-modal')?.classList.add('hidden');
 });
 
-console.log('[GamesUy] store.js v14 cargado (con botón reportar)');
+console.log('[GamesUy] store.js v15 cargado (con compartir juego)');

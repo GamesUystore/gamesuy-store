@@ -4002,3 +4002,152 @@ body::after {
     padding: 4px 10px;
   }
 }
+/* ============================================================
+   FASE 18 — Estadísticas internas
+   ============================================================ */
+
+/* ---------- RESUMEN GENERAL ---------- */
+.estadisticas-resumen {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.estadistica-card-grande {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 28px 20px;
+  border-radius: var(--r-lg);
+  background: linear-gradient(160deg, var(--bg-2) 0%, var(--bg-0) 100%);
+  border: 1px solid var(--border);
+  text-align: center;
+}
+
+.estadistica-catalogo {
+  border-color: rgba(0, 240, 255, 0.4);
+  background: linear-gradient(160deg, rgba(0, 240, 255, 0.08) 0%, var(--bg-0) 100%);
+}
+
+.estadistica-label {
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.estadistica-valor {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 2.4rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--cyan);
+  text-shadow: 0 0 20px rgba(0, 240, 255, 0.5);
+}
+
+/* ---------- LISTAS DE ESTADÍSTICAS ---------- */
+.estadisticas-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.est-fila {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 14px;
+  align-items: center;
+  padding: 12px 14px;
+  background: var(--bg-0);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.est-fila:hover {
+  border-color: var(--border-hi);
+  transform: translateX(3px);
+}
+
+.est-fila-num {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--gold);
+  min-width: 40px;
+  text-align: center;
+}
+
+.est-fila-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.est-fila-titulo {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.est-fila-barra-wrap {
+  height: 6px;
+  background: var(--bg-2);
+  border-radius: var(--r-pill);
+  overflow: hidden;
+}
+
+.est-fila-barra {
+  height: 100%;
+  background: linear-gradient(90deg, var(--cyan), var(--purple));
+  border-radius: var(--r-pill);
+  transition: width 0.5s ease;
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
+}
+
+.est-fila-barra-alerta {
+  background: linear-gradient(90deg, var(--gold), #ff8c00);
+  box-shadow: 0 0 8px rgba(255, 184, 0, 0.4);
+}
+
+.est-fila-count {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--green);
+  text-shadow: 0 0 10px rgba(0, 255, 157, 0.3);
+  min-width: 40px;
+  text-align: right;
+}
+
+/* ---------- RESPONSIVE MÓVIL ---------- */
+@media (max-width: 640px) {
+  .estadistica-valor {
+    font-size: 1.8rem;
+  }
+  .estadistica-card-grande {
+    padding: 20px 14px;
+  }
+  .est-fila {
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+  .est-fila-num {
+    display: none;
+  }
+  .est-fila-titulo {
+    font-size: 0.82rem;
+  }
+  .est-fila-count {
+    font-size: 0.85rem;
+    min-width: 32px;
+  }
+}

@@ -4151,3 +4151,48 @@ body::after {
     min-width: 32px;
   }
 }
+/* ============================================================
+   FASE 19 — Botón Editar en Carga Masiva
+   ============================================================ */
+
+.masivo-juego-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.masivo-juego-edit {
+  padding: 8px 14px;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  background: linear-gradient(135deg, var(--gold), #ffdd77);
+  color: #000;
+  border: none;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 0 10px rgba(255, 184, 0, 0.4);
+  white-space: nowrap;
+}
+.masivo-juego-edit:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 18px rgba(255, 184, 0, 0.75);
+}
+
+@media (max-width: 640px) {
+  .masivo-juego-actions {
+    width: 100%;
+    margin-top: 10px;
+  }
+  .masivo-juego-edit,
+  .masivo-juego-delete {
+    flex: 1;
+  }
+  .masivo-juego-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

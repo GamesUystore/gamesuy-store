@@ -1,6 +1,6 @@
 // ============================================================
 // GAMESUY STORE — Carga masiva de precios
-// Fase 7.2: Badges + Eliminar juegos duplicados
+// Fase 7.3: Botón Editar agregado
 // ============================================================
 
 import { db } from './firebase-config.js';
@@ -24,7 +24,7 @@ const POR_PAGINA = 20;
 
 let cambios = {};
 
-console.log('[GamesUy] precios-masivo.js v3 iniciando...');
+console.log('[GamesUy] precios-masivo.js v4 iniciando...');
 
 onSnapshot(doc(db, 'settings', 'cotizaciones'), (snap) => {
   if (!snap.exists()) return;
@@ -95,7 +95,6 @@ function formatFecha(dateStr) {
   return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : dateStr;
 }
 
-// Devuelve el estado del juego para mostrar el badge correcto
 function obtenerEstadoProducto(p) {
   const esPreventa = productoEsPreventa(p);
   const esSoloOferta = p.soloOferta && !p.soloPreventa;
@@ -292,8 +291,12 @@ function renderJuego(p) {
           </div>
           <h4>${escapeHtml(p.title || '(sin título)')}</h4>
         </div>
-        <button class="masivo-juego-delete" title="Eliminar este juego"
-                onclick="window.eliminarJuegoMasivo('${p.id}', '${tituloEscapado}')">🗑️</button>
+        <div class="masivo-juego-actions">
+          <button class="masivo-juego-edit" title="Editar este juego"
+                  onclick="window.abrirEditarMasivo('${p.id}')">✏️ Editar</button>
+          <button class="masivo-juego-delete" title="Eliminar este juego"
+                  onclick="window.eliminarJuegoMasivo('${p.id}', '${tituloEscapado}')">🗑️</button>
+        </div>
       </div>
       <div class="masivo-juego-variantes">
         ${variantesHtml}
@@ -335,6 +338,24 @@ function activarListeners() {
     });
   });
 }
+
+// ============================================================
+// ABRIR EDITOR COMPLETO desde la carga masiva
+// ============================================================
+window.abrirEditarMasivo = function(id) {
+  if (typeof window.abrirEditarProducto !== 'function') {
+    alert('No se pudo abrir el editor. Recargá la página e intentá de nuevo.');
+    return;
+  }
+  // Abre el modal de precios (que expone precios.js)
+  window.abrirEditarProducto(id);
+  // Cambia automáticamente a la pestaña "Información"
+  setTimeout(() => {
+    if (typeof window.switchModalTab === 'function') {
+      window.switchModalTab('info');
+    }
+  }, 80);
+};
 
 // ============================================================
 // ELIMINAR JUEGO
@@ -472,4 +493,4 @@ $('btn-save-masivo')?.addEventListener('click', guardarTodos);
 // INIT
 // ============================================================
 cargarProductos();
-console.log('[GamesUy] precios-masivo.js v3 cargado (con eliminar juegos)');
+console.log('[GamesUy] precios-masivo.js v4 cargado (con botón Editar)');

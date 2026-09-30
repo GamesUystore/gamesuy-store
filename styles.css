@@ -3480,3 +3480,200 @@ body::after {
     display: none;
   }
 }
+/* ============================================================
+   FASE 15 — Reportes + Pedidos (botones y modales)
+   ============================================================ */
+
+/* ---------- BOTÓN FLOTANTE "PEDIR JUEGO" ---------- */
+.report-float {
+  position: fixed;
+  bottom: 92px;
+  right: 24px;
+  width: 58px;
+  height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  background: linear-gradient(135deg, #ffb800, #ff8c00);
+  color: #000;
+  border: none;
+  border-radius: 50%;
+  box-shadow: 0 0 24px rgba(255, 184, 0, 0.6);
+  z-index: 999;
+  cursor: pointer;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+.report-float:hover {
+  transform: scale(1.1);
+  box-shadow: 0 0 34px rgba(255, 184, 0, 0.9);
+}
+
+/* ---------- BOTÓN "REPORTAR PROBLEMA" EN LAS CARDS ---------- */
+.btn-reporte {
+  margin-top: 8px !important;
+  background: transparent !important;
+  color: #ff8aa8 !important;
+  border: 1px solid rgba(255, 0, 85, 0.4) !important;
+  font-size: 0.78rem !important;
+  padding: 8px 12px !important;
+  box-shadow: none !important;
+}
+.btn-reporte:hover {
+  background: rgba(255, 0, 85, 0.1) !important;
+  border-color: #ff4d6d !important;
+  color: #ff4d6d !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(255, 0, 85, 0.2) !important;
+}
+
+/* ---------- MODALES DE REPORTE Y PEDIDO ---------- */
+#reporte-modal .contact-form,
+#pedido-modal .contact-form {
+  max-width: 100%;
+}
+
+#reporte-modal .card-select,
+#pedido-modal .card-select {
+  width: 100%;
+  padding: 11px 14px;
+  font-size: 0.95rem;
+  margin-bottom: 4px;
+}
+
+#reporte-modal input[readonly] {
+  background: var(--bg-0) !important;
+  color: var(--text-muted) !important;
+  cursor: not-allowed;
+}
+
+/* ---------- ADMIN: REPORTES Y PEDIDOS ---------- */
+.admin-reporte-item {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  background: var(--bg-0);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  transition: border-color 0.2s ease;
+}
+.admin-reporte-item:hover {
+  border-color: var(--border-hi);
+}
+
+.admin-reporte-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-reporte-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-reporte-tipo {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  background: rgba(255, 0, 85, 0.12);
+  border: 1px solid rgba(255, 0, 85, 0.4);
+  color: #ff8aa8;
+}
+
+.admin-pedido-tipo {
+  background: rgba(255, 184, 0, 0.12) !important;
+  border-color: rgba(255, 184, 0, 0.4) !important;
+  color: var(--gold) !important;
+}
+
+.admin-pedido-plataforma {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: var(--r-sm);
+  background: rgba(0, 240, 255, 0.1);
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  color: var(--cyan);
+}
+
+.admin-reporte-fecha {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-left: auto;
+}
+
+.admin-reporte-juego {
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 700;
+  word-break: break-word;
+}
+
+.admin-reporte-desc {
+  color: var(--text-dim);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  white-space: pre-line;
+  word-break: break-word;
+  margin: 0;
+}
+
+.admin-reporte-contacto {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  padding-top: 4px;
+}
+.admin-reporte-contacto a {
+  color: var(--cyan);
+  text-decoration: none;
+  font-weight: 600;
+}
+.admin-reporte-contacto a:hover {
+  text-decoration: underline;
+}
+
+.admin-reporte-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.admin-reporte-acciones .btn {
+  width: auto;
+  flex: 0 1 auto;
+  min-width: 130px;
+}
+
+/* ---------- RESPONSIVE MÓVIL ---------- */
+@media (max-width: 640px) {
+  .report-float {
+    width: 52px;
+    height: 52px;
+    font-size: 1.3rem;
+    bottom: 80px;
+    right: 16px;
+  }
+  .btn-reporte {
+    font-size: 0.72rem !important;
+    padding: 7px 10px !important;
+  }
+  .admin-reporte-fecha {
+    margin-left: 0;
+    width: 100%;
+  }
+  .admin-reporte-acciones .btn {
+    width: 100%;
+    min-width: 100%;
+  }
+}

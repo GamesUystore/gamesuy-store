@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=36">
+  <link rel="stylesheet" href="styles.css?v=37">
 </head>
 <body>
 
@@ -171,6 +171,7 @@
           <button class="admin-tab" data-tab="contenido">📄 Contenido</button>
           <button class="admin-tab" data-tab="resenas">⭐ Reseñas</button>
           <button class="admin-tab" data-tab="reportes">📢 Reportes</button>
+          <button class="admin-tab" data-tab="visitas">📊 Visitas</button>
           <button class="admin-tab" data-tab="excel">📥 Importar Excel</button>
           <button class="admin-tab" data-tab="config">⚙️ Configuración</button>
           <button class="admin-tab" data-tab="mantenimiento">🧹 Mantenimiento</button>
@@ -400,7 +401,6 @@
           </div>
         </div>
 
-        <!-- NUEVO: Tab Reportes -->
         <div class="admin-tab-content" data-tab-content="reportes">
           <div class="admin-grid">
             <div class="admin-card admin-card-wide">
@@ -437,6 +437,40 @@
 
               <h4 class="admin-subtitle" style="margin-top:24px;">✅ Resueltos</h4>
               <div id="admin-pedidos-resueltos" class="admin-resenas-list">
+                <p style="color:var(--text-muted);text-align:center;padding:20px;">Cargando...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- NUEVO: Tab Visitas -->
+        <div class="admin-tab-content" data-tab-content="visitas">
+          <div class="admin-grid">
+            <div class="admin-card admin-card-wide">
+              <h3>📊 Estadísticas de visitas</h3>
+              <p class="admin-help">Solo cuenta 1 visita por persona por día. Tus visitas como admin NO se cuentan.</p>
+
+              <div class="visitas-stats">
+                <div class="visita-stat-card visita-stat-hoy">
+                  <span class="visita-stat-label">📅 Hoy</span>
+                  <span class="visita-stat-valor" id="visita-hoy">0</span>
+                </div>
+                <div class="visita-stat-card visita-stat-semana">
+                  <span class="visita-stat-label">📆 Últimos 7 días</span>
+                  <span class="visita-stat-valor" id="visita-semana">0</span>
+                </div>
+                <div class="visita-stat-card visita-stat-mes">
+                  <span class="visita-stat-label">🗓️ Este mes</span>
+                  <span class="visita-stat-valor" id="visita-mes">0</span>
+                </div>
+                <div class="visita-stat-card visita-stat-total">
+                  <span class="visita-stat-label">🌐 Total histórico</span>
+                  <span class="visita-stat-valor" id="visita-total">0</span>
+                </div>
+              </div>
+
+              <h4 class="admin-subtitle" style="margin-top:24px;">Últimos 7 días</h4>
+              <div id="visitas-ultimos" class="visitas-ultimos">
                 <p style="color:var(--text-muted);text-align:center;padding:20px;">Cargando...</p>
               </div>
             </div>
@@ -563,12 +597,12 @@
     </section>
   </main>
 
-  <footer class="site-footer"><p>© 2026 GamesUy Store — Juegos digitales en Uruguay</p></footer>
+  <footer class="site-footer">
+    <p>© 2026 GamesUy Store — Juegos digitales en Uruguay</p>
+    <p class="footer-visitas"><span id="footer-visitas">👁️ Cargando visitas...</span></p>
+  </footer>
 
-  <!-- Botón flotante WhatsApp -->
   <a href="https://wa.me/59896572226" class="chat-float" target="_blank" rel="noopener" title="Contactar por WhatsApp">💬</a>
-
-  <!-- NUEVO: Botón flotante Pedir juego -->
   <button class="report-float" onclick="abrirModalPedido()" title="¿No encontrás un juego? Pedilo acá">🔍</button>
 
   <div id="login-modal" class="admin-modal hidden">
@@ -705,7 +739,6 @@
     </div>
   </div>
 
-  <!-- NUEVO: Modal Reportar problema -->
   <div id="reporte-modal" class="admin-modal hidden">
     <div class="modal-content modal-content-large">
       <button class="modal-close" onclick="cerrarModalReporte()" aria-label="Cerrar">✕</button>
@@ -741,7 +774,6 @@
     </div>
   </div>
 
-  <!-- NUEVO: Modal Pedir juego -->
   <div id="pedido-modal" class="admin-modal hidden">
     <div class="modal-content modal-content-large">
       <button class="modal-close" onclick="cerrarModalPedido()" aria-label="Cerrar">✕</button>
@@ -814,17 +846,18 @@
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-  <script type="module" src="js/settings.js?v=36"></script>
-  <script type="module" src="js/auth.js?v=36"></script>
-  <script type="module" src="js/admin.js?v=36"></script>
-  <script type="module" src="js/excel-importer.js?v=36"></script>
-  <script type="module" src="js/maintenance.js?v=36"></script>
-  <script type="module" src="js/precios.js?v=36"></script>
-  <script type="module" src="js/precios-masivo.js?v=36"></script>
-  <script type="module" src="js/manual-create.js?v=36"></script>
-  <script type="module" src="js/contenido.js?v=36"></script>
-  <script type="module" src="js/resenas.js?v=36"></script>
-  <script type="module" src="js/reportes.js?v=36"></script>
-  <script type="module" src="js/store.js?v=36"></script>
+  <script type="module" src="js/settings.js?v=37"></script>
+  <script type="module" src="js/auth.js?v=37"></script>
+  <script type="module" src="js/admin.js?v=37"></script>
+  <script type="module" src="js/excel-importer.js?v=37"></script>
+  <script type="module" src="js/maintenance.js?v=37"></script>
+  <script type="module" src="js/precios.js?v=37"></script>
+  <script type="module" src="js/precios-masivo.js?v=37"></script>
+  <script type="module" src="js/manual-create.js?v=37"></script>
+  <script type="module" src="js/contenido.js?v=37"></script>
+  <script type="module" src="js/resenas.js?v=37"></script>
+  <script type="module" src="js/reportes.js?v=37"></script>
+  <script type="module" src="js/visitas.js?v=37"></script>
+  <script type="module" src="js/store.js?v=37"></script>
 </body>
 </html>

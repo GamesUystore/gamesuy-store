@@ -3677,3 +3677,220 @@ body::after {
     min-width: 100%;
   }
 }
+/* ============================================================
+   FASE 16 — Contador de visitas
+   ============================================================ */
+
+/* ---------- FOOTER: contador público ---------- */
+.footer-visitas {
+  margin-top: 8px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+}
+
+#footer-visitas {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  font-weight: 600;
+  transition: all 0.25s ease;
+}
+
+#footer-visitas:hover {
+  border-color: rgba(0, 240, 255, 0.3);
+  color: var(--cyan);
+}
+
+/* ---------- ADMIN: tarjetas de estadísticas ---------- */
+.visitas-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.visita-stat-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 20px 14px;
+  background: linear-gradient(160deg, var(--bg-2) 0%, var(--bg-0) 100%);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  text-align: center;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.visita-stat-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--border-hi);
+}
+
+.visita-stat-label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.visita-stat-valor {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1.8rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--text);
+}
+
+.visita-stat-hoy {
+  border-color: rgba(0, 240, 255, 0.4);
+  background: linear-gradient(160deg, rgba(0, 240, 255, 0.08) 0%, var(--bg-0) 100%);
+}
+.visita-stat-hoy .visita-stat-valor {
+  color: var(--cyan);
+  text-shadow: 0 0 14px rgba(0, 240, 255, 0.4);
+}
+
+.visita-stat-semana {
+  border-color: rgba(139, 92, 246, 0.4);
+}
+.visita-stat-semana .visita-stat-valor {
+  color: var(--purple);
+}
+
+.visita-stat-mes {
+  border-color: rgba(255, 184, 0, 0.4);
+}
+.visita-stat-mes .visita-stat-valor {
+  color: var(--gold);
+}
+
+.visita-stat-total {
+  border-color: rgba(0, 255, 157, 0.4);
+}
+.visita-stat-total .visita-stat-valor {
+  color: var(--green);
+  text-shadow: 0 0 14px rgba(0, 255, 157, 0.3);
+}
+
+/* ---------- ADMIN: gráfico últimos 7 días ---------- */
+.visitas-ultimos {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.visita-dia {
+  display: grid;
+  grid-template-columns: 130px 1fr 60px;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 14px;
+  background: var(--bg-0);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  transition: border-color 0.2s ease;
+}
+
+.visita-dia:hover {
+  border-color: var(--border-hi);
+}
+
+.visita-dia-hoy {
+  border-color: rgba(0, 240, 255, 0.4);
+  background: linear-gradient(90deg, rgba(0, 240, 255, 0.05) 0%, var(--bg-0) 100%);
+}
+
+.visita-dia-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.visita-dia-nombre {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.visita-dia-hoy .visita-dia-nombre {
+  color: var(--cyan);
+}
+
+.visita-dia-fecha {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.visita-dia-barra-wrap {
+  height: 8px;
+  background: var(--bg-2);
+  border-radius: var(--r-pill);
+  overflow: hidden;
+  min-width: 60px;
+}
+
+.visita-dia-barra {
+  height: 100%;
+  background: linear-gradient(90deg, var(--cyan), var(--purple));
+  border-radius: var(--r-pill);
+  transition: width 0.5s ease;
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
+}
+
+.visita-dia-hoy .visita-dia-barra {
+  background: linear-gradient(90deg, var(--cyan), #00b4d8);
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.6);
+}
+
+.visita-dia-cantidad {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text);
+  text-align: right;
+}
+
+.visita-dia-hoy .visita-dia-cantidad {
+  color: var(--cyan);
+}
+
+/* ---------- RESPONSIVE MÓVIL ---------- */
+@media (max-width: 640px) {
+  .visitas-stats {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .visita-stat-card {
+    padding: 16px 10px;
+  }
+  .visita-stat-valor {
+    font-size: 1.4rem;
+  }
+  .visita-stat-label {
+    font-size: 0.65rem;
+  }
+  .visita-dia {
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+  .visita-dia-barra-wrap {
+    grid-column: 1 / -1;
+    order: 3;
+    height: 6px;
+  }
+  .visita-dia-cantidad {
+    font-size: 0.9rem;
+  }
+}

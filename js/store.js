@@ -1,6 +1,6 @@
 // ============================================================
 // GAMESUY STORE — Catálogo público + Ofertas + Preventas
-// Fase 8.6: Paginación con números clickeables
+// Fase 8.7: Botón Reportar problema en cada card
 // ============================================================
 
 import { db, auth } from './firebase-config.js';
@@ -45,6 +45,8 @@ onSnapshot(doc(db, 'settings', 'payments'), (snap) => {
 
 onSnapshot(collection(db, 'products'), (snap) => {
   productos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  // Exponer cache global para que reportes.js pueda acceder
+  window.__productosCache = productos;
   console.log('[GamesUy] Catálogo:', productos.length, 'productos');
   renderAll();
 });
@@ -343,7 +345,6 @@ function renderPaginacion(contId, actual, total, onPage) {
     return;
   }
 
-  // Recolectar números a mostrar
   const paginas = new Set();
   paginas.add(1);
   if (total >= 2) paginas.add(2);
@@ -357,16 +358,11 @@ function renderPaginacion(contId, actual, total, onPage) {
     .filter(n => n >= 1 && n <= total)
     .sort((a, b) => a - b);
 
-  // Construir HTML
   let html = '';
 
-  // Botón « (primera)
   html += `<button class="pag-btn pag-nav" data-pag="1" ${actual <= 1 ? 'disabled' : ''} title="Primera página">«</button>`;
-
-  // Botón ← (anterior)
   html += `<button class="pag-btn pag-nav" data-pag="${actual - 1}" ${actual <= 1 ? 'disabled' : ''} title="Anterior">←</button>`;
 
-  // Números con "…"
   let previo = 0;
   listaNumeros.forEach(p => {
     if (previo && p - previo > 1) {
@@ -377,15 +373,11 @@ function renderPaginacion(contId, actual, total, onPage) {
     previo = p;
   });
 
-  // Botón → (siguiente)
   html += `<button class="pag-btn pag-nav" data-pag="${actual + 1}" ${actual >= total ? 'disabled' : ''} title="Siguiente">→</button>`;
-
-  // Botón » (última)
   html += `<button class="pag-btn pag-nav" data-pag="${total}" ${actual >= total ? 'disabled' : ''} title="Última página">»</button>`;
 
   cont.innerHTML = html;
 
-  // Listeners
   cont.querySelectorAll('.pag-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const p = parseInt(btn.dataset.pag, 10);
@@ -464,6 +456,7 @@ function renderCard(p, prefijo = 'cat') {
       <div class="card-countdown" id="countdown-${prefijo}-${cardId}"></div>
       <a class="btn btn-buy" id="wa-${prefijo}-${cardId}" href="#" target="_blank" rel="noopener">💬 Comprar por WhatsApp</a>
       ${tieneTrailer ? `<button class="btn btn-secondary" onclick="abrirTrailer('${cardId}')">🎬 Ver Trailer</button>` : ''}
+      <button class="btn btn-reporte" onclick="abrirModalReporte('${cardId}')">⚠️ Reportar problema</button>
     </article>
   `;
 }
@@ -508,6 +501,7 @@ window.eliminarDesdeCatalogo = async function(id) {
   try {
     await deleteDoc(doc(db, 'products', id));
     productos = productos.filter(p => p.id !== id);
+    window.__productosCache = productos;
     console.log('[GamesUy] Juego eliminado:', titulo);
     alert(`✅ Juego eliminado:\n\n${titulo}`);
     renderAll();
@@ -841,4 +835,4 @@ document.getElementById('trailer-modal')?.addEventListener('click', (e) => {
   if (e.target.id === 'trailer-modal') document.getElementById('trailer-modal')?.classList.add('hidden');
 });
 
-console.log('[GamesUy] store.js v13 cargado (con paginación mejorada)');
+console.log('[GamesUy] store.js v14 cargado (con botón reportar)');

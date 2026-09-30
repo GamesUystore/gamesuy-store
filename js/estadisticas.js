@@ -1,11 +1,12 @@
 // ============================================================
 // GAMESUY STORE — Estadísticas internas
 // Fase 18: Tracking de vistas, trailers, WhatsApp, categorías, búsquedas
+// Fase 3 Perf: usar increment() para reducir lecturas
 // ============================================================
 
 import { db, auth } from './firebase-config.js';
 import {
-  doc, getDoc, setDoc, collection, getDocs, onSnapshot
+  doc, getDoc, setDoc, increment, collection, getDocs, onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 const $ = (id) => document.getElementById(id);
@@ -41,22 +42,19 @@ function escapeHtml(str) {
 
 /**
  * Registrar una vista del catálogo (1 vez por sesión por página).
+ * Optimizado: 1 sola operación a Firestore (antes eran 2).
  */
 window.__estRegistrarVista = async function() {
   if (auth.currentUser) return; // No contar admins
 
   try {
-    // Evitar múltiples registros en la misma sesión
     const key = 'gamesuy_vista_registrada_' + hoy();
     if (sessionStorage.getItem(key)) return;
     sessionStorage.setItem(key, '1');
 
     const ref = doc(db, 'estadisticas', 'vistas');
-    const snap = await getDoc(ref);
-    const total = snap.exists() ? (Number(snap.data().total) || 0) : 0;
-
     await setDoc(ref, {
-      total: total + 1,
+      total: increment(1),
       ultimaVista: new Date().toISOString()
     }, { merge: true });
   } catch (err) {
@@ -174,21 +172,13 @@ async function cargarTodo() {
       getDoc(doc(db, 'estadisticas', 'busquedas'))
     ]);
 
-    // Total vistas
     const totalVistas = vistas.exists() ? (Number(vistas.data().total) || 0) : 0;
     const elTotal = $('est-total-vistas');
     if (elTotal) elTotal.textContent = totalVistas.toLocaleString('es-UY');
 
-    // Top trailers
     renderTop('est-top-trailers', trailers.exists() ? trailers.data().juegos : {}, '🎬');
-
-    // Top WhatsApp
     renderTop('est-top-whatsapp', whatsapp.exists() ? whatsapp.data().juegos : {}, '💬');
-
-    // Top categorías
     renderTopCategorias('est-top-categorias', categorias.exists() ? categorias.data().categorias : {});
-
-    // Top búsquedas vacías
     renderTopBusquedas('est-top-busquedas', busquedas.exists() ? busquedas.data().busquedas : {});
   } catch (err) {
     console.error('[GamesUy] Error al cargar estadísticas:', err);
@@ -316,7 +306,6 @@ function renderTopBusquedas(contId, busquedasObj) {
   }).join('');
 }
 
-// Recalcular cuando el admin abre el tab Estadísticas
 document.querySelectorAll('.admin-tab').forEach(tab => {
   tab.addEventListener('click', () => {
     if (tab.dataset.tab === 'estadisticas') {
@@ -325,7 +314,6 @@ document.querySelectorAll('.admin-tab').forEach(tab => {
   });
 });
 
-// Cargar al iniciar por si ya está activo
 cargarTodo();
 
-console.log('[GamesUy] estadisticas.js cargado');
+console.log('[GamesUy] estadisticas.js v2 cargado (con increment optimizado)');

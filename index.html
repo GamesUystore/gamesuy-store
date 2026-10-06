@@ -41,7 +41,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="styles.css?v=38">
+  <link rel="stylesheet" href="styles.css?v=39">
 
   <!-- DATOS ESTRUCTURADOS (JSON-LD) -->
   <script type="application/ld+json">
@@ -227,6 +227,22 @@
     <section id="page-admin" class="page-section">
       <h2 class="section-title section-title-admin">⚙️ Panel de Administración</h2>
 
+      <!-- NUEVO: Banner de pendientes -->
+      <div id="pendientes-banner" class="pendientes-banner hidden">
+        <button class="pendientes-cerrar" onclick="cerrarBannerPendientes()" title="Ocultar por ahora">✕</button>
+        <div class="pendientes-header">
+          <span class="pendientes-icono">⚠️</span>
+          <div class="pendientes-header-texto">
+            <h3 class="pendientes-titulo">¡ATENCIÓN! Juegos pendientes de editar</h3>
+            <p class="pendientes-subtitulo" id="pendientes-count-text">Cargando...</p>
+          </div>
+        </div>
+        <div class="pendientes-lista" id="pendientes-lista"></div>
+        <div class="pendientes-acciones">
+          <button class="btn btn-warning" onclick="irAPendientes()">🎯 Ir a editarlos ahora</button>
+        </div>
+      </div>
+
       <div id="admin-not-logged" class="admin-placeholder">
         <p class="section-subtitle">Necesitás iniciar sesión.</p>
         <button class="btn btn-primary" id="btn-open-login">🔐 Iniciar sesión</button>
@@ -387,6 +403,7 @@
                   <option value="con-precio">✅ Con precio cargado</option>
                   <option value="ofertas">🔥 Solo ofertas</option>
                   <option value="preventas">🚀 Solo preventas</option>
+                  <option value="pendientes">⚠️ Pendientes de editar</option>
                   <option value="todos">Todos</option>
                 </select>
                 <span class="masivo-count" id="masivo-count">Cargando...</span>
@@ -976,7 +993,8 @@
   <script type="module" src="js/settings.js?v=38"></script>
   <script type="module" src="js/auth.js?v=38"></script>
   <script type="module" src="js/admin.js?v=38"></script>
-  <script type="module" src="js/excel-importer.js?v=38"></script>
+  <script type="module" src="js/pendientes.js?v=1"></script>
+  <script type="module" src="js/excel-importer.js?v=17"></script>
   <script type="module" src="js/maintenance.js?v=38"></script>
   <script type="module" src="js/precios.js?v=38"></script>
   <script type="module" src="js/precios-masivo.js?v=39"></script>

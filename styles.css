@@ -4347,3 +4347,30 @@ body::after {
   .pendiente-item-variantes { font-size: 0.76rem; }
   .pendientes-acciones .btn { width: 100%; min-width: 100%; }
 }
+/* ============================================================
+   FASE 21 — Badge de pendiente en carga masiva
+   ============================================================ */
+
+.masivo-juego-pendiente {
+  border-color: rgba(255, 184, 0, 0.6) !important;
+  box-shadow: 0 0 20px rgba(255, 184, 0, 0.2);
+}
+
+.masivo-pendiente-badge {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  background: linear-gradient(90deg, #ffb800, #ff8c00);
+  color: #000;
+  text-transform: uppercase;
+  box-shadow: 0 0 12px rgba(255, 184, 0, 0.5);
+  animation: pendiente-badge-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pendiente-badge-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 12px rgba(255, 184, 0, 0.5); }
+  50% { transform: scale(1.05); box-shadow: 0 0 18px rgba(255, 184, 0, 0.8); }
+}

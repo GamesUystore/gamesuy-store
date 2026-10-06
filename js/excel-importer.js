@@ -1,6 +1,7 @@
 // ============================================================
 // GAMESUY STORE — Importador de Excel
 // Fase 4.3: Variantes SIN STOCK + Ofertas con 4 variantes
+// Fase 3.1: Crear pendientes cuando hay juegos/variantes nuevas
 // ============================================================
 
 import { db } from './firebase-config.js';
@@ -10,6 +11,7 @@ import {
 import {
   parseCosto, esCostoValido, aplicarVariacion, roundUYU
 } from './data-model.js';
+import { crearPendiente } from './pendientes.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -280,7 +282,6 @@ function construirVariantesStock(fila) {
 
   const variantes = [];
 
-  // PS4 Primaria — se crea siempre que NO sea NO DISPONIBLE
   if (tienePS4) {
     const costoARS = parseCosto(ps4PriRaw);
     variantes.push({
@@ -291,7 +292,6 @@ function construirVariantesStock(fila) {
     });
   }
 
-  // PS5 Primaria — se crea siempre que NO sea NO DISPONIBLE
   if (tienePS5) {
     const costoARS = parseCosto(ps5PriRaw);
     variantes.push({
@@ -302,7 +302,6 @@ function construirVariantesStock(fila) {
     });
   }
 
-  // Secundaria — si NO dice "NO DISPONIBLE", creamos las 2 (PS4 y PS5)
   if (!secNoDisp) {
     const costoSec = parseCosto(secRaw);
     const disponible = esCostoValido(secRaw);
@@ -350,7 +349,6 @@ function fusionarVarianteStock(nueva, existente) {
   }
 
   if (costoViejo === 0 && costoNuevo > 0) {
-    // ⚠️ Era SIN STOCK y ahora tiene stock → NO pisamos el precio (está vacío)
     resultado.costoARS = costoNuevo;
     resultado.disponible = true;
     return resultado;
@@ -383,8 +381,9 @@ async function procesarStock() {
 
   const filas = excel.rows.slice(5);
   let creados = 0, actualizados = 0, saltados = 0;
-  let nuevosConStock = 0; // ← variantes que pasaron de SIN STOCK a con stock
+  let nuevosConStock = 0;
   const operaciones = [];
+  const pendientesACrear = []; // ← NUEVO
 
   for (const fila of filas) {
     const titulo = String(fila[0] || '').trim();
@@ -397,10 +396,12 @@ async function procesarStock() {
     const existente = productosMap[matchKey];
 
     if (existente) {
+      const idsExistentes = new Set((existente.variants || []).map(v => v.id));
+      const variantesAgregadas = variantesNuevas.filter(vn => !idsExistentes.has(vn.id));
+
       const variantesFinales = variantesNuevas.map(vn => {
         const ve = (existente.variants || []).find(v => v.id === vn.id);
         const resultado = fusionarVarianteStock(vn, ve);
-        // Detectar si pasó de sin stock a con stock
         if (ve && Number(ve.costoARS) === 0 && Number(resultado.costoARS) > 0) {
           nuevosConStock++;
         }
@@ -419,6 +420,19 @@ async function procesarStock() {
           data: { variants: variantesFinales, updatedAt: new Date().toISOString() }
         });
         actualizados++;
+
+        // ← NUEVO: si agregamos variantes nuevas, crear pendiente
+        if (variantesAgregadas.length > 0) {
+          pendientesACrear.push({
+            productoId: existente.id,
+            productoTitle: existente.title || titulo,
+            tipo: 'variante_nueva',
+            variantesNuevas: variantesAgregadas.map(v => ({
+              id: v.id, label: v.label, costoARS: v.costoARS
+            })),
+            origen: 'stock'
+          });
+        }
       } else {
         saltados++;
       }
@@ -429,8 +443,9 @@ async function procesarStock() {
       const promoRaw = String(fila[7] || '').trim().toUpperCase();
       const aplica3x2 = promoRaw === 'SI';
 
+      const ref = doc(collection(db, 'products'));
       operaciones.push({
-        ref: doc(collection(db, 'products')),
+        ref,
         data: {
           title: titulo, matchKey, categories,
           coverUrl: '', gameplayUrl: '', youtubeUrl: '', description: '',
@@ -441,11 +456,30 @@ async function procesarStock() {
         }
       });
       creados++;
+
+      // ← NUEVO: crear pendiente para juego nuevo
+      pendientesACrear.push({
+        productoId: ref.id, // doc() ya generó el ID
+        productoTitle: titulo,
+        tipo: 'juego_nuevo',
+        variantesNuevas: variantesNuevas.map(v => ({
+          id: v.id, label: v.label, costoARS: v.costoARS
+        })),
+        origen: 'stock'
+      });
     }
   }
 
   log('stock-log', `⏳ Guardando ${operaciones.length} operaciones...`);
   await ejecutarBatches(operaciones, 'stock-log');
+
+  // ← NUEVO: crear los pendientes en Firestore
+  if (pendientesACrear.length > 0) {
+    log('stock-log', `⏳ Creando ${pendientesACrear.length} alertas de edición...`);
+    for (const p of pendientesACrear) {
+      await crearPendiente(p);
+    }
+  }
 
   log('stock-log', '');
   log('stock-log', '═══════════════════════════════════');
@@ -453,20 +487,29 @@ async function procesarStock() {
   log('stock-log', `   🆕 Creados:              ${creados}`);
   log('stock-log', `   🔄 Actualizados:         ${actualizados}`);
   log('stock-log', `   🟢 Nuevas con stock:     ${nuevosConStock}`);
+  log('stock-log', `   🔔 Alertas creadas:      ${pendientesACrear.length}`);
   log('stock-log', `   ⏭️  Saltados:             ${saltados}`);
   log('stock-log', '═══════════════════════════════════');
 
-  if (nuevosConStock > 0) {
+  if (pendientesACrear.length > 0) {
     log('stock-log', '');
-    log('stock-log', `⚠️  <b>${nuevosConStock} variantes pasaron de SIN STOCK a con stock.</b>`);
-    log('stock-log', `Andá al panel de Precios y cargales el precio.`);
+    log('stock-log', `⚠️  <b>${pendientesACrear.length} juegos o variantes nuevas</b> necesitan que les pongas precio.`);
+    log('stock-log', `Andá al panel de Carga masiva y filtralos.`);
   }
 
-  alert(`✅ Stock procesado\n\nCreados: ${creados}\nActualizados: ${actualizados}\nNuevas con stock: ${nuevosConStock}`);
+  alert(
+    `✅ Stock procesado\n\n` +
+    `Creados: ${creados}\n` +
+    `Actualizados: ${actualizados}\n` +
+    `Nuevas con stock: ${nuevosConStock}\n\n` +
+    (pendientesACrear.length > 0
+      ? `⚠️ ${pendientesACrear.length} juegos/variantes nuevas necesitan precio.`
+      : `Sin novedades para editar.`)
+  );
 }
 
 // ============================================================
-// OFERTAS — Ahora crea las 4 variantes
+// OFERTAS
 // ============================================================
 async function procesarOfertas() {
   const excel = EXCEL.ofertas;
@@ -509,6 +552,7 @@ async function procesarOfertas() {
   const stats = { exacto: 0, relajado: 0, 'super-relajado': 0, fuzzy: 0, creados: 0 };
   let sinPrecio = 0, saltadas = 0;
   const operaciones = [];
+  const pendientesACrear = []; // ← NUEVO
 
   for (const fila of filas) {
     const tituloRaw = String(fila[0] || '').trim();
@@ -523,7 +567,6 @@ async function procesarOfertas() {
     const { prod, tipo } = buscarProducto(matchKey, m1, m2, m3);
 
     if (prod) {
-      // Aplicar oferta respetando variantes existentes
       let modificado = false;
       const nuevasVariantes = (prod.variants || []).map(v => {
         if (v.tipo !== 'primaria') return v;
@@ -538,7 +581,6 @@ async function procesarOfertas() {
         };
       });
 
-      // Agregar variantes primarias que no existían
       plataformas.forEach(plat => {
         if (!nuevasVariantes.some(v => v.id === `${plat}_primaria`)) {
           nuevasVariantes.push({
@@ -553,7 +595,6 @@ async function procesarOfertas() {
         }
       });
 
-      // Agregar variantes secundarias (con costo de oferta en 0 → cargar a mano)
       plataformas.forEach(plat => {
         const idSec = `${plat}_secundaria`;
         if (!nuevasVariantes.some(v => v.id === idSec)) {
@@ -577,11 +618,9 @@ async function procesarOfertas() {
         stats[tipo] = (stats[tipo] || 0) + 1;
       }
     } else {
-      // Juego NUEVO desde Ofertas → crear las 4 variantes
       const categories = [...plataformas];
       const variantesNuevas = [];
       plataformas.forEach(plat => {
-        // Primaria con costo de oferta
         variantesNuevas.push({
           id: `${plat}_primaria`, label: `${plat.toUpperCase()} Primaria`,
           categoria: plat, tipo: 'primaria',
@@ -590,7 +629,6 @@ async function procesarOfertas() {
           enOferta: true, ofertaCostoARS: costoOfertaARS,
           ofertaPrecioUYU: 0, ofertaHasta: fechaHasta
         });
-        // Secundaria con costo de oferta 0 (para cargar a mano)
         variantesNuevas.push({
           id: `${plat}_secundaria`, label: `${plat.toUpperCase()} Secundaria`,
           categoria: plat, tipo: 'secundaria',
@@ -601,8 +639,9 @@ async function procesarOfertas() {
         });
       });
 
+      const ref = doc(collection(db, 'products'));
       operaciones.push({
-        ref: doc(collection(db, 'products')),
+        ref,
         data: {
           title: titulo, matchKey, categories,
           coverUrl: '', gameplayUrl: '', youtubeUrl: '', description: '',
@@ -613,11 +652,30 @@ async function procesarOfertas() {
         }
       });
       stats.creados++;
+
+      // ← NUEVO: pendiente para juego nuevo de ofertas
+      pendientesACrear.push({
+        productoId: ref.id,
+        productoTitle: titulo,
+        tipo: 'juego_nuevo',
+        variantesNuevas: variantesNuevas.map(v => ({
+          id: v.id, label: v.label, costoARS: v.costoARS
+        })),
+        origen: 'ofertas'
+      });
     }
   }
 
   log('ofertas-log', `⏳ Guardando ${operaciones.length} operaciones...`);
   await ejecutarBatches(operaciones, 'ofertas-log');
+
+  // ← NUEVO: crear pendientes
+  if (pendientesACrear.length > 0) {
+    log('ofertas-log', `⏳ Creando ${pendientesACrear.length} alertas...`);
+    for (const p of pendientesACrear) {
+      await crearPendiente(p);
+    }
+  }
 
   const totalAplicadas = (stats.exacto || 0) + (stats.relajado || 0) + (stats['super-relajado'] || 0) + (stats.fuzzy || 0);
   log('ofertas-log', '');
@@ -629,11 +687,19 @@ async function procesarOfertas() {
   log('ofertas-log', `   🎯 Fuzzy:          ${stats.fuzzy || 0}`);
   log('ofertas-log', `   ✨ Total aplicadas: ${totalAplicadas}`);
   log('ofertas-log', `   🆕 Creados nuevos:  ${stats.creados}`);
+  log('ofertas-log', `   🔔 Alertas creadas: ${pendientesACrear.length}`);
   log('ofertas-log', `   ⏭️  Sin precio:      ${sinPrecio}`);
   log('ofertas-log', `   ⏭️  Saltadas:        ${saltadas}`);
   log('ofertas-log', '═══════════════════════════════════');
 
-  alert(`✅ Ofertas procesadas\n\nAplicadas: ${totalAplicadas}\nCreados nuevos: ${stats.creados}`);
+  alert(
+    `✅ Ofertas procesadas\n\n` +
+    `Aplicadas: ${totalAplicadas}\n` +
+    `Creados nuevos: ${stats.creados}` +
+    (pendientesACrear.length > 0
+      ? `\n\n⚠️ ${pendientesACrear.length} juegos nuevos necesitan precio.`
+      : '')
+  );
 }
 
 // ============================================================
@@ -671,6 +737,7 @@ async function procesarPreventas() {
   const stats = { exacto: 0, relajado: 0, 'super-relajado': 0, fuzzy: 0, creados: 0 };
   let sinCosto = 0, saltadas = 0;
   const operaciones = [];
+  const pendientesACrear = []; // ← NUEVO
 
   for (const fila of filas) {
     const tituloRaw = String(fila[0] || '').trim();
@@ -701,6 +768,17 @@ async function procesarPreventas() {
           gananciaPct: null, precioFinalUYU: null,
           enOferta: false, ofertaCostoARS: null, ofertaPrecioUYU: null, ofertaHasta: null
         });
+
+        // ← NUEVO: pendiente para variante nueva
+        pendientesACrear.push({
+          productoId: prod.id,
+          productoTitle: prod.title || titulo,
+          tipo: 'variante_nueva',
+          variantesNuevas: [{
+            id: 'ps5_primaria', label: 'PS5 Primaria', costoARS: costoPS5Primaria
+          }],
+          origen: 'preventas'
+        });
       }
 
       const categories = new Set([...(prod.categories || []), 'ps5']);
@@ -723,8 +801,9 @@ async function procesarPreventas() {
         enOferta: false, ofertaCostoARS: null, ofertaPrecioUYU: null, ofertaHasta: null
       }];
 
+      const ref = doc(collection(db, 'products'));
       operaciones.push({
-        ref: doc(collection(db, 'products')),
+        ref,
         data: {
           title: titulo, matchKey, categories: ['ps5'],
           coverUrl: '', gameplayUrl: '', youtubeUrl: '', description: '',
@@ -736,11 +815,30 @@ async function procesarPreventas() {
         }
       });
       stats.creados++;
+
+      // ← NUEVO: pendiente para preventa nueva
+      pendientesACrear.push({
+        productoId: ref.id,
+        productoTitle: titulo,
+        tipo: 'juego_nuevo',
+        variantesNuevas: variantesNuevas.map(v => ({
+          id: v.id, label: v.label, costoARS: v.costoARS
+        })),
+        origen: 'preventas'
+      });
     }
   }
 
   log('preventas-log', `⏳ Guardando ${operaciones.length} operaciones...`);
   await ejecutarBatches(operaciones, 'preventas-log');
+
+  // ← NUEVO: crear pendientes
+  if (pendientesACrear.length > 0) {
+    log('preventas-log', `⏳ Creando ${pendientesACrear.length} alertas...`);
+    for (const p of pendientesACrear) {
+      await crearPendiente(p);
+    }
+  }
 
   const totalAplicadas = (stats.exacto || 0) + (stats.relajado || 0) + (stats['super-relajado'] || 0) + (stats.fuzzy || 0);
   log('preventas-log', '');
@@ -748,10 +846,18 @@ async function procesarPreventas() {
   log('preventas-log', `✅ PREVENTAS PROCESADAS`);
   log('preventas-log', `   ✨ Total aplicadas: ${totalAplicadas}`);
   log('preventas-log', `   🆕 Creados nuevos:  ${stats.creados}`);
+  log('preventas-log', `   🔔 Alertas creadas: ${pendientesACrear.length}`);
   log('preventas-log', `   ⏭️  Sin costo:       ${sinCosto}`);
   log('preventas-log', '═══════════════════════════════════');
 
-  alert(`✅ Preventas procesadas\n\nAplicadas: ${totalAplicadas}\nCreados nuevos: ${stats.creados}`);
+  alert(
+    `✅ Preventas procesadas\n\n` +
+    `Aplicadas: ${totalAplicadas}\n` +
+    `Creados nuevos: ${stats.creados}` +
+    (pendientesACrear.length > 0
+      ? `\n\n⚠️ ${pendientesACrear.length} juegos/variantes nuevas necesitan precio.`
+      : '')
+  );
 }
 
 // ============================================================
@@ -835,4 +941,4 @@ $('btn-clean-ofertas')?.addEventListener('click', async () => {
   finally { btn.disabled = false; btn.textContent = '🧹 Limpiar ofertas vencidas'; }
 });
 
-console.log('[GamesUy] excel-importer.js v16 cargado (variantes SIN STOCK + ofertas con 4 variantes)');
+console.log('[GamesUy] excel-importer.js v17 cargado (con sistema de pendientes)');

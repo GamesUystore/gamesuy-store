@@ -1,6 +1,7 @@
 // ============================================================
 // GAMESUY STORE — Gestor de precios
 // Fase 6.3: Expone función para editar desde catálogo público
+// Fase 3.2: Integración con sistema de pendientes
 // ============================================================
 
 import { db } from './firebase-config.js';
@@ -11,6 +12,7 @@ import {
   getCostoUYU, calcGananciaPct, calcPrecioUSD,
   roundUYU, formatUYU, formatUSD
 } from './data-model.js';
+import { marcarPendienteResuelto } from './pendientes.js';
 
 const $ = (id) => document.getElementById(id);
 const MAX_IMG_KB = 300;
@@ -24,7 +26,7 @@ let pagina = 1;
 const POR_PAGINA = 30;
 let productoActivo = null;
 
-console.log('[GamesUy] precios.js v17 iniciando...');
+console.log('[GamesUy] precios.js v18 iniciando...');
 
 onSnapshot(doc(db, 'settings', 'cotizaciones'), (snap) => {
   if (!snap.exists()) return;
@@ -431,6 +433,10 @@ async function guardarNormal(prod, variantId, body) {
     await updateDoc(doc(db, 'products', prod.id), { variants: nuevasVariantes });
     prod.variants = nuevasVariantes;
     btn.textContent = '✅ Guardado';
+
+    // Marcar pendiente como resuelto
+    marcarPendienteResuelto(prod.id);
+
     setTimeout(() => { btn.disabled = false; btn.textContent = '💾 Guardar precio normal'; render(); }, 900);
   } catch (err) {
     console.error('[GamesUy] Error:', err);
@@ -473,6 +479,10 @@ async function guardarOferta(prod, variantId, body) {
     await updateDoc(doc(db, 'products', prod.id), { variants: nuevasVariantes });
     prod.variants = nuevasVariantes;
     btn.textContent = '✅ Guardado';
+
+    // Marcar pendiente como resuelto
+    marcarPendienteResuelto(prod.id);
+
     setTimeout(() => { btn.disabled = false; btn.textContent = '💾 Guardar precio de oferta'; render(); }, 900);
   } catch (err) {
     console.error('[GamesUy] Error:', err);
@@ -580,6 +590,10 @@ $('btn-save-info')?.addEventListener('click', async () => {
     await updateDoc(doc(db, 'products', productoActivo.id), data);
     Object.assign(productoActivo, data);
     btn.textContent = '✅ Guardado';
+
+    // Marcar pendiente como resuelto
+    marcarPendienteResuelto(productoActivo.id);
+
     setTimeout(() => { btn.disabled = false; btn.textContent = '💾 Guardar información'; render(); }, 900);
   } catch (err) {
     console.error('[GamesUy] Error:', err);
@@ -599,11 +613,8 @@ $('precios-estado')?.addEventListener('change', (e) => { filtroEstado = e.target
 $('precios-prev')?.addEventListener('click', () => { if (pagina > 1) { pagina--; render(); } });
 $('precios-next')?.addEventListener('click', () => { pagina++; render(); });
 
-// ============================================================
-// EXPONER FUNCIÓN PARA EL CATÁLOGO PÚBLICO
-// Permite abrir el modal de edición desde el botón ✏️ de las cards
-// ============================================================
+// Exponer función para el catálogo público
 window.abrirEditarProducto = abrirModal;
 
 cargarProductos();
-console.log('[GamesUy] precios.js v17 cargado');
+console.log('[GamesUy] precios.js v18 cargado (con pendientes)');

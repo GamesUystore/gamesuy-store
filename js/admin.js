@@ -1,13 +1,18 @@
 // ============================================================
 // GAMESUY STORE — Panel de Administración
+// Fase 3.5: Recalculo automático de precios al cambiar cotización
 // ============================================================
 
 import { db } from './firebase-config.js';
 import {
   doc,
   setDoc,
-  onSnapshot
+  onSnapshot,
+  collection,
+  getDocs,
+  writeBatch
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { roundUYU, roundUSD } from './data-model.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -22,7 +27,7 @@ function mostrarToast(msg, tipo = 'success') {
   toast.className = 'admin-toast ' + tipo;
   setTimeout(() => {
     toast.className = 'admin-toast hidden';
-  }, 3200);
+  }, 4000);
 }
 
 function fileToBase64(file) {
@@ -42,12 +47,17 @@ async function validarImagen(file, maxKB) {
 }
 
 // ============================================================
-// COTIZACIONES
+// COTIZACIONES + RECÁLCULO AUTOMÁTICO DE PRECIOS
 // ============================================================
+
+let cotizacionesActuales = { arsAUYU: 0.055, usdAUYU: 39.50 };
 
 onSnapshot(doc(db, 'settings', 'cotizaciones'), (snap) => {
   if (!snap.exists()) return;
   const c = snap.data();
+  cotizacionesActuales.arsAUYU = Number(c.arsAUYU) || 0.055;
+  cotizacionesActuales.usdAUYU = Number(c.usdAUYU) || 39.50;
+
   const elArs = $('admin-cot-ars');
   const elUsd = $('admin-cot-usd');
   const elUpd = $('admin-cot-updated');
@@ -66,23 +76,171 @@ onSnapshot(doc(db, 'settings', 'cotizaciones'), (snap) => {
   if (el) el.addEventListener('input', () => { el.dataset.dirty = '1'; });
 });
 
+// ============================================================
+// RECALCULAR TODOS LOS PRECIOS
+// ============================================================
+async function recalcularTodosLosPrecios(viejaCot, nuevaCot) {
+  if (!viejaCot || viejaCot <= 0) {
+    mostrarToast('⚠️ No se puede recalcular: la cotización vieja no es válida.', 'error');
+    return;
+  }
+
+  const factor = nuevaCot / viejaCot;
+  const porcentaje = Math.round((factor - 1) * 100 * 100) / 100;
+
+  // Confirmar antes de proceder
+  const confirmado = confirm(
+    `🔄 RECALCULAR TODOS LOS PRECIOS\n\n` +
+    `Cotización anterior: ${viejaCot}\n` +
+    `Cotización nueva:    ${nuevaCot}\n\n` +
+    `Factor: ×${factor.toFixed(4)} (${porcentaje >= 0 ? '+' : ''}${porcentaje}%)\n\n` +
+    `Esto actualizará los precios de TODOS los juegos ` +
+    `que tengan ganancia % guardada.\n\n` +
+    `¿Proceder con el recálculo?`
+  );
+
+  if (!confirmado) {
+    mostrarToast('Recálculo cancelado', 'error');
+    return;
+  }
+
+  mostrarToast(`🔄 Recalculando precios de todos los juegos...`, 'success');
+
+  try {
+    const snap = await getDocs(collection(db, 'products'));
+    const operaciones = [];
+    let totalVariantes = 0;
+    let variantesRecalculadas = 0;
+    let variantesSinGanancia = 0;
+    let variantesSinCosto = 0;
+    let ofertasRecalculadas = 0;
+
+    snap.docs.forEach(d => {
+      const prod = { id: d.id, ...d.data() };
+      const variantes = prod.variants || [];
+      if (variantes.length === 0) return;
+
+      let huboCambios = false;
+
+      const nuevasVariantes = variantes.map(v => {
+        totalVariantes++;
+
+        const costoARS = Number(v.costoARS) || 0;
+        const gananciaPct = (v.gananciaPct !== null && v.gananciaPct !== undefined)
+          ? Number(v.gananciaPct)
+          : null;
+
+        // Sin costo: no se puede recalcular
+        if (costoARS <= 0) {
+          variantesSinCosto++;
+          return v;
+        }
+
+        // Sin ganancia % (precio cargado a mano): no lo tocamos, avisamos
+        if (gananciaPct === null || isNaN(gananciaPct)) {
+          variantesSinGanancia++;
+          return v;
+        }
+
+        // Recalcular precio normal
+        const nuevoPrecioBase = costoARS * nuevaCot * (1 + gananciaPct);
+        const nuevoPrecioUYU = roundUYU(nuevoPrecioBase);
+
+        const resultado = {
+          ...v,
+          precioFinalUYU: nuevoPrecioUYU,
+          updatedAt: new Date().toISOString()
+        };
+
+        // Si tiene oferta activa con ganancia definida, recalcular oferta también
+        const ofertaCostoARS = Number(v.ofertaCostoARS) || 0;
+        const ofertaGanancia = (v.ofertaGananciaPct !== null && v.ofertaGananciaPct !== undefined)
+          ? Number(v.ofertaGananciaPct)
+          : null;
+
+        if (ofertaCostoARS > 0 && ofertaGanancia !== null && !isNaN(ofertaGanancia)) {
+          const nuevoOfertaBase = ofertaCostoARS * nuevaCot * (1 + ofertaGanancia);
+          resultado.ofertaPrecioUYU = roundUYU(nuevoOfertaBase);
+          ofertasRecalculadas++;
+        }
+
+        huboCambios = true;
+        variantesRecalculadas++;
+        return resultado;
+      });
+
+      if (huboCambios) {
+        operaciones.push({
+          ref: doc(db, 'products', prod.id),
+          data: { variants: nuevasVariantes, updatedAt: new Date().toISOString() }
+        });
+      }
+    });
+
+    if (operaciones.length === 0) {
+      mostrarToast(
+        `No se recalculó nada.\n` +
+        `Variantes sin costo: ${variantesSinCosto}\n` +
+        `Variantes sin ganancia %: ${variantesSinGanancia}`,
+        'error'
+      );
+      return;
+    }
+
+    // Guardar en lotes
+    const TAM = 400;
+    for (let i = 0; i < operaciones.length; i += TAM) {
+      const lote = operaciones.slice(i, i + TAM);
+      const batch = writeBatch(db);
+      lote.forEach(op => batch.set(op.ref, op.data, { merge: true }));
+      await batch.commit();
+    }
+
+    // Resumen final
+    const resumen =
+      `✅ RECÁLCULO COMPLETO\n\n` +
+      `Juegos actualizados:      ${operaciones.length}\n` +
+      `Variantes recalculadas:   ${variantesRecalculadas}\n` +
+      `Ofertas recalculadas:     ${ofertasRecalculadas}\n\n` +
+      `⚠️  Sin ganancia %:        ${variantesSinGanancia}\n` +
+      `⚠️  Sin costo ARS:         ${variantesSinCosto}\n\n` +
+      (variantesSinGanancia > 0
+        ? `Las variantes "sin ganancia %" fueron cargadas con precio a mano.\nRevisalas una por una en Admin → Carga masiva.`
+        : `Todo calculado automáticamente.`);
+
+    alert(resumen);
+    mostrarToast(`✅ ${operaciones.length} juegos recalculados`, 'success');
+
+  } catch (err) {
+    console.error('[GamesUy] Error al recalcular:', err);
+    mostrarToast('❌ Error: ' + err.message, 'error');
+  }
+}
+
+// ============================================================
+// GUARDAR COTIZACIÓN + RECÁLCULO AUTOMÁTICO
+// ============================================================
 $('btn-save-cot')?.addEventListener('click', async () => {
   try {
-    const ars = parseFloat($('admin-cot-ars').value);
-    const usd = parseFloat($('admin-cot-usd').value);
+    const arsNueva = parseFloat($('admin-cot-ars').value);
+    const usdNueva = parseFloat($('admin-cot-usd').value);
 
-    if (!(ars > 0)) {
+    if (!(arsNueva > 0)) {
       mostrarToast('La cotización ARS→UYU debe ser mayor a 0.', 'error');
       return;
     }
-    if (!(usd > 0)) {
+    if (!(usdNueva > 0)) {
       mostrarToast('La cotización USD→UYU debe ser mayor a 0.', 'error');
       return;
     }
 
+    const arsVieja = cotizacionesActuales.arsAUYU;
+    const cambióARS = Math.abs(arsNueva - arsVieja) > 0.0000001;
+
+    // Guardar cotizaciones
     await setDoc(doc(db, 'settings', 'cotizaciones'), {
-      arsAUYU: ars,
-      usdAUYU: usd,
+      arsAUYU: arsNueva,
+      usdAUYU: usdNueva,
       actualizado: new Date().toISOString()
     }, { merge: true });
 
@@ -90,8 +248,116 @@ $('btn-save-cot')?.addEventListener('click', async () => {
     delete $('admin-cot-usd').dataset.dirty;
 
     mostrarToast('✅ Cotizaciones guardadas');
+
+    // Si cambió la cotización ARS → recalcular todos los precios
+    if (cambióARS) {
+      setTimeout(async () => {
+        await recalcularTodosLosPrecios(arsVieja, arsNueva);
+      }, 500);
+    } else {
+      console.log('[GamesUy] Cotización ARS sin cambios → no se recalcula.');
+    }
+
   } catch (err) {
     console.error('[GamesUy] Error al guardar cotizaciones:', err);
+    mostrarToast('❌ ' + err.message, 'error');
+  }
+});
+
+// ============================================================
+// BOTÓN MANUAL: RECALCULAR (por si querés forzarlo)
+// ============================================================
+$('btn-recalcular-precios')?.addEventListener('click', async () => {
+  const arsActual = cotizacionesActuales.arsAUYU;
+  // Factor 1: usar la misma cotización (recalcula desde cero)
+  // Pero necesitamos un factor distinto a 1. Entonces usamos la fórmula directa.
+  if (!confirm(
+    `🔄 RECALCULAR PRECIOS (manual)\n\n` +
+    `Cotización actual: ${arsActual}\n\n` +
+    `Esto recalcula el precio final de cada variante usando:\n` +
+    `  costoARS × ${arsActual} × (1 + ganancia%)\n\n` +
+    `Útil si algún precio quedó desactualizado.\n\n` +
+    `¿Proceder?`
+  )) return;
+
+  mostrarToast('🔄 Recalculando precios...', 'success');
+
+  try {
+    const snap = await getDocs(collection(db, 'products'));
+    const operaciones = [];
+    let recalculadas = 0;
+    let sinGanancia = 0;
+    let sinCosto = 0;
+
+    snap.docs.forEach(d => {
+      const prod = { id: d.id, ...d.data() };
+      const variantes = prod.variants || [];
+      if (variantes.length === 0) return;
+
+      let huboCambios = false;
+
+      const nuevasVariantes = variantes.map(v => {
+        const costoARS = Number(v.costoARS) || 0;
+        const gananciaPct = (v.gananciaPct !== null && v.gananciaPct !== undefined)
+          ? Number(v.gananciaPct)
+          : null;
+
+        if (costoARS <= 0) { sinCosto++; return v; }
+        if (gananciaPct === null || isNaN(gananciaPct)) { sinGanancia++; return v; }
+
+        const nuevoPrecioUYU = roundUYU(costoARS * arsActual * (1 + gananciaPct));
+        const resultado = {
+          ...v,
+          precioFinalUYU: nuevoPrecioUYU,
+          updatedAt: new Date().toISOString()
+        };
+
+        const ofertaCostoARS = Number(v.ofertaCostoARS) || 0;
+        const ofertaGanancia = (v.ofertaGananciaPct !== null && v.ofertaGananciaPct !== undefined)
+          ? Number(v.ofertaGananciaPct)
+          : null;
+
+        if (ofertaCostoARS > 0 && ofertaGanancia !== null && !isNaN(ofertaGanancia)) {
+          resultado.ofertaPrecioUYU = roundUYU(ofertaCostoARS * arsActual * (1 + ofertaGanancia));
+        }
+
+        huboCambios = true;
+        recalculadas++;
+        return resultado;
+      });
+
+      if (huboCambios) {
+        operaciones.push({
+          ref: doc(db, 'products', prod.id),
+          data: { variants: nuevasVariantes, updatedAt: new Date().toISOString() }
+        });
+      }
+    });
+
+    if (operaciones.length === 0) {
+      mostrarToast('No hay precios para recalcular.', 'error');
+      return;
+    }
+
+    const TAM = 400;
+    for (let i = 0; i < operaciones.length; i += TAM) {
+      const lote = operaciones.slice(i, i + TAM);
+      const batch = writeBatch(db);
+      lote.forEach(op => batch.set(op.ref, op.data, { merge: true }));
+      await batch.commit();
+    }
+
+    alert(
+      `✅ RECÁLCULO COMPLETO\n\n` +
+      `Juegos actualizados:    ${operaciones.length}\n` +
+      `Variantes recalculadas: ${recalculadas}\n` +
+      `⚠️  Sin ganancia %:      ${sinGanancia}\n` +
+      `⚠️  Sin costo ARS:       ${sinCosto}`
+    );
+    mostrarToast(`✅ ${operaciones.length} juegos recalculados`, 'success');
+
+  } catch (err) {
+    console.error('[GamesUy] Error al recalcular:', err);
     mostrarToast('❌ ' + err.message, 'error');
   }
 });
@@ -240,7 +506,6 @@ $('btn-save-banner')?.addEventListener('click', async () => {
   }
 });
 
-// Quitar solo la imagen del banner
 $('btn-clear-banner-img')?.addEventListener('click', async () => {
   if (!confirm('¿Quitar solo la imagen del banner?\n\nEl texto, título y etiqueta se mantienen.')) return;
   try {
@@ -268,4 +533,4 @@ $('btn-clear-banner')?.addEventListener('click', async () => {
   mostrarToast('Banner oculto');
 });
 
-console.log('[GamesUy] admin.js cargado');
+console.log('[GamesUy] admin.js v2 cargado (con recálculo automático de precios)');

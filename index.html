@@ -664,8 +664,13 @@
               <input type="number" id="admin-cot-usd" step="0.01" min="0.01" placeholder="39.50">
               <div class="admin-actions">
                 <button id="btn-save-cot" class="btn btn-primary">Guardar cotizaciones</button>
+                <button id="btn-recalcular-precios" class="btn btn-warning" type="button">🔄 Recalcular precios</button>
               </div>
               <p class="admin-hint" id="admin-cot-updated" style="margin-top:12px;"></p>
+              <p class="admin-hint" style="margin-top:8px;color:var(--gold);">
+                ⚠️ Al guardar una cotización nueva, los precios se recalculan automáticamente.
+                El botón <strong>🔄 Recalcular precios</strong> es para forzar el recálculo manual.
+              </p>
             </div>
             <div class="admin-card">
               <h3>🖼️ Logo de la tienda</h3>
@@ -991,7 +996,7 @@
 
   <script type="module" src="js/settings.js?v=38"></script>
   <script type="module" src="js/auth.js?v=38"></script>
-  <script type="module" src="js/admin.js?v=38"></script>
+  <script type="module" src="js/admin.js?v=2"></script>
   <script type="module" src="js/pendientes.js?v=1"></script>
   <script type="module" src="js/excel-importer.js?v=17"></script>
   <script type="module" src="js/maintenance.js?v=38"></script>

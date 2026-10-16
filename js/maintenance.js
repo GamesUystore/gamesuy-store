@@ -1,7 +1,7 @@
 // ============================================================
 // GAMESUY STORE — Mantenimiento
 // Fase 3.5.6: Limpieza + borrado por fecha
-// Fase 3.6: Eliminar productos que no están en el Excel NGS actual
+// Fase 3.7: Eliminar productos no-NGS con FUZZY MATCH
 // ============================================================
 
 import { db } from './firebase-config.js';
@@ -52,19 +52,52 @@ function logNGSClear() {
 }
 
 // ============================================================
-// HELPERS DE NORMALIZACIÓN (igual que el importador)
+// NORMALIZACIÓN AGRESIVA PARA COMPARAR
 // ============================================================
-function normalizarTituloNGS(titulo) {
-  return String(titulo || '')
+function limpiarParaComparar(str) {
+  return String(str || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .replace(/[\uFE0E\uFE0F]/g, '')
-    .replace(/^[\p{Emoji_Presentation}\p{Extended_Pictographic}\s💎]+/u, '')
-    .replace(/[“”«»]/g, '"')
-    .replace(/[‘’]/g, "'")
+    .replace(/[™®©]/g, '')
+    .replace(/[“”«»"'‘’]/g, '')
+    .replace(/[:\-–—.,;!?()\[\]{}]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase();
 }
 
+function tokensDe(str) {
+  const limpio = limpiarParaComparar(str);
+  return new Set(limpio.split(/\s+/).filter(w => w.length >= 3));
+}
+
+function matcheaConNGS(mkFirestore, matchKeysNGS) {
+  const limpioFS = limpiarParaComparar(mkFirestore);
+
+  if (matchKeysNGS.has(limpioFS)) return 'exacto';
+
+  const tokensFS = tokensDe(mkFirestore);
+  if (tokensFS.size < 2) return null;
+
+  let mejorScore = 0;
+  for (const mkNGS of matchKeysNGS) {
+    const tokensNGS = tokensDe(mkNGS);
+    if (tokensNGS.size < 2) continue;
+
+    let comunes = 0;
+    for (const t of tokensFS) if (tokensNGS.has(t)) comunes++;
+
+    const minTokens = Math.min(tokensFS.size, tokensNGS.size);
+    const score = comunes / minTokens;
+    if (score > mejorScore) mejorScore = score;
+    if (mejorScore >= 0.75) return 'fuzzy';
+  }
+  return null;
+}
+
+// ============================================================
+// HELPERS EXCEL
+// ============================================================
 function esFilaEncabezadoNGS(titulo) {
   const t = String(titulo || '').trim();
   if (!t) return true;
@@ -292,8 +325,8 @@ function inyectarCardNGS() {
     <div class="admin-card admin-card-wide admin-card-danger" id="clean-ngs-card">
       <h3>🗑️ Eliminar productos que NO están en el Excel de NGS actual</h3>
       <p class="admin-help">
-        Subí el Excel de STOCK de NGS. Todos los productos que NO aparezcan en ese Excel serán eliminados. Sirve para limpiar productos de proveedores anteriores.<br><br>
-        <strong>🔒 Los productos creados manualmente (PS3, Steam, PS Plus, Streaming, etc.) NO se borran.</strong>
+        Subí el Excel de STOCK de NGS. Solo se eliminarán los productos que <b>no coincidan de ninguna forma</b> con el Excel (match inteligente: ignora ™, ®, acentos, "Digital Edition", etc.).<br><br>
+        <strong>🔒 Los productos creados manualmente NO se borran.</strong>
       </p>
       <input type="file" id="clean-ngs-file" accept=".xlsx,.xls" class="admin-file">
       <div id="clean-ngs-log" class="import-log"><em>Esperando Excel de NGS...</em></div>
@@ -335,7 +368,6 @@ function activarListenersNGS() {
     try {
       const { sheetName, rows } = await leerExcelSimple(file);
 
-      // Detectar inicio (buscando "PRIMARIA PS4" o "PRIMARIA PS5")
       let inicioIdx = 4;
       for (let i = 0; i < Math.min(rows.length, 15); i++) {
         const fila = rows[i] || [];
@@ -348,7 +380,6 @@ function activarListenersNGS() {
         }
       }
 
-      // Extraer matchKeys
       const set = new Set();
       let filasOk = 0, filasSkip = 0;
 
@@ -356,7 +387,7 @@ function activarListenersNGS() {
         const titulo = String(rows[i][0] || '').trim();
         if (esFilaEncabezadoNGS(titulo)) { filasSkip++; continue; }
         if (titulo.length < 2) { filasSkip++; continue; }
-        set.add(normalizarTituloNGS(titulo));
+        set.add(limpiarParaComparar(titulo));
         filasOk++;
       }
 
@@ -365,7 +396,7 @@ function activarListenersNGS() {
       logNGS(`Hoja: <code>${sheetName}</code>`);
       logNGS(`Total de filas: <b>${rows.length}</b>`);
       logNGS(`✅ Títulos válidos en el Excel: <b>${filasOk}</b>`);
-      logNGS(`📌 MatchKeys únicos: <b>${set.size}</b>`);
+      logNGS(`📌 Títulos únicos (normalizados): <b>${set.size}</b>`);
       logNGS(`⏭️ Filas saltadas (encabezados): <b>${filasSkip}</b>`);
 
       if (set.size < 20) {
@@ -402,34 +433,44 @@ function activarListenersNGS() {
       const snap = await getDocs(collection(db, 'products'));
       productosNoNGS = [];
       let preservadosManuales = 0;
-      let enExcel = 0;
+      let exactos = 0;
+      let fuzzy = 0;
 
       snap.docs.forEach(d => {
         const data = d.data();
 
-        // Preservar los creados manualmente
         if (data.manual === true) {
           preservadosManuales++;
           return;
         }
 
         const mk = data.matchKey || '';
-        if (!mk) {
-          productosNoNGS.push({ id: d.id, title: data.title || '(sin título)', razon: 'sin matchKey' });
+        const base = mk || data.title || '';
+        if (!base) {
+          productosNoNGS.push({ id: d.id, title: data.title || '(sin título)', razon: 'sin datos' });
           return;
         }
 
-        if (matchKeysNGS.has(mk)) {
-          enExcel++;
+        const tipo = matcheaConNGS(base, matchKeysNGS);
+
+        if (tipo === 'exacto') {
+          exactos++;
+        } else if (tipo === 'fuzzy') {
+          fuzzy++;
         } else {
-          productosNoNGS.push({ id: d.id, title: data.title || '(sin título)', razon: 'no está en el Excel' });
+          productosNoNGS.push({
+            id: d.id,
+            title: data.title || '(sin título)',
+            razon: 'sin coincidencia'
+          });
         }
       });
 
       logNGS(`📊 Total en Firestore: <b>${snap.size}</b>`);
       logNGS(`🔒 Manuales preservados: <b>${preservadosManuales}</b>`);
-      logNGS(`✅ Productos que SÍ están en el Excel: <b>${enExcel}</b>`);
-      logNGS(`🗑️  Productos que NO están (a borrar): <b>${productosNoNGS.length}</b>`);
+      logNGS(`✅ Match exacto con NGS: <b>${exactos}</b>`);
+      logNGS(`🎯 Match fuzzy con NGS: <b>${fuzzy}</b> (NO se borran)`);
+      logNGS(`🗑️  SIN coincidencia (a borrar): <b>${productosNoNGS.length}</b>`);
 
       if (productosNoNGS.length === 0) {
         logNGS('');
@@ -438,12 +479,12 @@ function activarListenersNGS() {
       }
 
       logNGS('');
-      logNGS('<strong>Primeros 30 a borrar:</strong>');
-      productosNoNGS.slice(0, 30).forEach(p => {
-        logNGS(`&nbsp;&nbsp;• ${p.title} <small>(${p.razon})</small>`);
+      logNGS('<strong>Primeros 40 a borrar:</strong>');
+      productosNoNGS.slice(0, 40).forEach(p => {
+        logNGS(`&nbsp;&nbsp;• ${p.title}`);
       });
-      if (productosNoNGS.length > 30) {
-        logNGS(`&nbsp;&nbsp;... y ${productosNoNGS.length - 30} más.`);
+      if (productosNoNGS.length > 40) {
+        logNGS(`&nbsp;&nbsp;... y ${productosNoNGS.length - 40} más.`);
       }
 
       const confirm = $('clean-ngs-confirm');
@@ -527,4 +568,4 @@ function activarListenersNGS() {
 // ============================================================
 inyectarCardNGS();
 
-console.log('[GamesUy] maintenance.js v7 cargado (con limpieza NGS)');
+console.log('[GamesUy] maintenance.js v8 cargado (con fuzzy match)');

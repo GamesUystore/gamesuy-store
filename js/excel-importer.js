@@ -1,6 +1,7 @@
 // ============================================================
 // GAMESUY STORE — Importador de Excel (formato NEO GAMING STORE)
 // Fase 4.5: Soporta Stock NGS + Ofertas NGS
+// Fase 4.6: FIX parseo de precios argentinos (punto como miles)
 // ============================================================
 
 import { db } from './firebase-config.js';
@@ -8,7 +9,7 @@ import {
   collection, getDocs, doc, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import {
-  parseCosto, esCostoValido, aplicarVariacion, roundUYU
+  parseCosto, esCostoValido, aplicarVariacion, roundUYU, parseNumeroFlexible
 } from './data-model.js';
 import { crearPendiente } from './pendientes.js';
 
@@ -129,16 +130,15 @@ function encontrarInicioDatos(rows) {
 }
 
 function encontrarInicioOfertas(rows) {
-  // Buscar la primera fila que tenga un precio numérico en columna B
   for (let i = 0; i < Math.min(rows.length, 15); i++) {
     const fila = rows[i] || [];
     const titulo = String(fila[0] || '');
     const precio = parseCosto(fila[1]);
-    if (titulo && precio > 0 && !/OFERTAS|DESTACADAS|PRECIOS|CONSULTAR|SECUNDARIA|^▬|^$/i.test(titulo)) {
+    if (titulo && precio > 0 && !/OFERTAS|DESTACADAS|PRECIOS|CONSULTAR|SECUNDARIA|^▪|^$/i.test(titulo)) {
       return i;
     }
   }
-  return 7; // fallback
+  return 7;
 }
 
 function esFilaEncabezado(titulo) {
@@ -147,23 +147,30 @@ function esFilaEncabezado(titulo) {
   const upper = t.toUpperCase();
   if (upper === 'JUEGO' || upper === 'NEO GAMING STORE') return true;
   if (/^LISTADO|^PRECIOS EN PESOS|^SI EL JUEGO|^NO DISPONIBLE/i.test(t)) return true;
-  if (/OFERTAS|DESTACADAS|^▬+|^━+|PRECIOS|CONSULTAR|SECUNDARIA|^🎮|^🔥|^💎\s*$/i.test(t)) return true;
+  if (/OFERTAS|DESTACADAS|^▪+|^═+|PRECIOS|CONSULTAR|SECUNDARIA|^🎮|^🔥|^💎\s*$/i.test(t)) return true;
   return false;
 }
 
 // ============================================================
-// PARSEO STOCK NGS
+// PARSEO STOCK NGS — FIX: ahora entiende formato argentino
 // ============================================================
 function parsearValorNGS(raw) {
   if (raw === null || raw === undefined) return { tipo: 'sin_stock', valor: 0 };
+
+  // Si ya viene como número (Excel lo devolvió como number)
+  if (typeof raw === 'number') {
+    if (raw > 0) return { tipo: 'costo', valor: raw };
+    return { tipo: 'sin_stock', valor: 0 };
+  }
+
   const s = String(raw).trim().toUpperCase();
   if (!s) return { tipo: 'sin_stock', valor: 0 };
   if (/^NO\s*DISPONIBLE/i.test(s)) return { tipo: 'no_disponible', valor: 0 };
   if (/^SIN\s*STOCK/i.test(s)) return { tipo: 'sin_stock', valor: 0 };
 
-  const limpio = String(raw).replace(/[^0-9.,]/g, '').replace(',', '.');
-  const num = parseFloat(limpio);
-  if (!isNaN(num) && num > 0) return { tipo: 'costo', valor: num };
+  // ✅ FIX: usa el parser flexible (entiende "20.000" como 20000)
+  const num = parseNumeroFlexible(raw);
+  if (num > 0) return { tipo: 'costo', valor: num };
   return { tipo: 'sin_stock', valor: 0 };
 }
 
@@ -224,19 +231,16 @@ function parsearTituloOfertaNGS(tituloRaw) {
 
   const plataformas = [];
 
-  // Buscar "PS4" o "PS5" en cualquier parte del título
   const tienePS4 = /\bPS4\b/i.test(t);
   const tienePS5 = /\bPS5\b/i.test(t);
 
   if (tienePS4) plataformas.push('ps4');
   if (tienePS5) plataformas.push('ps5');
 
-  // Si no menciona ninguna, asumimos ambas
   if (plataformas.length === 0) {
     plataformas.push('ps4', 'ps5');
   }
 
-  // Quitar " PS4", " PS5" y variantes del título
   t = t.replace(/\s*[-–—]?\s*PS4\s*[-–—]?\s*/gi, ' ')
        .replace(/\s*[-–—]?\s*PS5\s*[-–—]?\s*/gi, ' ')
        .replace(/\s+/g, ' ')
@@ -360,7 +364,7 @@ async function procesarStock() {
     const data = d.data();
     if (data.matchKey) productosMap[data.matchKey] = { id: d.id, ...data };
   });
-  log('stock-log', `✔ ${snap.size} productos en la base.`);
+  log('stock-log', `✓ ${snap.size} productos en la base.`);
 
   const filas = excel.rows.slice(inicioIdx);
   let creados = 0, actualizados = 0, saltados = 0;
@@ -474,7 +478,6 @@ async function procesarOfertas() {
   const excel = EXCEL.ofertas;
   if (!excel) { log('ofertas-log', '⚠ No hay Excel de Ofertas cargado.', 'error'); return; }
 
-  // Detectar fecha del header si no está puesta
   let fechaHasta = $('oferta-fecha-hasta')?.value;
   if (!fechaHasta) {
     const autoFecha = extraerFechaOfertaNGS(excel.rows);
@@ -505,7 +508,7 @@ async function procesarOfertas() {
       if (!m3[s]) m3[s] = { id: d.id, ...data };
     }
   });
-  log('ofertas-log', `✔ ${snap.size} productos en la base.`);
+  log('ofertas-log', `✓ ${snap.size} productos en la base.`);
 
   const inicioIdx = encontrarInicioOfertas(excel.rows);
   log('ofertas-log', `📌 Datos detectados desde la fila ${inicioIdx + 1}`);
@@ -519,7 +522,7 @@ async function procesarOfertas() {
   for (const fila of filas) {
     const tituloRaw = String(fila[0] || '').trim();
     if (!tituloRaw) { saltadas++; continue; }
-    if (/OFERTAS|DESTACADAS|PRECIOS|CONSULTAR|SECUNDARIA|^▬|^━/i.test(tituloRaw)) { saltadas++; continue; }
+    if (/OFERTAS|DESTACADAS|PRECIOS|CONSULTAR|SECUNDARIA|^▪|^═/i.test(tituloRaw)) { saltadas++; continue; }
 
     const costoOfertaARS = parseCosto(fila[1]);
     if (!costoOfertaARS) { sinPrecio++; continue; }
@@ -532,7 +535,6 @@ async function procesarOfertas() {
     if (prod) {
       let modificado = false;
       const nuevasVariantes = (prod.variants || []).map(v => {
-        // Solo modificamos variantes primarias de las plataformas indicadas
         if (v.tipo !== 'primaria') return v;
         if (!plataformas.includes(v.categoria)) return v;
         modificado = true;
@@ -684,4 +686,4 @@ $('btn-clean-ofertas')?.addEventListener('click', async () => {
   finally { btn.disabled = false; btn.textContent = '🧹 Limpiar ofertas vencidas'; }
 });
 
-console.log('[GamesUy] excel-importer.js v19 cargado (stock + ofertas NGS)');
+console.log('[GamesUy] excel-importer.js v20 cargado (fix precios argentinos)');

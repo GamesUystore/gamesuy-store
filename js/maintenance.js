@@ -1,6 +1,7 @@
 // ============================================================
 // GAMESUY STORE — Mantenimiento
 // Fase 3.5.6: Limpieza + borrado por fecha
+// Fase 3.6: Eliminar productos que no están en el Excel NGS actual
 // ============================================================
 
 import { db } from './firebase-config.js';
@@ -13,10 +14,19 @@ import {
 
 const $ = (id) => document.getElementById(id);
 
+// ============================================================
+// ESTADO
+// ============================================================
 let productosABorrar = [];
 let analizado = false;
 let tipoAnalisis = null;
 
+let productosNoNGS = [];
+let matchKeysNGS = null;
+
+// ============================================================
+// HELPERS DE LOG
+// ============================================================
 function logClean(html) {
   const el = $('clean-log');
   if (!el) return;
@@ -29,10 +39,65 @@ function logCleanClear() {
   if (el) el.innerHTML = '';
 }
 
-// ============================================================
-// ANALIZAR — sin matchKey
-// ============================================================
+function logNGS(html) {
+  const el = $('clean-ngs-log');
+  if (!el) return;
+  el.innerHTML += `<div>${html}</div>`;
+  el.scrollTop = el.scrollHeight;
+}
 
+function logNGSClear() {
+  const el = $('clean-ngs-log');
+  if (el) el.innerHTML = '';
+}
+
+// ============================================================
+// HELPERS DE NORMALIZACIÓN (igual que el importador)
+// ============================================================
+function normalizarTituloNGS(titulo) {
+  return String(titulo || '')
+    .replace(/[\uFE0E\uFE0F]/g, '')
+    .replace(/^[\p{Emoji_Presentation}\p{Extended_Pictographic}\s💎]+/u, '')
+    .replace(/[“”«»]/g, '"')
+    .replace(/[‘’]/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function esFilaEncabezadoNGS(titulo) {
+  const t = String(titulo || '').trim();
+  if (!t) return true;
+  const upper = t.toUpperCase();
+  if (upper === 'JUEGO' || upper === 'NEO GAMING STORE') return true;
+  if (/^LISTADO|^PRECIOS EN PESOS|^SI EL JUEGO|^NO DISPONIBLE/i.test(t)) return true;
+  if (/OFERTAS|DESTACADAS|^▪+|^═+|PRECIOS|CONSULTAR|SECUNDARIA|^🎮|^🔥|^💎\s*$/i.test(t)) return true;
+  return false;
+}
+
+function leerExcelSimple(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, {
+          type: 'array', cellText: true, cellDates: false, raw: false, codepage: 65001
+        });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false });
+        resolve({ sheetName, rows });
+      } catch (err) { reject(err); }
+    };
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+// ============================================================
+// EXISTENTE: ANALIZAR — sin matchKey
+// ============================================================
 $('btn-analyze-clean')?.addEventListener('click', async () => {
   const btn = $('btn-analyze-clean');
   btn.disabled = true;
@@ -90,9 +155,8 @@ $('btn-analyze-clean')?.addEventListener('click', async () => {
 });
 
 // ============================================================
-// ANALIZAR — creados recientemente (últimas 3 horas)
+// EXISTENTE: ANALIZAR — creados recientemente
 // ============================================================
-
 $('btn-analyze-recent')?.addEventListener('click', async () => {
   const btn = $('btn-analyze-recent');
   btn.disabled = true;
@@ -154,18 +218,16 @@ $('btn-analyze-recent')?.addEventListener('click', async () => {
 });
 
 // ============================================================
-// CONFIRMACIÓN
+// EXISTENTE: CONFIRMACIÓN
 // ============================================================
-
 $('clean-confirm')?.addEventListener('input', (e) => {
   const val = e.target.value.trim().toUpperCase();
   $('btn-do-clean').disabled = val !== 'BORRAR';
 });
 
 // ============================================================
-// BORRAR
+// EXISTENTE: BORRAR
 // ============================================================
-
 $('btn-do-clean')?.addEventListener('click', async () => {
   if (!analizado || productosABorrar.length === 0) return;
 
@@ -218,4 +280,251 @@ $('btn-do-clean')?.addEventListener('click', async () => {
   }
 });
 
-console.log('[GamesUy] maintenance.js v6 cargado (con borrado por fecha)');
+// ============================================================
+// NGS: INYECTAR CARD EN EL TAB MANTENIMIENTO
+// ============================================================
+function inyectarCardNGS() {
+  const grid = document.querySelector('[data-tab-content="mantenimiento"] .admin-grid');
+  if (!grid) return;
+  if (document.getElementById('clean-ngs-card')) return;
+
+  grid.insertAdjacentHTML('beforeend', `
+    <div class="admin-card admin-card-wide admin-card-danger" id="clean-ngs-card">
+      <h3>🗑️ Eliminar productos que NO están en el Excel de NGS actual</h3>
+      <p class="admin-help">
+        Subí el Excel de STOCK de NGS. Todos los productos que NO aparezcan en ese Excel serán eliminados. Sirve para limpiar productos de proveedores anteriores.<br><br>
+        <strong>🔒 Los productos creados manualmente (PS3, Steam, PS Plus, Streaming, etc.) NO se borran.</strong>
+      </p>
+      <input type="file" id="clean-ngs-file" accept=".xlsx,.xls" class="admin-file">
+      <div id="clean-ngs-log" class="import-log"><em>Esperando Excel de NGS...</em></div>
+      <div class="admin-actions">
+        <button id="btn-analyze-ngs" class="btn btn-warning" disabled>🔍 Analizar productos fuera del Excel</button>
+        <button id="btn-do-clean-ngs" class="btn btn-danger" disabled>🗑️ Borrar productos</button>
+      </div>
+      <label class="admin-label" style="margin-top:16px;">Escribí <code>BORRAR</code> para confirmar:</label>
+      <input type="text" id="clean-ngs-confirm" placeholder="BORRAR" autocomplete="off" disabled>
+    </div>
+  `);
+
+  activarListenersNGS();
+}
+
+// ============================================================
+// NGS: ACTIVAR LISTENERS
+// ============================================================
+function activarListenersNGS() {
+
+  // ---------- CARGAR EXCEL ----------
+  $('clean-ngs-file')?.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    logNGSClear();
+    matchKeysNGS = null;
+    productosNoNGS = [];
+
+    const btnAnalyze = $('btn-analyze-ngs');
+    const btnDelete = $('btn-do-clean-ngs');
+    const confirm = $('clean-ngs-confirm');
+    if (btnAnalyze) btnAnalyze.disabled = true;
+    if (btnDelete) btnDelete.disabled = true;
+    if (confirm) { confirm.disabled = true; confirm.value = ''; }
+
+    logNGS(`📄 Leyendo <b>${file.name}</b>...`);
+
+    try {
+      const { sheetName, rows } = await leerExcelSimple(file);
+
+      // Detectar inicio (buscando "PRIMARIA PS4" o "PRIMARIA PS5")
+      let inicioIdx = 4;
+      for (let i = 0; i < Math.min(rows.length, 15); i++) {
+        const fila = rows[i] || [];
+        for (const celda of fila) {
+          const txt = String(celda || '').toUpperCase();
+          if (txt.includes('PRIMARIA PS4') || txt.includes('PRIMARIA PS5')) {
+            inicioIdx = i + 1;
+            break;
+          }
+        }
+      }
+
+      // Extraer matchKeys
+      const set = new Set();
+      let filasOk = 0, filasSkip = 0;
+
+      for (let i = inicioIdx; i < rows.length; i++) {
+        const titulo = String(rows[i][0] || '').trim();
+        if (esFilaEncabezadoNGS(titulo)) { filasSkip++; continue; }
+        if (titulo.length < 2) { filasSkip++; continue; }
+        set.add(normalizarTituloNGS(titulo));
+        filasOk++;
+      }
+
+      matchKeysNGS = set;
+
+      logNGS(`Hoja: <code>${sheetName}</code>`);
+      logNGS(`Total de filas: <b>${rows.length}</b>`);
+      logNGS(`✅ Títulos válidos en el Excel: <b>${filasOk}</b>`);
+      logNGS(`📌 MatchKeys únicos: <b>${set.size}</b>`);
+      logNGS(`⏭️ Filas saltadas (encabezados): <b>${filasSkip}</b>`);
+
+      if (set.size < 20) {
+        logNGS('');
+        logNGS('⚠️ <b>ATENCIÓN:</b> el Excel tiene muy pocos títulos válidos. Verificá que sea el archivo correcto.');
+        return;
+      }
+
+      logNGS('');
+      logNGS('Ahora hacé clic en <b>🔍 Analizar productos fuera del Excel</b>.');
+      if (btnAnalyze) btnAnalyze.disabled = false;
+
+    } catch (err) {
+      logNGS(`❌ Error al leer el Excel: ${err.message}`);
+      console.error(err);
+    }
+  });
+
+  // ---------- ANALIZAR ----------
+  $('btn-analyze-ngs')?.addEventListener('click', async () => {
+    if (!matchKeysNGS || matchKeysNGS.size === 0) {
+      alert('Primero cargá el Excel de NGS.');
+      return;
+    }
+
+    const btn = $('btn-analyze-ngs');
+    btn.disabled = true;
+    btn.textContent = '⏳ Analizando...';
+
+    try {
+      logNGS('');
+      logNGS('🔍 Leyendo todos los productos de Firestore...');
+
+      const snap = await getDocs(collection(db, 'products'));
+      productosNoNGS = [];
+      let preservadosManuales = 0;
+      let enExcel = 0;
+
+      snap.docs.forEach(d => {
+        const data = d.data();
+
+        // Preservar los creados manualmente
+        if (data.manual === true) {
+          preservadosManuales++;
+          return;
+        }
+
+        const mk = data.matchKey || '';
+        if (!mk) {
+          productosNoNGS.push({ id: d.id, title: data.title || '(sin título)', razon: 'sin matchKey' });
+          return;
+        }
+
+        if (matchKeysNGS.has(mk)) {
+          enExcel++;
+        } else {
+          productosNoNGS.push({ id: d.id, title: data.title || '(sin título)', razon: 'no está en el Excel' });
+        }
+      });
+
+      logNGS(`📊 Total en Firestore: <b>${snap.size}</b>`);
+      logNGS(`🔒 Manuales preservados: <b>${preservadosManuales}</b>`);
+      logNGS(`✅ Productos que SÍ están en el Excel: <b>${enExcel}</b>`);
+      logNGS(`🗑️  Productos que NO están (a borrar): <b>${productosNoNGS.length}</b>`);
+
+      if (productosNoNGS.length === 0) {
+        logNGS('');
+        logNGS('🎉 ¡Perfecto! No hay productos para borrar.');
+        return;
+      }
+
+      logNGS('');
+      logNGS('<strong>Primeros 30 a borrar:</strong>');
+      productosNoNGS.slice(0, 30).forEach(p => {
+        logNGS(`&nbsp;&nbsp;• ${p.title} <small>(${p.razon})</small>`);
+      });
+      if (productosNoNGS.length > 30) {
+        logNGS(`&nbsp;&nbsp;... y ${productosNoNGS.length - 30} más.`);
+      }
+
+      const confirm = $('clean-ngs-confirm');
+      const btnDelete = $('btn-do-clean-ngs');
+      if (confirm) { confirm.disabled = false; confirm.value = ''; }
+      if (btnDelete) btnDelete.disabled = true;
+
+      logNGS('');
+      logNGS('✍️  Para borrarlos, escribí <b>BORRAR</b> en el campo de confirmación.');
+
+    } catch (err) {
+      console.error('[GamesUy] Error analizando NGS:', err);
+      logNGS(`❌ Error: ${err.message}`);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '🔍 Analizar productos fuera del Excel';
+    }
+  });
+
+  // ---------- CONFIRMACIÓN ----------
+  $('clean-ngs-confirm')?.addEventListener('input', (e) => {
+    const val = e.target.value.trim().toUpperCase();
+    const btn = $('btn-do-clean-ngs');
+    if (btn) btn.disabled = val !== 'BORRAR';
+  });
+
+  // ---------- BORRAR ----------
+  $('btn-do-clean-ngs')?.addEventListener('click', async () => {
+    if (productosNoNGS.length === 0) return;
+
+    const confirmacion = $('clean-ngs-confirm').value.trim().toUpperCase();
+    if (confirmacion !== 'BORRAR') return;
+
+    if (!confirm(`⚠️ Vas a borrar ${productosNoNGS.length} productos.\n\nEsta acción NO se puede deshacer.\n\n¿Continuar?`)) {
+      return;
+    }
+
+    const btn = $('btn-do-clean-ngs');
+    btn.disabled = true;
+    btn.textContent = '⏳ Borrando...';
+
+    try {
+      logNGS('');
+      logNGS('🗑️  Iniciando borrado...');
+
+      const TAM = 400;
+      let borrados = 0;
+
+      for (let i = 0; i < productosNoNGS.length; i += TAM) {
+        const lote = productosNoNGS.slice(i, i + TAM);
+        const batch = writeBatch(db);
+        lote.forEach(p => batch.delete(doc(db, 'products', p.id)));
+        await batch.commit();
+        borrados += lote.length;
+        logNGS(`&nbsp;&nbsp;→ Borrados ${borrados} / ${productosNoNGS.length}`);
+      }
+
+      logNGS('');
+      logNGS(`✅ <strong>Limpieza completada. ${borrados} productos eliminados.</strong>`);
+
+      productosNoNGS = [];
+      matchKeysNGS = null;
+      const confirm = $('clean-ngs-confirm');
+      if (confirm) { confirm.value = ''; confirm.disabled = true; }
+      const fileInput = $('clean-ngs-file');
+      if (fileInput) fileInput.value = '';
+
+      alert(`✅ Limpieza completada.\n${borrados} productos eliminados.`);
+    } catch (err) {
+      console.error('[GamesUy] Error borrando:', err);
+      logNGS(`❌ Error: ${err.message}`);
+      btn.disabled = false;
+    } finally {
+      btn.textContent = '🗑️ Borrar productos';
+    }
+  });
+}
+
+// ============================================================
+// INIT
+// ============================================================
+inyectarCardNGS();
+
+console.log('[GamesUy] maintenance.js v7 cargado (con limpieza NGS)');

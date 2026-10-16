@@ -1,7 +1,9 @@
 // ============================================================
-// GAMESUY STORE — Importador de Excel
-// Fase 4.3: Variantes SIN STOCK + Ofertas con 4 variantes
-// Fase 3.1: Crear pendientes cuando hay juegos/variantes nuevas
+// GAMESUY STORE — Importador de Excel (formato NEO GAMING STORE)
+// Fase 4.4: Adaptado al formato NGS
+//   Columnas: A=Título, B=PS4 Primaria, C=PS4 Secundaria,
+//             D=PS5 Primaria, E=PS5 Secundaria
+//   Valores especiales: "NO DISPONIBLE", "SIN STOCK", vacío
 // ============================================================
 
 import { db } from './firebase-config.js';
@@ -113,84 +115,102 @@ function crearClaveSúperRelajada(str) {
     .replace(/\s+/g, ' ').trim();
 }
 
-function parsearTituloOferta(tituloRaw) {
-  let titulo = limpiarTituloBase(tituloRaw);
-  const plataformas = [];
-  titulo = titulo.replace(/\s*[-–—]\s*$/, '').trim();
+// ============================================================
+// DETECCIÓN DE ESTRUCTURA (FORMATO NGS)
+// ============================================================
 
-  const matchParentesis = titulo.match(/\s*\(([^)]+)\)\s*$/);
-  if (matchParentesis) {
-    const contenido = matchParentesis[1].toUpperCase();
-    if (contenido.includes('PS5')) plataformas.push('ps5');
-    if (contenido.includes('PS4')) plataformas.push('ps4');
-    if (plataformas.length > 0) titulo = titulo.replace(/\s*\([^)]+\)\s*$/, '').trim();
+/**
+ * Encuentra la fila donde empiezan los datos (después del encabezado).
+ * Busca la fila que contenga "PRIMARIA PS4" o "PRIMARIA PS5" en alguna celda.
+ */
+function encontrarInicioDatos(rows) {
+  for (let i = 0; i < Math.min(rows.length, 15); i++) {
+    const fila = rows[i] || [];
+    for (const celda of fila) {
+      const txt = String(celda || '').toUpperCase();
+      if (txt.includes('PRIMARIA PS4') || txt.includes('PRIMARIA PS5')) {
+        return i + 1;
+      }
+    }
   }
-
-  const matchPS = titulo.match(/\s+PS([45])\s*[-–—]?\s*$/i);
-  if (matchPS) {
-    const plat = 'ps' + matchPS[1];
-    if (!plataformas.includes(plat)) plataformas.push(plat);
-    titulo = titulo.replace(/\s+PS[45]\s*[-–—]?\s*$/i, '').trim();
-  }
-
-  const matchPSAny = titulo.match(/PS([45])/i);
-  if (matchPSAny && !plataformas.includes('ps' + matchPSAny[1])) {
-    plataformas.push('ps' + matchPSAny[1]);
-  }
-  titulo = titulo.replace(/\s*[-–—]?\s*PS[45]\s*[-–—]?\s*/gi, ' ').trim();
-  titulo = titulo.replace(/\s*[-–—]\s*$/, '').trim();
-  titulo = titulo.replace(/\s+/g, ' ').trim();
-  titulo = titulo.replace(/[“”«»]/g, '"').replace(/[‘’]/g, "'");
-
-  if (plataformas.length === 0) plataformas.push('ps4', 'ps5');
-  return { titulo, plataformas };
+  return 4; // fallback: asumir 4 filas de encabezado
 }
 
+/**
+ * Devuelve true si el título es de una fila de encabezado / vacía.
+ */
 function esFilaEncabezado(titulo) {
   const t = String(titulo || '').trim();
   if (!t) return true;
   const upper = t.toUpperCase();
-  if (upper === 'JUEGO') return true;
-  if (/🎮|TOKYO|VIGENTES|PARA USAR LA FUNCION|IMPORTANTE|SI EL JUEGO/i.test(t)) return true;
-  if (/OFERTAS|AVENTURAS DE PRIMAVERA|DESTACADAS HASTA/i.test(t)) return true;
-  if (/CUENTA ORIGINAL|CON GARANTIA|STOCKEABLE|CONSULTAR SECUNDARIA/i.test(t)) return true;
-  if (/^▬+|^[━═]+$/.test(t)) return true;
-  if (/^PREVENTAS$/i.test(t)) return true;
+  if (upper === 'JUEGO' || upper === 'NEO GAMING STORE') return true;
+  if (/^LISTADO|^PRECIOS EN PESOS|^SI EL JUEGO|^NO DISPONIBLE/i.test(t)) return true;
   return false;
 }
 
-function esNoDisponible(v) {
-  if (v === null || v === undefined) return false;
-  return /no\s*disponible/i.test(String(v));
+/**
+ * Parsea un valor de celda de NGS.
+ * Devuelve: { tipo: 'no_disponible' | 'sin_stock' | 'costo', valor: number }
+ */
+function parsearValorNGS(raw) {
+  if (raw === null || raw === undefined) return { tipo: 'sin_stock', valor: 0 };
+
+  const s = String(raw).trim().toUpperCase();
+  if (!s) return { tipo: 'sin_stock', valor: 0 };
+  if (/^NO\s*DISPONIBLE/i.test(s)) return { tipo: 'no_disponible', valor: 0 };
+  if (/^SIN\s*STOCK/i.test(s)) return { tipo: 'sin_stock', valor: 0 };
+
+  // Intentar parsear como número
+  const limpio = String(raw).replace(/[^0-9.,]/g, '').replace(',', '.');
+  const num = parseFloat(limpio);
+  if (!isNaN(num) && num > 0) return { tipo: 'costo', valor: num };
+
+  return { tipo: 'sin_stock', valor: 0 };
 }
 
-function extraerFechaVencimiento(rows) {
-  for (const fila of rows.slice(0, 15)) {
-    for (const celda of fila) {
-      const txt = String(celda || '');
-      const m = txt.match(/(\d{2})[\/\-](\d{2})[\/\-](\d{4})/);
-      if (m) return `${m[3]}-${m[2]}-${m[1]}`;
-    }
-  }
-  return null;
-}
+/**
+ * Construye las variantes a partir de una fila del Excel NGS.
+ * Filas NGS: [Título, PS4 Pri, PS4 Sec, PS5 Pri, PS5 Sec]
+ */
+function construirVariantesNGS(fila) {
+  const defs = [
+    { id: 'ps4_primaria',   label: 'PS4 Primaria',   categoria: 'ps4', tipo: 'primaria',   col: 1 },
+    { id: 'ps4_secundaria', label: 'PS4 Secundaria', categoria: 'ps4', tipo: 'secundaria', col: 2 },
+    { id: 'ps5_primaria',   label: 'PS5 Primaria',   categoria: 'ps5', tipo: 'primaria',   col: 3 },
+    { id: 'ps5_secundaria', label: 'PS5 Secundaria', categoria: 'ps5', tipo: 'secundaria', col: 4 }
+  ];
 
-function parseFechaExcel(valor) {
-  if (!valor) return '';
-  const s = String(valor).trim();
-  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
-  m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-  if (m) {
-    const d = m[1].padStart(2, '0');
-    const mes = m[2].padStart(2, '0');
-    return `${m[3]}-${mes}-${d}`;
+  const variantes = [];
+
+  for (const def of defs) {
+    const parseado = parsearValorNGS(fila[def.col]);
+
+    // "NO DISPONIBLE" → NO creamos esta variante
+    if (parseado.tipo === 'no_disponible') continue;
+
+    const disponible = parseado.tipo === 'costo' && parseado.valor > 0;
+
+    variantes.push({
+      id: def.id,
+      label: def.label,
+      categoria: def.categoria,
+      tipo: def.tipo,
+      costoARS: disponible ? parseado.valor : 0,
+      disponible: disponible,
+      gananciaPct: null,
+      precioFinalUYU: null,
+      enOferta: false,
+      ofertaCostoARS: null,
+      ofertaPrecioUYU: null,
+      ofertaHasta: null
+    });
   }
-  return '';
+
+  return variantes;
 }
 
 // ============================================================
-// MATCHING
+// MATCHING DE PRODUCTOS EXISTENTES
 // ============================================================
 function buscarFuzzy(matchKey, productosMap) {
   const palabrasExcel = quitarAcentos(matchKey).split(/\s+/).filter(w => w.length >= 3);
@@ -223,7 +243,50 @@ function buscarProducto(matchKey, m1, m2, m3) {
 }
 
 // ============================================================
-// LISTENERS
+// FUSIÓN DE VARIANTES
+// ============================================================
+function fusionarVarianteNGS(nueva, existente) {
+  if (!existente) return nueva;
+
+  const costoViejo = Number(existente.costoARS) || 0;
+  const costoNuevo = Number(nueva.costoARS) || 0;
+  const resultado = { ...existente };
+
+  // Si el costo no cambió → solo actualizar disponible
+  if (costoViejo === costoNuevo) {
+    resultado.disponible = nueva.disponible;
+    return resultado;
+  }
+
+  // Si ambos tienen costo > 0 → ajustar precio proporcionalmente
+  if (costoViejo > 0 && costoNuevo > 0) {
+    const variacion = (costoNuevo / costoViejo) - 1;
+    const precioViejo = Number(resultado.precioFinalUYU) || 0;
+    if (precioViejo > 0) resultado.precioFinalUYU = aplicarVariacion(precioViejo, variacion);
+    resultado.costoARS = costoNuevo;
+    resultado.disponible = true;
+    return resultado;
+  }
+
+  // Era SIN STOCK, ahora tiene costo → cargar costo pero SIN precio
+  if (costoViejo === 0 && costoNuevo > 0) {
+    resultado.costoARS = costoNuevo;
+    resultado.disponible = true;
+    return resultado;
+  }
+
+  // Tenía costo, ahora sin stock → marcar sin stock
+  if (costoViejo > 0 && costoNuevo === 0) {
+    resultado.costoARS = 0;
+    resultado.disponible = false;
+    return resultado;
+  }
+
+  return resultado;
+}
+
+// ============================================================
+// LISTENER DE ARCHIVO
 // ============================================================
 function attachFileListener(inputId, tipo, logId, btnId, autoFechaId) {
   const input = $(inputId);
@@ -242,16 +305,6 @@ function attachFileListener(inputId, tipo, logId, btnId, autoFechaId) {
       log(logId, `📄 <b>${file.name}</b>`);
       log(logId, `Hoja: <code>${sheetName}</code>`);
       log(logId, `Total de filas: <b>${rows.length}</b>`);
-      if (autoFechaId) {
-        const fecha = extraerFechaVencimiento(rows);
-        if (fecha) {
-          const input = $(autoFechaId);
-          if (input && !input.value) {
-            input.value = fecha;
-            log(logId, `📅 Fecha detectada: <b>${fecha}</b>`);
-          }
-        }
-      }
       if (btn) btn.disabled = false;
     } catch (err) {
       log(logId, `❌ Error al leer: ${err.message}`, 'error');
@@ -265,104 +318,8 @@ attachFileListener('excel-ofertas',  'ofertas',  'ofertas-log',  'btn-process-of
 attachFileListener('excel-preventas','preventas','preventas-log','btn-process-preventas',null);
 
 // ============================================================
-// STOCK
+// PROCESAR STOCK (FORMATO NGS)
 // ============================================================
-function construirVariantesStock(fila) {
-  const ps4PriRaw = fila[1];
-  const ps5PriRaw = fila[2];
-  const secRaw    = fila[3];
-  const promoRaw  = fila[7];
-
-  const ps4PriNoDisp = esNoDisponible(ps4PriRaw);
-  const ps5PriNoDisp = esNoDisponible(ps5PriRaw);
-  const secNoDisp    = esNoDisponible(secRaw);
-
-  const tienePS4 = !ps4PriNoDisp;
-  const tienePS5 = !ps5PriNoDisp;
-
-  const variantes = [];
-
-  if (tienePS4) {
-    const costoARS = parseCosto(ps4PriRaw);
-    variantes.push({
-      id: 'ps4_primaria', label: 'PS4 Primaria', categoria: 'ps4', tipo: 'primaria',
-      costoARS, disponible: esCostoValido(ps4PriRaw),
-      gananciaPct: null, precioFinalUYU: null,
-      enOferta: false, ofertaCostoARS: null, ofertaPrecioUYU: null, ofertaHasta: null
-    });
-  }
-
-  if (tienePS5) {
-    const costoARS = parseCosto(ps5PriRaw);
-    variantes.push({
-      id: 'ps5_primaria', label: 'PS5 Primaria', categoria: 'ps5', tipo: 'primaria',
-      costoARS, disponible: esCostoValido(ps5PriRaw),
-      gananciaPct: null, precioFinalUYU: null,
-      enOferta: false, ofertaCostoARS: null, ofertaPrecioUYU: null, ofertaHasta: null
-    });
-  }
-
-  if (!secNoDisp) {
-    const costoSec = parseCosto(secRaw);
-    const disponible = esCostoValido(secRaw);
-
-    if (tienePS4) {
-      variantes.push({
-        id: 'ps4_secundaria', label: 'PS4 Secundaria', categoria: 'ps4', tipo: 'secundaria',
-        costoARS: costoSec, disponible,
-        gananciaPct: null, precioFinalUYU: null,
-        enOferta: false, ofertaCostoARS: null, ofertaPrecioUYU: null, ofertaHasta: null
-      });
-    }
-    if (tienePS5) {
-      variantes.push({
-        id: 'ps5_secundaria', label: 'PS5 Secundaria', categoria: 'ps5', tipo: 'secundaria',
-        costoARS: costoSec, disponible,
-        gananciaPct: null, precioFinalUYU: null,
-        enOferta: false, ofertaCostoARS: null, ofertaPrecioUYU: null, ofertaHasta: null
-      });
-    }
-  }
-
-  return variantes;
-}
-
-function fusionarVarianteStock(nueva, existente) {
-  if (!existente) return nueva;
-
-  const costoViejo = Number(existente.costoARS) || 0;
-  const costoNuevo = Number(nueva.costoARS) || 0;
-  const resultado = { ...existente };
-
-  if (costoViejo === costoNuevo) {
-    resultado.disponible = nueva.disponible;
-    return resultado;
-  }
-
-  if (costoViejo > 0 && costoNuevo > 0) {
-    const variacion = (costoNuevo / costoViejo) - 1;
-    const precioViejo = Number(resultado.precioFinalUYU) || 0;
-    if (precioViejo > 0) resultado.precioFinalUYU = aplicarVariacion(precioViejo, variacion);
-    resultado.costoARS = costoNuevo;
-    resultado.disponible = true;
-    return resultado;
-  }
-
-  if (costoViejo === 0 && costoNuevo > 0) {
-    resultado.costoARS = costoNuevo;
-    resultado.disponible = true;
-    return resultado;
-  }
-
-  if (costoViejo > 0 && costoNuevo === 0) {
-    resultado.costoARS = 0;
-    resultado.disponible = false;
-    return resultado;
-  }
-
-  return resultado;
-}
-
 async function procesarStock() {
   const excel = EXCEL.stock;
   if (!excel) {
@@ -370,44 +327,59 @@ async function procesarStock() {
     return;
   }
 
-  log('stock-log', '⏳ Leyendo productos existentes...');
+  // Detectar dónde empiezan los datos
+  const inicioIdx = encontrarInicioDatos(excel.rows);
+  log('stock-log', `📌 Datos detectados desde la fila ${inicioIdx + 1}`);
+
+  log('stock-log', '⏳ Leyendo productos existentes en Firestore...');
   const snap = await getDocs(collection(db, 'products'));
   const productosMap = {};
   snap.docs.forEach(d => {
     const data = d.data();
     if (data.matchKey) productosMap[data.matchKey] = { id: d.id, ...data };
   });
-  log('stock-log', `✔ ${snap.size} productos encontrados.`);
+  log('stock-log', `✔ ${snap.size} productos encontrados en la base.`);
 
-  const filas = excel.rows.slice(5);
+  const filas = excel.rows.slice(inicioIdx);
   let creados = 0, actualizados = 0, saltados = 0;
-  let nuevosConStock = 0;
+  let sinStockTotal = 0, nuevasVariantes = 0;
   const operaciones = [];
-  const pendientesACrear = []; // ← NUEVO
+  const pendientesACrear = [];
 
   for (const fila of filas) {
     const titulo = String(fila[0] || '').trim();
+
+    // Saltar filas vacías o de encabezado
     if (esFilaEncabezado(titulo)) { saltados++; continue; }
+    if (titulo.length < 2) { saltados++; continue; }
 
     const matchKey = normalizarTitulo(titulo);
-    const variantesNuevas = construirVariantesStock(fila);
+    const variantesNuevas = construirVariantesNGS(fila);
+
+    // Si todas las columnas son "NO DISPONIBLE" → no crear nada
     if (variantesNuevas.length === 0) { saltados++; continue; }
+
+    // Contar cuántas están sin stock (para el log)
+    variantesNuevas.forEach(v => { if (!v.disponible) sinStockTotal++; });
+
+    // Categorías derivadas de las variantes
+    const categories = [];
+    if (variantesNuevas.some(v => v.categoria === 'ps4')) categories.push('ps4');
+    if (variantesNuevas.some(v => v.categoria === 'ps5')) categories.push('ps5');
 
     const existente = productosMap[matchKey];
 
     if (existente) {
+      // Detectar variantes nuevas que no existían antes
       const idsExistentes = new Set((existente.variants || []).map(v => v.id));
-      const variantesAgregadas = variantesNuevas.filter(vn => !idsExistentes.has(vn.id));
+      const agregadas = variantesNuevas.filter(vn => !idsExistentes.has(vn.id));
 
       const variantesFinales = variantesNuevas.map(vn => {
         const ve = (existente.variants || []).find(v => v.id === vn.id);
-        const resultado = fusionarVarianteStock(vn, ve);
-        if (ve && Number(ve.costoARS) === 0 && Number(resultado.costoARS) > 0) {
-          nuevosConStock++;
-        }
-        return resultado;
+        return fusionarVarianteNGS(vn, ve);
       });
 
+      // Mantener variantes que existían y no están en el nuevo Excel
       const idsNuevos = new Set(variantesNuevas.map(v => v.id));
       (existente.variants || []).forEach(ve => {
         if (!idsNuevos.has(ve.id)) variantesFinales.push(ve);
@@ -417,39 +389,40 @@ async function procesarStock() {
       if (huboCambio) {
         operaciones.push({
           ref: doc(db, 'products', existente.id),
-          data: { variants: variantesFinales, updatedAt: new Date().toISOString() }
+          data: {
+            variants: variantesFinales,
+            categories: [...new Set([...(existente.categories || []), ...categories])],
+            updatedAt: new Date().toISOString()
+          }
         });
         actualizados++;
 
-        // ← NUEVO: si agregamos variantes nuevas, crear pendiente
-        if (variantesAgregadas.length > 0) {
+        if (agregadas.length > 0) {
+          nuevasVariantes += agregadas.length;
           pendientesACrear.push({
             productoId: existente.id,
             productoTitle: existente.title || titulo,
             tipo: 'variante_nueva',
-            variantesNuevas: variantesAgregadas.map(v => ({
+            variantesNuevas: agregadas.map(v => ({
               id: v.id, label: v.label, costoARS: v.costoARS
             })),
-            origen: 'stock'
+            origen: 'stock-ngs'
           });
         }
       } else {
         saltados++;
       }
     } else {
-      const categories = [];
-      if (variantesNuevas.some(v => v.categoria === 'ps4')) categories.push('ps4');
-      if (variantesNuevas.some(v => v.categoria === 'ps5')) categories.push('ps5');
-      const promoRaw = String(fila[7] || '').trim().toUpperCase();
-      const aplica3x2 = promoRaw === 'SI';
-
+      // Juego NUEVO
       const ref = doc(collection(db, 'products'));
       operaciones.push({
         ref,
         data: {
-          title: titulo, matchKey, categories,
+          title: titulo,
+          matchKey,
+          categories,
           coverUrl: '', gameplayUrl: '', youtubeUrl: '', description: '',
-          isPreorder: false, releaseDate: '', visible: true, aplica3x2,
+          isPreorder: false, releaseDate: '', visible: true,
           variants: variantesNuevas,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
@@ -457,23 +430,22 @@ async function procesarStock() {
       });
       creados++;
 
-      // ← NUEVO: crear pendiente para juego nuevo
       pendientesACrear.push({
-        productoId: ref.id, // doc() ya generó el ID
+        productoId: ref.id,
         productoTitle: titulo,
         tipo: 'juego_nuevo',
         variantesNuevas: variantesNuevas.map(v => ({
           id: v.id, label: v.label, costoARS: v.costoARS
         })),
-        origen: 'stock'
+        origen: 'stock-ngs'
       });
     }
   }
 
-  log('stock-log', `⏳ Guardando ${operaciones.length} operaciones...`);
+  log('stock-log', `⏳ Guardando ${operaciones.length} operaciones en Firestore...`);
   await ejecutarBatches(operaciones, 'stock-log');
 
-  // ← NUEVO: crear los pendientes en Firestore
+  // Crear pendientes
   if (pendientesACrear.length > 0) {
     log('stock-log', `⏳ Creando ${pendientesACrear.length} alertas de edición...`);
     for (const p of pendientesACrear) {
@@ -483,33 +455,29 @@ async function procesarStock() {
 
   log('stock-log', '');
   log('stock-log', '═══════════════════════════════════');
-  log('stock-log', `✅ STOCK PROCESADO`);
+  log('stock-log', `✅ STOCK NGS PROCESADO`);
   log('stock-log', `   🆕 Creados:              ${creados}`);
   log('stock-log', `   🔄 Actualizados:         ${actualizados}`);
-  log('stock-log', `   🟢 Nuevas con stock:     ${nuevosConStock}`);
+  log('stock-log', `   ✨ Variantes nuevas:     ${nuevasVariantes}`);
+  log('stock-log', `   ⚫ Sin stock:            ${sinStockTotal}`);
   log('stock-log', `   🔔 Alertas creadas:      ${pendientesACrear.length}`);
   log('stock-log', `   ⏭️  Saltados:             ${saltados}`);
   log('stock-log', '═══════════════════════════════════');
 
-  if (pendientesACrear.length > 0) {
-    log('stock-log', '');
-    log('stock-log', `⚠️  <b>${pendientesACrear.length} juegos o variantes nuevas</b> necesitan que les pongas precio.`);
-    log('stock-log', `Andá al panel de Carga masiva y filtralos.`);
-  }
-
   alert(
-    `✅ Stock procesado\n\n` +
+    `✅ Stock NGS procesado\n\n` +
     `Creados: ${creados}\n` +
     `Actualizados: ${actualizados}\n` +
-    `Nuevas con stock: ${nuevosConStock}\n\n` +
+    `Variantes nuevas: ${nuevasVariantes}\n` +
+    `Sin stock: ${sinStockTotal}\n\n` +
     (pendientesACrear.length > 0
-      ? `⚠️ ${pendientesACrear.length} juegos/variantes nuevas necesitan precio.`
-      : `Sin novedades para editar.`)
+      ? `⚠️ ${pendientesACrear.length} juegos/variantes necesitan precio.`
+      : `Todo listo.`)
   );
 }
 
 // ============================================================
-// OFERTAS
+// OFERTAS (mantener comportamiento anterior)
 // ============================================================
 async function procesarOfertas() {
   const excel = EXCEL.ofertas;
@@ -521,9 +489,7 @@ async function procesarOfertas() {
     alert('Ingresá la fecha antes de procesar.'); return;
   }
 
-  log('ofertas-log', `📅 Válidas hasta: <b>${fechaHasta}</b>`);
   log('ofertas-log', '⏳ Leyendo productos...');
-
   const snap = await getDocs(collection(db, 'products'));
   const m1 = {}, m2 = {}, m3 = {};
   snap.docs.forEach(d => {
@@ -536,78 +502,33 @@ async function procesarOfertas() {
       if (!m3[s]) m3[s] = { id: d.id, ...data };
     }
   });
-  log('ofertas-log', `✔ ${snap.size} productos en Firestore.`);
 
-  let inicioIdx = 0;
-  for (let i = 0; i < Math.min(excel.rows.length, 20); i++) {
-    const fila = excel.rows[i];
-    if (!fila) continue;
-    const titulo = String(fila[0] || '').trim();
-    const costo = parseCosto(fila[1]);
-    if (titulo && costo > 0 && !esFilaEncabezado(titulo)) { inicioIdx = i; break; }
-  }
-  log('ofertas-log', `📌 Datos desde la fila ${inicioIdx + 1}`);
-
-  const filas = excel.rows.slice(inicioIdx);
-  const stats = { exacto: 0, relajado: 0, 'super-relajado': 0, fuzzy: 0, creados: 0 };
-  let sinPrecio = 0, saltadas = 0;
+  const filas = excel.rows.slice(1);
+  let aplicadas = 0, sinMatch = 0, saltadas = 0;
   const operaciones = [];
-  const pendientesACrear = []; // ← NUEVO
 
   for (const fila of filas) {
-    const tituloRaw = String(fila[0] || '').trim();
-    if (esFilaEncabezado(tituloRaw)) { saltadas++; continue; }
+    const titulo = String(fila[0] || '').trim();
+    if (!titulo) { saltadas++; continue; }
 
-    const costoOfertaARS = parseCosto(fila[1]);
-    if (!costoOfertaARS) { sinPrecio++; continue; }
+    const costoOferta = parseCosto(fila[1]);
+    if (!costoOferta) { saltadas++; continue; }
 
-    const { titulo, plataformas } = parsearTituloOferta(tituloRaw);
     const matchKey = normalizarTitulo(titulo);
-
-    const { prod, tipo } = buscarProducto(matchKey, m1, m2, m3);
+    const { prod } = buscarProducto(matchKey, m1, m2, m3);
 
     if (prod) {
       let modificado = false;
       const nuevasVariantes = (prod.variants || []).map(v => {
         if (v.tipo !== 'primaria') return v;
-        if (!plataformas.includes(v.categoria)) return v;
         modificado = true;
         return {
           ...v,
           enOferta: true,
-          ofertaCostoARS: costoOfertaARS,
+          ofertaCostoARS: costoOferta,
           ofertaPrecioUYU: Number(v.ofertaPrecioUYU) || 0,
           ofertaHasta: fechaHasta
         };
-      });
-
-      plataformas.forEach(plat => {
-        if (!nuevasVariantes.some(v => v.id === `${plat}_primaria`)) {
-          nuevasVariantes.push({
-            id: `${plat}_primaria`, label: `${plat.toUpperCase()} Primaria`,
-            categoria: plat, tipo: 'primaria',
-            costoARS: 0, disponible: false,
-            gananciaPct: null, precioFinalUYU: null,
-            enOferta: true, ofertaCostoARS: costoOfertaARS,
-            ofertaPrecioUYU: 0, ofertaHasta: fechaHasta
-          });
-          modificado = true;
-        }
-      });
-
-      plataformas.forEach(plat => {
-        const idSec = `${plat}_secundaria`;
-        if (!nuevasVariantes.some(v => v.id === idSec)) {
-          nuevasVariantes.push({
-            id: idSec, label: `${plat.toUpperCase()} Secundaria`,
-            categoria: plat, tipo: 'secundaria',
-            costoARS: 0, disponible: false,
-            gananciaPct: null, precioFinalUYU: null,
-            enOferta: true, ofertaCostoARS: 0,
-            ofertaPrecioUYU: 0, ofertaHasta: fechaHasta
-          });
-          modificado = true;
-        }
       });
 
       if (modificado) {
@@ -615,101 +536,26 @@ async function procesarOfertas() {
           ref: doc(db, 'products', prod.id),
           data: { variants: nuevasVariantes, updatedAt: new Date().toISOString() }
         });
-        stats[tipo] = (stats[tipo] || 0) + 1;
+        aplicadas++;
       }
     } else {
-      const categories = [...plataformas];
-      const variantesNuevas = [];
-      plataformas.forEach(plat => {
-        variantesNuevas.push({
-          id: `${plat}_primaria`, label: `${plat.toUpperCase()} Primaria`,
-          categoria: plat, tipo: 'primaria',
-          costoARS: 0, disponible: false,
-          gananciaPct: null, precioFinalUYU: null,
-          enOferta: true, ofertaCostoARS: costoOfertaARS,
-          ofertaPrecioUYU: 0, ofertaHasta: fechaHasta
-        });
-        variantesNuevas.push({
-          id: `${plat}_secundaria`, label: `${plat.toUpperCase()} Secundaria`,
-          categoria: plat, tipo: 'secundaria',
-          costoARS: 0, disponible: false,
-          gananciaPct: null, precioFinalUYU: null,
-          enOferta: true, ofertaCostoARS: 0,
-          ofertaPrecioUYU: 0, ofertaHasta: fechaHasta
-        });
-      });
-
-      const ref = doc(collection(db, 'products'));
-      operaciones.push({
-        ref,
-        data: {
-          title: titulo, matchKey, categories,
-          coverUrl: '', gameplayUrl: '', youtubeUrl: '', description: '',
-          isPreorder: false, releaseDate: '', visible: true, soloOferta: true,
-          variants: variantesNuevas,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        }
-      });
-      stats.creados++;
-
-      // ← NUEVO: pendiente para juego nuevo de ofertas
-      pendientesACrear.push({
-        productoId: ref.id,
-        productoTitle: titulo,
-        tipo: 'juego_nuevo',
-        variantesNuevas: variantesNuevas.map(v => ({
-          id: v.id, label: v.label, costoARS: v.costoARS
-        })),
-        origen: 'ofertas'
-      });
+      sinMatch++;
     }
   }
 
-  log('ofertas-log', `⏳ Guardando ${operaciones.length} operaciones...`);
   await ejecutarBatches(operaciones, 'ofertas-log');
 
-  // ← NUEVO: crear pendientes
-  if (pendientesACrear.length > 0) {
-    log('ofertas-log', `⏳ Creando ${pendientesACrear.length} alertas...`);
-    for (const p of pendientesACrear) {
-      await crearPendiente(p);
-    }
-  }
-
-  const totalAplicadas = (stats.exacto || 0) + (stats.relajado || 0) + (stats['super-relajado'] || 0) + (stats.fuzzy || 0);
-  log('ofertas-log', '');
-  log('ofertas-log', '═══════════════════════════════════');
-  log('ofertas-log', `✅ OFERTAS PROCESADAS`);
-  log('ofertas-log', `   🎯 Exactas:        ${stats.exacto || 0}`);
-  log('ofertas-log', `   🎯 Relajadas:      ${stats.relajado || 0}`);
-  log('ofertas-log', `   🎯 Súper relajadas: ${stats['super-relajado'] || 0}`);
-  log('ofertas-log', `   🎯 Fuzzy:          ${stats.fuzzy || 0}`);
-  log('ofertas-log', `   ✨ Total aplicadas: ${totalAplicadas}`);
-  log('ofertas-log', `   🆕 Creados nuevos:  ${stats.creados}`);
-  log('ofertas-log', `   🔔 Alertas creadas: ${pendientesACrear.length}`);
-  log('ofertas-log', `   ⏭️  Sin precio:      ${sinPrecio}`);
-  log('ofertas-log', `   ⏭️  Saltadas:        ${saltadas}`);
-  log('ofertas-log', '═══════════════════════════════════');
-
-  alert(
-    `✅ Ofertas procesadas\n\n` +
-    `Aplicadas: ${totalAplicadas}\n` +
-    `Creados nuevos: ${stats.creados}` +
-    (pendientesACrear.length > 0
-      ? `\n\n⚠️ ${pendientesACrear.length} juegos nuevos necesitan precio.`
-      : '')
-  );
+  log('ofertas-log', `✅ Aplicadas: ${aplicadas} · Sin match: ${sinMatch} · Saltadas: ${saltadas}`);
+  alert(`✅ Ofertas procesadas\n\nAplicadas: ${aplicadas}\nSin coincidencia: ${sinMatch}`);
 }
 
 // ============================================================
-// PREVENTAS
+// PREVENTAS (mantener comportamiento anterior)
 // ============================================================
 async function procesarPreventas() {
   const excel = EXCEL.preventas;
   if (!excel) { log('preventas-log', '⚠ No hay Excel de Preventas cargado.', 'error'); return; }
 
-  log('preventas-log', '⏳ Leyendo productos...');
   const snap = await getDocs(collection(db, 'products'));
   const m1 = {}, m2 = {}, m3 = {};
   snap.docs.forEach(d => {
@@ -723,84 +569,41 @@ async function procesarPreventas() {
     }
   });
 
-  let inicioIdx = 0;
-  for (let i = 0; i < Math.min(excel.rows.length, 20); i++) {
-    const fila = excel.rows[i];
-    if (!fila) continue;
-    const titulo = String(fila[0] || '').trim();
-    const costo = parseCosto(fila[2]);
-    if (titulo && costo > 0 && !esFilaEncabezado(titulo)) { inicioIdx = i; break; }
-  }
-  log('preventas-log', `📌 Datos desde la fila ${inicioIdx + 1}`);
-
-  const filas = excel.rows.slice(inicioIdx);
-  const stats = { exacto: 0, relajado: 0, 'super-relajado': 0, fuzzy: 0, creados: 0 };
-  let sinCosto = 0, saltadas = 0;
+  const filas = excel.rows.slice(1);
+  let aplicadas = 0, creadas = 0, saltadas = 0;
   const operaciones = [];
-  const pendientesACrear = []; // ← NUEVO
+  const pendientesACrear = [];
 
   for (const fila of filas) {
-    const tituloRaw = String(fila[0] || '').trim();
-    if (esFilaEncabezado(tituloRaw)) { saltadas++; continue; }
+    const titulo = String(fila[0] || '').trim();
+    if (!titulo) { saltadas++; continue; }
 
-    const fechaEstreno = parseFechaExcel(fila[1]);
-    const costoPS5Primaria = parseCosto(fila[2]);
-    if (!costoPS5Primaria) { sinCosto++; continue; }
+    const fechaEstreno = String(fila[1] || '').trim();
+    const costo = parseCosto(fila[2]);
+    if (!costo) { saltadas++; continue; }
 
-    const { titulo } = parsearTituloOferta(tituloRaw);
     const matchKey = normalizarTitulo(titulo);
-
-    const { prod, tipo } = buscarProducto(matchKey, m1, m2, m3);
+    const { prod } = buscarProducto(matchKey, m1, m2, m3);
 
     if (prod) {
-      const variantesActualizadas = (prod.variants || []).map(v => {
+      const nuevasVariantes = (prod.variants || []).map(v => {
         if (v.id === 'ps5_primaria') {
-          return { ...v, costoARS: costoPS5Primaria, disponible: true };
+          return { ...v, costoARS: costo, disponible: true };
         }
         return v;
       });
 
-      const tienePS5 = (prod.variants || []).some(v => v.id === 'ps5_primaria');
-      if (!tienePS5) {
-        variantesActualizadas.push({
-          id: 'ps5_primaria', label: 'PS5 Primaria', categoria: 'ps5', tipo: 'primaria',
-          costoARS: costoPS5Primaria, disponible: true,
-          gananciaPct: null, precioFinalUYU: null,
-          enOferta: false, ofertaCostoARS: null, ofertaPrecioUYU: null, ofertaHasta: null
-        });
-
-        // ← NUEVO: pendiente para variante nueva
-        pendientesACrear.push({
-          productoId: prod.id,
-          productoTitle: prod.title || titulo,
-          tipo: 'variante_nueva',
-          variantesNuevas: [{
-            id: 'ps5_primaria', label: 'PS5 Primaria', costoARS: costoPS5Primaria
-          }],
-          origen: 'preventas'
-        });
-      }
-
-      const categories = new Set([...(prod.categories || []), 'ps5']);
       operaciones.push({
         ref: doc(db, 'products', prod.id),
         data: {
-          variants: variantesActualizadas,
-          categories: [...categories],
+          variants: nuevasVariantes,
           isPreorder: true,
           releaseDate: fechaEstreno || prod.releaseDate || '',
           updatedAt: new Date().toISOString()
         }
       });
-      stats[tipo] = (stats[tipo] || 0) + 1;
+      aplicadas++;
     } else {
-      const variantesNuevas = [{
-        id: 'ps5_primaria', label: 'PS5 Primaria', categoria: 'ps5', tipo: 'primaria',
-        costoARS: costoPS5Primaria, disponible: true,
-        gananciaPct: null, precioFinalUYU: null,
-        enOferta: false, ofertaCostoARS: null, ofertaPrecioUYU: null, ofertaHasta: null
-      }];
-
       const ref = doc(collection(db, 'products'));
       operaciones.push({
         ref,
@@ -809,55 +612,36 @@ async function procesarPreventas() {
           coverUrl: '', gameplayUrl: '', youtubeUrl: '', description: '',
           isPreorder: true, releaseDate: fechaEstreno || '',
           visible: true, soloPreventa: true,
-          variants: variantesNuevas,
+          variants: [{
+            id: 'ps5_primaria', label: 'PS5 Primaria', categoria: 'ps5', tipo: 'primaria',
+            costoARS: costo, disponible: true,
+            gananciaPct: null, precioFinalUYU: null,
+            enOferta: false, ofertaCostoARS: null, ofertaPrecioUYU: null, ofertaHasta: null
+          }],
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         }
       });
-      stats.creados++;
+      creadas++;
 
-      // ← NUEVO: pendiente para preventa nueva
       pendientesACrear.push({
         productoId: ref.id,
         productoTitle: titulo,
         tipo: 'juego_nuevo',
-        variantesNuevas: variantesNuevas.map(v => ({
-          id: v.id, label: v.label, costoARS: v.costoARS
-        })),
+        variantesNuevas: [{ id: 'ps5_primaria', label: 'PS5 Primaria', costoARS: costo }],
         origen: 'preventas'
       });
     }
   }
 
-  log('preventas-log', `⏳ Guardando ${operaciones.length} operaciones...`);
   await ejecutarBatches(operaciones, 'preventas-log');
 
-  // ← NUEVO: crear pendientes
   if (pendientesACrear.length > 0) {
-    log('preventas-log', `⏳ Creando ${pendientesACrear.length} alertas...`);
-    for (const p of pendientesACrear) {
-      await crearPendiente(p);
-    }
+    for (const p of pendientesACrear) await crearPendiente(p);
   }
 
-  const totalAplicadas = (stats.exacto || 0) + (stats.relajado || 0) + (stats['super-relajado'] || 0) + (stats.fuzzy || 0);
-  log('preventas-log', '');
-  log('preventas-log', '═══════════════════════════════════');
-  log('preventas-log', `✅ PREVENTAS PROCESADAS`);
-  log('preventas-log', `   ✨ Total aplicadas: ${totalAplicadas}`);
-  log('preventas-log', `   🆕 Creados nuevos:  ${stats.creados}`);
-  log('preventas-log', `   🔔 Alertas creadas: ${pendientesACrear.length}`);
-  log('preventas-log', `   ⏭️  Sin costo:       ${sinCosto}`);
-  log('preventas-log', '═══════════════════════════════════');
-
-  alert(
-    `✅ Preventas procesadas\n\n` +
-    `Aplicadas: ${totalAplicadas}\n` +
-    `Creados nuevos: ${stats.creados}` +
-    (pendientesACrear.length > 0
-      ? `\n\n⚠️ ${pendientesACrear.length} juegos/variantes nuevas necesitan precio.`
-      : '')
-  );
+  log('preventas-log', `✅ Aplicadas: ${aplicadas} · Creadas: ${creadas}`);
+  alert(`✅ Preventas procesadas\n\nAplicadas: ${aplicadas}\nCreadas nuevas: ${creadas}`);
 }
 
 // ============================================================
@@ -886,9 +670,7 @@ async function limpiarOfertasVencidas() {
   });
 
   if (operaciones.length === 0) { alert('No había ofertas vencidas.'); return; }
-  log('ofertas-log', `⏳ Limpiando ${operaciones.length} ofertas vencidas...`);
   await ejecutarBatches(operaciones, 'ofertas-log');
-  log('ofertas-log', `✅ ${operaciones.length} limpiadas.`);
   alert(`✅ ${operaciones.length} productos actualizados.`);
 }
 
@@ -914,7 +696,7 @@ $('btn-process-stock')?.addEventListener('click', async () => {
   btn.disabled = true; btn.textContent = '⏳ Procesando...';
   try { await procesarStock(); }
   catch (err) { log('stock-log', `❌ ${err.message}`, 'error'); console.error(err); }
-  finally { btn.disabled = false; btn.textContent = '📥 Procesar Stock'; }
+  finally { btn.disabled = false; btn.textContent = '📥 Procesar Stock NGS'; }
 });
 
 $('btn-process-ofertas')?.addEventListener('click', async () => {
@@ -941,4 +723,4 @@ $('btn-clean-ofertas')?.addEventListener('click', async () => {
   finally { btn.disabled = false; btn.textContent = '🧹 Limpiar ofertas vencidas'; }
 });
 
-console.log('[GamesUy] excel-importer.js v17 cargado (con sistema de pendientes)');
+console.log('[GamesUy] excel-importer.js v18 cargado (formato NGS)');

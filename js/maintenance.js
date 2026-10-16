@@ -1,7 +1,7 @@
 // ============================================================
 // GAMESUY STORE — Mantenimiento
 // Fase 3.5.6: Limpieza + borrado por fecha
-// Fase 3.7: Eliminar productos no-NGS con FUZZY MATCH
+// Fase 3.8: Eliminar productos no-NGS con FUZZY MATCH + descarga lista
 // ============================================================
 
 import { db } from './firebase-config.js';
@@ -14,9 +14,6 @@ import {
 
 const $ = (id) => document.getElementById(id);
 
-// ============================================================
-// ESTADO
-// ============================================================
 let productosABorrar = [];
 let analizado = false;
 let tipoAnalisis = null;
@@ -33,11 +30,7 @@ function logClean(html) {
   el.innerHTML += `<div>${html}</div>`;
   el.scrollTop = el.scrollHeight;
 }
-
-function logCleanClear() {
-  const el = $('clean-log');
-  if (el) el.innerHTML = '';
-}
+function logCleanClear() { const el = $('clean-log'); if (el) el.innerHTML = ''; }
 
 function logNGS(html) {
   const el = $('clean-ngs-log');
@@ -45,14 +38,10 @@ function logNGS(html) {
   el.innerHTML += `<div>${html}</div>`;
   el.scrollTop = el.scrollHeight;
 }
-
-function logNGSClear() {
-  const el = $('clean-ngs-log');
-  if (el) el.innerHTML = '';
-}
+function logNGSClear() { const el = $('clean-ngs-log'); if (el) el.innerHTML = ''; }
 
 // ============================================================
-// NORMALIZACIÓN AGRESIVA PARA COMPARAR
+// NORMALIZACIÓN
 // ============================================================
 function limpiarParaComparar(str) {
   return String(str || '')
@@ -73,7 +62,6 @@ function tokensDe(str) {
 
 function matcheaConNGS(mkFirestore, matchKeysNGS) {
   const limpioFS = limpiarParaComparar(mkFirestore);
-
   if (matchKeysNGS.has(limpioFS)) return 'exacto';
 
   const tokensFS = tokensDe(mkFirestore);
@@ -83,10 +71,8 @@ function matcheaConNGS(mkFirestore, matchKeysNGS) {
   for (const mkNGS of matchKeysNGS) {
     const tokensNGS = tokensDe(mkNGS);
     if (tokensNGS.size < 2) continue;
-
     let comunes = 0;
     for (const t of tokensFS) if (tokensNGS.has(t)) comunes++;
-
     const minTokens = Math.min(tokensFS.size, tokensNGS.size);
     const score = comunes / minTokens;
     if (score > mejorScore) mejorScore = score;
@@ -135,21 +121,17 @@ $('btn-analyze-clean')?.addEventListener('click', async () => {
   const btn = $('btn-analyze-clean');
   btn.disabled = true;
   btn.textContent = '⏳ Analizando...';
-
   logCleanClear();
   logClean('🔍 Leyendo productos de Firestore...');
-
   try {
     const snap = await getDocs(collection(db, 'products'));
     productosABorrar = [];
-
     snap.docs.forEach(d => {
       const data = d.data();
       if (!data.matchKey || !String(data.matchKey).trim()) {
         productosABorrar.push({ id: d.id, title: data.title || '(sin título)' });
       }
     });
-
     logClean('');
     logClean(`📊 Total en Firestore: <b>${snap.size}</b>`);
     logClean(`✅ Productos con matchKey: <b>${snap.size - productosABorrar.length}</b>`);
@@ -162,24 +144,20 @@ $('btn-analyze-clean')?.addEventListener('click', async () => {
       $('clean-confirm').disabled = true;
       return;
     }
-
     logClean('');
     logClean('<strong>Primeros 20 a borrar:</strong>');
     productosABorrar.slice(0, 20).forEach(p => logClean(`&nbsp;&nbsp;• ${p.title}`));
-    if (productosABorrar.length > 20) {
-      logClean(`&nbsp;&nbsp;... y ${productosABorrar.length - 20} más.`);
-    }
+    if (productosABorrar.length > 20) logClean(`&nbsp;&nbsp;... y ${productosABorrar.length - 20} más.`);
 
     analizado = true;
     tipoAnalisis = 'sin-matchkey';
     $('clean-confirm').disabled = false;
     $('clean-confirm').value = '';
     $('btn-do-clean').disabled = true;
-
     logClean('');
-    logClean('✍️  Para habilitar el borrado, escribí <b>BORRAR</b> en el campo de confirmación.');
+    logClean('✍️  Para habilitar el borrado, escribí <b>BORRAR</b>.');
   } catch (err) {
-    console.error('[GamesUy] Error analizando:', err);
+    console.error(err);
     logClean(`❌ Error: ${err.message}`);
   } finally {
     btn.disabled = false;
@@ -188,22 +166,19 @@ $('btn-analyze-clean')?.addEventListener('click', async () => {
 });
 
 // ============================================================
-// EXISTENTE: ANALIZAR — creados recientemente
+// EXISTENTE: ANALIZAR — recientes
 // ============================================================
 $('btn-analyze-recent')?.addEventListener('click', async () => {
   const btn = $('btn-analyze-recent');
   btn.disabled = true;
   btn.textContent = '⏳ Analizando...';
-
   logCleanClear();
   logClean('🔍 Leyendo productos creados en las últimas 3 horas...');
-
   try {
     const snap = await getDocs(collection(db, 'products'));
     productosABorrar = [];
     const ahora = Date.now();
     const TRES_HORAS = 3 * 60 * 60 * 1000;
-
     snap.docs.forEach(d => {
       const data = d.data();
       if (!data.createdAt) return;
@@ -213,7 +188,6 @@ $('btn-analyze-recent')?.addEventListener('click', async () => {
         productosABorrar.push({ id: d.id, title: data.title || '(sin título)' });
       }
     });
-
     logClean('');
     logClean(`📊 Total en Firestore: <b>${snap.size}</b>`);
     logClean(`🆕 Creados en las últimas 3 horas: <b>${productosABorrar.length}</b>`);
@@ -225,24 +199,19 @@ $('btn-analyze-recent')?.addEventListener('click', async () => {
       $('clean-confirm').disabled = true;
       return;
     }
-
     logClean('');
     logClean('<strong>Primeros 30 productos recientes:</strong>');
     productosABorrar.slice(0, 30).forEach(p => logClean(`&nbsp;&nbsp;• ${p.title}`));
-    if (productosABorrar.length > 30) {
-      logClean(`&nbsp;&nbsp;... y ${productosABorrar.length - 30} más.`);
-    }
-
+    if (productosABorrar.length > 30) logClean(`&nbsp;&nbsp;... y ${productosABorrar.length - 30} más.`);
     analizado = true;
     tipoAnalisis = 'recientes';
     $('clean-confirm').disabled = false;
     $('clean-confirm').value = '';
     $('btn-do-clean').disabled = true;
-
     logClean('');
-    logClean('✍️  Para habilitar el borrado, escribí <b>BORRAR</b> en el campo de confirmación.');
+    logClean('✍️  Para habilitar el borrado, escribí <b>BORRAR</b>.');
   } catch (err) {
-    console.error('[GamesUy] Error analizando recientes:', err);
+    console.error(err);
     logClean(`❌ Error: ${err.message}`);
   } finally {
     btn.disabled = false;
@@ -250,40 +219,26 @@ $('btn-analyze-recent')?.addEventListener('click', async () => {
   }
 });
 
-// ============================================================
-// EXISTENTE: CONFIRMACIÓN
-// ============================================================
 $('clean-confirm')?.addEventListener('input', (e) => {
   const val = e.target.value.trim().toUpperCase();
   $('btn-do-clean').disabled = val !== 'BORRAR';
 });
 
-// ============================================================
-// EXISTENTE: BORRAR
-// ============================================================
 $('btn-do-clean')?.addEventListener('click', async () => {
   if (!analizado || productosABorrar.length === 0) return;
-
   const confirmacion = $('clean-confirm').value.trim().toUpperCase();
   if (confirmacion !== 'BORRAR') return;
-
   const modo = tipoAnalisis === 'recientes' ? 'productos recientes' : 'productos sin matchKey';
-
-  if (!confirm(`⚠️ Vas a borrar ${productosABorrar.length} ${modo}.\n\nEsta acción NO se puede deshacer.\n\n¿Continuar?`)) {
-    return;
-  }
+  if (!confirm(`⚠️ Vas a borrar ${productosABorrar.length} ${modo}.\n\n¿Continuar?`)) return;
 
   const btn = $('btn-do-clean');
   btn.disabled = true;
   btn.textContent = '⏳ Borrando...';
-
   logClean('');
   logClean('🗑️  Iniciando borrado...');
-
   try {
     const TAM = 400;
     let borrados = 0;
-
     for (let i = 0; i < productosABorrar.length; i += TAM) {
       const lote = productosABorrar.slice(i, i + TAM);
       const batch = writeBatch(db);
@@ -292,20 +247,17 @@ $('btn-do-clean')?.addEventListener('click', async () => {
       borrados += lote.length;
       logClean(`&nbsp;&nbsp;→ Borrados ${borrados} / ${productosABorrar.length}`);
     }
-
     logClean('');
     logClean(`✅ <strong>Limpieza completada. ${borrados} productos eliminados.</strong>`);
-
     productosABorrar = [];
     analizado = false;
     tipoAnalisis = null;
     $('clean-confirm').value = '';
     $('clean-confirm').disabled = true;
     $('btn-do-clean').disabled = true;
-
     alert(`✅ Limpieza completada.\n${borrados} productos eliminados.`);
   } catch (err) {
-    console.error('[GamesUy] Error borrando:', err);
+    console.error(err);
     logClean(`❌ Error: ${err.message}`);
     btn.disabled = false;
   } finally {
@@ -314,7 +266,7 @@ $('btn-do-clean')?.addEventListener('click', async () => {
 });
 
 // ============================================================
-// NGS: INYECTAR CARD EN EL TAB MANTENIMIENTO
+// NGS: INYECTAR CARD
 // ============================================================
 function inyectarCardNGS() {
   const grid = document.querySelector('[data-tab-content="mantenimiento"] .admin-grid');
@@ -332,6 +284,7 @@ function inyectarCardNGS() {
       <div id="clean-ngs-log" class="import-log"><em>Esperando Excel de NGS...</em></div>
       <div class="admin-actions">
         <button id="btn-analyze-ngs" class="btn btn-warning" disabled>🔍 Analizar productos fuera del Excel</button>
+        <button id="btn-download-ngs" class="btn btn-secondary" disabled>📥 Descargar lista completa (.txt)</button>
         <button id="btn-do-clean-ngs" class="btn btn-danger" disabled>🗑️ Borrar productos</button>
       </div>
       <label class="admin-label" style="margin-top:16px;">Escribí <code>BORRAR</code> para confirmar:</label>
@@ -343,31 +296,29 @@ function inyectarCardNGS() {
 }
 
 // ============================================================
-// NGS: ACTIVAR LISTENERS
+// NGS: LISTENERS
 // ============================================================
 function activarListenersNGS() {
 
-  // ---------- CARGAR EXCEL ----------
   $('clean-ngs-file')?.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
     logNGSClear();
     matchKeysNGS = null;
     productosNoNGS = [];
 
     const btnAnalyze = $('btn-analyze-ngs');
     const btnDelete = $('btn-do-clean-ngs');
+    const btnDownload = $('btn-download-ngs');
     const confirm = $('clean-ngs-confirm');
     if (btnAnalyze) btnAnalyze.disabled = true;
     if (btnDelete) btnDelete.disabled = true;
+    if (btnDownload) btnDownload.disabled = true;
     if (confirm) { confirm.disabled = true; confirm.value = ''; }
 
     logNGS(`📄 Leyendo <b>${file.name}</b>...`);
-
     try {
       const { sheetName, rows } = await leerExcelSimple(file);
-
       let inicioIdx = 4;
       for (let i = 0; i < Math.min(rows.length, 15); i++) {
         const fila = rows[i] || [];
@@ -379,10 +330,8 @@ function activarListenersNGS() {
           }
         }
       }
-
       const set = new Set();
       let filasOk = 0, filasSkip = 0;
-
       for (let i = inicioIdx; i < rows.length; i++) {
         const titulo = String(rows[i][0] || '').trim();
         if (esFilaEncabezadoNGS(titulo)) { filasSkip++; continue; }
@@ -390,9 +339,7 @@ function activarListenersNGS() {
         set.add(limpiarParaComparar(titulo));
         filasOk++;
       }
-
       matchKeysNGS = set;
-
       logNGS(`Hoja: <code>${sheetName}</code>`);
       logNGS(`Total de filas: <b>${rows.length}</b>`);
       logNGS(`✅ Títulos válidos en el Excel: <b>${filasOk}</b>`);
@@ -401,69 +348,45 @@ function activarListenersNGS() {
 
       if (set.size < 20) {
         logNGS('');
-        logNGS('⚠️ <b>ATENCIÓN:</b> el Excel tiene muy pocos títulos válidos. Verificá que sea el archivo correcto.');
+        logNGS('⚠️ <b>ATENCIÓN:</b> el Excel tiene muy pocos títulos válidos.');
         return;
       }
-
       logNGS('');
       logNGS('Ahora hacé clic en <b>🔍 Analizar productos fuera del Excel</b>.');
       if (btnAnalyze) btnAnalyze.disabled = false;
-
     } catch (err) {
       logNGS(`❌ Error al leer el Excel: ${err.message}`);
       console.error(err);
     }
   });
 
-  // ---------- ANALIZAR ----------
   $('btn-analyze-ngs')?.addEventListener('click', async () => {
     if (!matchKeysNGS || matchKeysNGS.size === 0) {
       alert('Primero cargá el Excel de NGS.');
       return;
     }
-
     const btn = $('btn-analyze-ngs');
     btn.disabled = true;
     btn.textContent = '⏳ Analizando...';
-
     try {
       logNGS('');
       logNGS('🔍 Leyendo todos los productos de Firestore...');
-
       const snap = await getDocs(collection(db, 'products'));
       productosNoNGS = [];
-      let preservadosManuales = 0;
-      let exactos = 0;
-      let fuzzy = 0;
+      let preservadosManuales = 0, exactos = 0, fuzzy = 0;
 
       snap.docs.forEach(d => {
         const data = d.data();
-
-        if (data.manual === true) {
-          preservadosManuales++;
-          return;
-        }
-
-        const mk = data.matchKey || '';
-        const base = mk || data.title || '';
+        if (data.manual === true) { preservadosManuales++; return; }
+        const base = data.matchKey || data.title || '';
         if (!base) {
           productosNoNGS.push({ id: d.id, title: data.title || '(sin título)', razon: 'sin datos' });
           return;
         }
-
         const tipo = matcheaConNGS(base, matchKeysNGS);
-
-        if (tipo === 'exacto') {
-          exactos++;
-        } else if (tipo === 'fuzzy') {
-          fuzzy++;
-        } else {
-          productosNoNGS.push({
-            id: d.id,
-            title: data.title || '(sin título)',
-            razon: 'sin coincidencia'
-          });
-        }
+        if (tipo === 'exacto') exactos++;
+        else if (tipo === 'fuzzy') fuzzy++;
+        else productosNoNGS.push({ id: d.id, title: data.title || '(sin título)', razon: 'sin coincidencia' });
       });
 
       logNGS(`📊 Total en Firestore: <b>${snap.size}</b>`);
@@ -480,23 +403,21 @@ function activarListenersNGS() {
 
       logNGS('');
       logNGS('<strong>Primeros 40 a borrar:</strong>');
-      productosNoNGS.slice(0, 40).forEach(p => {
-        logNGS(`&nbsp;&nbsp;• ${p.title}`);
-      });
-      if (productosNoNGS.length > 40) {
-        logNGS(`&nbsp;&nbsp;... y ${productosNoNGS.length - 40} más.`);
-      }
+      productosNoNGS.slice(0, 40).forEach(p => logNGS(`&nbsp;&nbsp;• ${p.title}`));
+      if (productosNoNGS.length > 40) logNGS(`&nbsp;&nbsp;... y ${productosNoNGS.length - 40} más.`);
 
       const confirm = $('clean-ngs-confirm');
       const btnDelete = $('btn-do-clean-ngs');
+      const btnDownload = $('btn-download-ngs');
       if (confirm) { confirm.disabled = false; confirm.value = ''; }
       if (btnDelete) btnDelete.disabled = true;
+      if (btnDownload) btnDownload.disabled = false;
 
       logNGS('');
-      logNGS('✍️  Para borrarlos, escribí <b>BORRAR</b> en el campo de confirmación.');
-
+      logNGS('📥 <b>Recomendado:</b> hacé clic en <b>Descargar lista completa (.txt)</b> para revisar TODOS los títulos antes de borrar.');
+      logNGS('✍️  Después escribí <b>BORRAR</b> para habilitar el botón rojo.');
     } catch (err) {
-      console.error('[GamesUy] Error analizando NGS:', err);
+      console.error(err);
       logNGS(`❌ Error: ${err.message}`);
     } finally {
       btn.disabled = false;
@@ -504,35 +425,55 @@ function activarListenersNGS() {
     }
   });
 
-  // ---------- CONFIRMACIÓN ----------
+  // ---------- DESCARGAR LISTA COMPLETA ----------
+  $('btn-download-ngs')?.addEventListener('click', () => {
+    if (productosNoNGS.length === 0) return;
+
+    const hoy = new Date().toISOString().split('T')[0];
+    let txt = `GAMESUY STORE — PRODUCTOS FUERA DE NGS\n`;
+    txt += `Generado: ${new Date().toLocaleString('es-UY')}\n`;
+    txt += `Total: ${productosNoNGS.length} productos\n`;
+    txt += `${'='.repeat(60)}\n\n`;
+
+    productosNoNGS.forEach((p, i) => {
+      txt += `${String(i + 1).padStart(4, '0')}. ${p.title}\n`;
+    });
+
+    const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `productos-fuera-NGS-${hoy}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    logNGS('');
+    logNGS(`✅ Lista descargada: <b>productos-fuera-NGS-${hoy}.txt</b>`);
+    logNGS(`📝 Abrilo con el Bloc de Notas y revisalo antes de borrar.`);
+  });
+
   $('clean-ngs-confirm')?.addEventListener('input', (e) => {
     const val = e.target.value.trim().toUpperCase();
     const btn = $('btn-do-clean-ngs');
     if (btn) btn.disabled = val !== 'BORRAR';
   });
 
-  // ---------- BORRAR ----------
   $('btn-do-clean-ngs')?.addEventListener('click', async () => {
     if (productosNoNGS.length === 0) return;
-
     const confirmacion = $('clean-ngs-confirm').value.trim().toUpperCase();
     if (confirmacion !== 'BORRAR') return;
-
-    if (!confirm(`⚠️ Vas a borrar ${productosNoNGS.length} productos.\n\nEsta acción NO se puede deshacer.\n\n¿Continuar?`)) {
-      return;
-    }
+    if (!confirm(`⚠️ Vas a borrar ${productosNoNGS.length} productos.\n\n¿Continuar?`)) return;
 
     const btn = $('btn-do-clean-ngs');
     btn.disabled = true;
     btn.textContent = '⏳ Borrando...';
-
     try {
       logNGS('');
       logNGS('🗑️  Iniciando borrado...');
-
       const TAM = 400;
       let borrados = 0;
-
       for (let i = 0; i < productosNoNGS.length; i += TAM) {
         const lote = productosNoNGS.slice(i, i + TAM);
         const batch = writeBatch(db);
@@ -541,20 +482,19 @@ function activarListenersNGS() {
         borrados += lote.length;
         logNGS(`&nbsp;&nbsp;→ Borrados ${borrados} / ${productosNoNGS.length}`);
       }
-
       logNGS('');
       logNGS(`✅ <strong>Limpieza completada. ${borrados} productos eliminados.</strong>`);
-
       productosNoNGS = [];
       matchKeysNGS = null;
       const confirm = $('clean-ngs-confirm');
       if (confirm) { confirm.value = ''; confirm.disabled = true; }
       const fileInput = $('clean-ngs-file');
       if (fileInput) fileInput.value = '';
-
+      const btnDownload = $('btn-download-ngs');
+      if (btnDownload) btnDownload.disabled = true;
       alert(`✅ Limpieza completada.\n${borrados} productos eliminados.`);
     } catch (err) {
-      console.error('[GamesUy] Error borrando:', err);
+      console.error(err);
       logNGS(`❌ Error: ${err.message}`);
       btn.disabled = false;
     } finally {
@@ -568,4 +508,4 @@ function activarListenersNGS() {
 // ============================================================
 inyectarCardNGS();
 
-console.log('[GamesUy] maintenance.js v8 cargado (con fuzzy match)');
+console.log('[GamesUy] maintenance.js v9 cargado (con descarga de lista)');

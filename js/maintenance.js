@@ -1,7 +1,7 @@
 // ============================================================
 // GAMESUY STORE — Mantenimiento
 // Fase 3.5.6: Limpieza + borrado por fecha
-// Fase 3.8: Eliminar productos no-NGS con FUZZY MATCH + descarga lista
+// Fase 3.10: Eliminar TODO lo que no esté en el Excel NGS (estricto)
 // ============================================================
 
 import { db } from './firebase-config.js';
@@ -13,6 +13,10 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 const $ = (id) => document.getElementById(id);
+
+// Umbral ALTO = solo títulos casi idénticos cuentan como "match".
+// Si el título tiene diferencias grandes (Deluxe vs normal), NO matchea → se borra.
+const UMBRAL_FUZZY = 0.9;
 
 let productosABorrar = [];
 let analizado = false;
@@ -65,18 +69,19 @@ function matcheaConNGS(mkFirestore, matchKeysNGS) {
   if (matchKeysNGS.has(limpioFS)) return 'exacto';
 
   const tokensFS = tokensDe(mkFirestore);
-  if (tokensFS.size < 2) return null;
+  if (tokensFS.size < 1) return null;
 
   let mejorScore = 0;
   for (const mkNGS of matchKeysNGS) {
     const tokensNGS = tokensDe(mkNGS);
-    if (tokensNGS.size < 2) continue;
+    if (tokensNGS.size < 1) continue;
     let comunes = 0;
     for (const t of tokensFS) if (tokensNGS.has(t)) comunes++;
-    const minTokens = Math.min(tokensFS.size, tokensNGS.size);
-    const score = comunes / minTokens;
+    // Fórmula corregida: dividir por el MAYOR de los dos tamaños
+    const maxTokens = Math.max(tokensFS.size, tokensNGS.size);
+    const score = comunes / maxTokens;
     if (score > mejorScore) mejorScore = score;
-    if (mejorScore >= 0.75) return 'fuzzy';
+    if (mejorScore >= UMBRAL_FUZZY) return 'fuzzy';
   }
   return null;
 }
@@ -277,7 +282,7 @@ function inyectarCardNGS() {
     <div class="admin-card admin-card-wide admin-card-danger" id="clean-ngs-card">
       <h3>🗑️ Eliminar productos que NO están en el Excel de NGS actual</h3>
       <p class="admin-help">
-        Subí el Excel de STOCK de NGS. Solo se eliminarán los productos que <b>no coincidan de ninguna forma</b> con el Excel (match inteligente: ignora ™, ®, acentos, "Digital Edition", etc.).<br><br>
+        Subí el Excel de STOCK de NGS. Solo se conservarán los productos que coincidan EXACTAMENTE con el Excel. Todo lo demás (aunque sea "el mismo juego con otro título") se elimina.<br><br>
         <strong>🔒 Los productos creados manualmente NO se borran.</strong>
       </p>
       <input type="file" id="clean-ngs-file" accept=".xlsx,.xls" class="admin-file">
@@ -392,7 +397,7 @@ function activarListenersNGS() {
       logNGS(`📊 Total en Firestore: <b>${snap.size}</b>`);
       logNGS(`🔒 Manuales preservados: <b>${preservadosManuales}</b>`);
       logNGS(`✅ Match exacto con NGS: <b>${exactos}</b>`);
-      logNGS(`🎯 Match fuzzy con NGS: <b>${fuzzy}</b> (NO se borran)`);
+      logNGS(`🎯 Match fuzzy estricto (umbral ${UMBRAL_FUZZY}): <b>${fuzzy}</b>`);
       logNGS(`🗑️  SIN coincidencia (a borrar): <b>${productosNoNGS.length}</b>`);
 
       if (productosNoNGS.length === 0) {
@@ -414,7 +419,7 @@ function activarListenersNGS() {
       if (btnDownload) btnDownload.disabled = false;
 
       logNGS('');
-      logNGS('📥 <b>Recomendado:</b> hacé clic en <b>Descargar lista completa (.txt)</b> para revisar TODOS los títulos antes de borrar.');
+      logNGS('📥 <b>Recomendado:</b> clic en <b>Descargar lista completa (.txt)</b> para revisar antes de borrar.');
       logNGS('✍️  Después escribí <b>BORRAR</b> para habilitar el botón rojo.');
     } catch (err) {
       console.error(err);
@@ -425,13 +430,13 @@ function activarListenersNGS() {
     }
   });
 
-  // ---------- DESCARGAR LISTA COMPLETA ----------
   $('btn-download-ngs')?.addEventListener('click', () => {
     if (productosNoNGS.length === 0) return;
 
     const hoy = new Date().toISOString().split('T')[0];
     let txt = `GAMESUY STORE — PRODUCTOS FUERA DE NGS\n`;
     txt += `Generado: ${new Date().toLocaleString('es-UY')}\n`;
+    txt += `Umbral fuzzy: ${UMBRAL_FUZZY}\n`;
     txt += `Total: ${productosNoNGS.length} productos\n`;
     txt += `${'='.repeat(60)}\n\n`;
 
@@ -451,7 +456,6 @@ function activarListenersNGS() {
 
     logNGS('');
     logNGS(`✅ Lista descargada: <b>productos-fuera-NGS-${hoy}.txt</b>`);
-    logNGS(`📝 Abrilo con el Bloc de Notas y revisalo antes de borrar.`);
   });
 
   $('clean-ngs-confirm')?.addEventListener('input', (e) => {
@@ -503,9 +507,6 @@ function activarListenersNGS() {
   });
 }
 
-// ============================================================
-// INIT
-// ============================================================
 inyectarCardNGS();
 
-console.log('[GamesUy] maintenance.js v9 cargado (con descarga de lista)');
+console.log('[GamesUy] maintenance.js v11 cargado (umbral estricto 0.9)');

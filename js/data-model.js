@@ -3,6 +3,75 @@
 // ============================================================
 
 // ---------------------------------------------
+// PARSEO DE NÚMEROS (soporta formato argentino)
+// ---------------------------------------------
+
+/**
+ * Convierte un valor a número soportando formato argentino y US.
+ *   "20.000"     → 20000   (argentino: punto = miles)
+ *   "20.000,50"  → 20000.5 (argentino)
+ *   "20,000.50"  → 20000.5 (US)
+ *   "20000"      → 20000
+ *   "20,50"      → 20.5    (argentino: coma = decimal)
+ *   "20.50"      → 20.5    (US: punto = decimal)
+ *   20000        → 20000   (ya es número)
+ */
+export function parseNumeroFlexible(raw) {
+  if (raw === null || raw === undefined) return 0;
+  if (typeof raw === 'number') return isNaN(raw) ? 0 : raw;
+
+  let s = String(raw).trim();
+  if (!s) return 0;
+
+  // Dejar solo dígitos, puntos y comas
+  s = s.replace(/[^\d.,]/g, '');
+  if (!s) return 0;
+
+  const lastDot = s.lastIndexOf('.');
+  const lastComma = s.lastIndexOf(',');
+
+  if (lastDot > -1 && lastComma > -1) {
+    // Ambos presentes: el último es el separador decimal
+    if (lastComma > lastDot) {
+      // Argentino: 20.000,50 → 20000.50
+      s = s.replace(/\./g, '').replace(',', '.');
+    } else {
+      // US: 20,000.50 → 20000.50
+      s = s.replace(/,/g, '');
+    }
+  } else if (lastDot > -1) {
+    // Solo puntos
+    const partes = s.split('.');
+    if (partes.length > 2) {
+      // Múltiples puntos → todos separadores de miles
+      // "1.234.567" → 1234567
+      s = partes.join('');
+    } else if (partes.length === 2 && partes[1].length === 3 && partes[0].length <= 3) {
+      // Un punto con 3 dígitos después → separador de miles
+      // "20.000" → 20000
+      s = partes[0] + partes[1];
+    }
+    // Si no cumple, se deja el punto como decimal (20.50 → 20.5)
+  } else if (lastComma > -1) {
+    // Solo comas
+    const partes = s.split(',');
+    if (partes.length > 2) {
+      // Múltiples comas → separadores de miles
+      s = partes.join('');
+    } else if (partes.length === 2 && partes[1].length === 3 && partes[0].length <= 3) {
+      // "20,000" → 20000
+      s = partes[0] + partes[1];
+    } else {
+      // Decimal: "20,50" → 20.50
+      s = partes[0] + '.' + partes[1];
+    }
+  }
+
+  const num = parseFloat(s);
+  return isNaN(num) ? 0 : num;
+}
+
+// ---------------------------------------------
 // REDONDEO
 // ---------------------------------------------
 
@@ -26,71 +95,33 @@ export function roundUSD(n) {
 // COSTOS Y PRECIOS
 // ---------------------------------------------
 
-/**
- * Convierte un costo en ARS a UYU usando la cotización.
- * @param {number} costoARS
- * @param {number} cotizacionARSaUYU
- * @returns {number} Costo en UYU (sin redondear)
- */
 export function getCostoUYU(costoARS, cotizacionARSaUYU) {
   if (!costoARS || !cotizacionARSaUYU) return 0;
   return costoARS * cotizacionARSaUYU;
 }
 
-/**
- * Calcula el precio final en UYU a partir del costo ARS + ganancia %.
- * @param {number} costoARS
- * @param {number} cotizacionARSaUYU
- * @param {number} gananciaPct  (ej: 0.515 para 51.5%)
- * @returns {number} precio final UYU (redondeado hacia arriba)
- */
 export function calcPrecioUYU(costoARS, cotizacionARSaUYU, gananciaPct) {
   const costoUYU = getCostoUYU(costoARS, cotizacionARSaUYU);
   if (costoUYU <= 0) return 0;
   return roundUYU(costoUYU * (1 + gananciaPct));
 }
 
-/**
- * Calcula el precio de venta en USD a partir del precio final en UYU.
- * @param {number} precioUYU
- * @param {number} cotizacionUSDaUYU
- * @returns {number} precio en USD (redondeado hacia arriba al siguiente 0.05)
- */
 export function calcPrecioUSD(precioUYU, cotizacionUSDaUYU) {
   if (!precioUYU || !cotizacionUSDaUYU) return 0;
   return roundUSD(precioUYU / cotizacionUSDaUYU);
 }
 
-/**
- * Calcula la ganancia % a partir de un precio final que el admin define a mano.
- * @param {number} precioUYU
- * @param {number} costoARS
- * @param {number} cotizacionARSaUYU
- * @returns {number} ganancia como decimal (0.515 = 51.5%)
- */
 export function calcGananciaPct(precioUYU, costoARS, cotizacionARSaUYU) {
   const costoUYU = getCostoUYU(costoARS, cotizacionARSaUYU);
   if (costoUYU <= 0) return 0;
   return (precioUYU / costoUYU) - 1;
 }
 
-/**
- * Aplica una variación % a un precio.
- * @param {number} precioActual
- * @param {number} variacionPct  (0.0833 = +8.33%)
- * @returns {number} nuevo precio (redondeado)
- */
 export function aplicarVariacion(precioActual, variacionPct) {
   if (!precioActual) return 0;
   return roundUYU(precioActual * (1 + variacionPct));
 }
 
-/**
- * Calcula la variación % entre dos valores.
- * @param {number} valorAnterior
- * @param {number} valorNuevo
- * @returns {number} variación decimal (0.0833 = +8.33%)
- */
 export function calcVariacion(valorAnterior, valorNuevo) {
   if (!valorAnterior || valorAnterior === 0) return 0;
   return (valorNuevo / valorAnterior) - 1;
@@ -100,19 +131,11 @@ export function calcVariacion(valorAnterior, valorNuevo) {
 // FORMATEO
 // ---------------------------------------------
 
-/**
- * Formatea un precio en UYU.
- * Ej: 3550 → "$ 3.550"
- */
 export function formatUYU(n) {
   if (!n) return '$ 0';
   return '$ ' + Math.round(n).toLocaleString('es-UY');
 }
 
-/**
- * Formatea un precio en USD.
- * Ej: 89.75 → "US$ 89.75"
- */
 export function formatUSD(n) {
   if (!n) return 'US$ 0.00';
   return 'US$ ' + Number(n).toFixed(2);
@@ -122,28 +145,19 @@ export function formatUSD(n) {
 // VALIDACIÓN
 // ---------------------------------------------
 
-/**
- * Valida si un costo ARS del Excel es "válido" (número > 0).
- * Los strings "SIN STOCK" / "NO DISPONIBLE" / vacíos devuelven false.
- */
 export function esCostoValido(costo) {
   if (costo === null || costo === undefined) return false;
   if (typeof costo === 'number') return costo > 0;
   const limpio = String(costo).trim();
   if (!limpio) return false;
   if (/sin\s*stock|no\s*disponible/i.test(limpio)) return false;
-  const num = parseFloat(limpio.replace(/[^0-9.]/g, ''));
-  return !isNaN(num) && num > 0;
+  return parseNumeroFlexible(limpio) > 0;
 }
 
-/**
- * Convierte un valor de costo (string o número) a número.
- * Devuelve 0 si no es válido.
- */
 export function parseCosto(costo) {
   if (!esCostoValido(costo)) return 0;
   if (typeof costo === 'number') return costo;
-  return parseFloat(String(costo).replace(/[^0-9.]/g, '')) || 0;
+  return parseNumeroFlexible(costo);
 }
 
 console.log('[GamesUy] data-model.js cargado');

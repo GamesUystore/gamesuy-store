@@ -2,6 +2,7 @@
 // GAMESUY STORE — Gestor de precios
 // Fase 6.3: Expone función para editar desde catálogo público
 // Fase 3.2: Integración con sistema de pendientes
+// Fase 3.5: Botón "Ver en PS Store" para comparar precios
 // ============================================================
 
 import { db } from './firebase-config.js';
@@ -26,7 +27,7 @@ let pagina = 1;
 const POR_PAGINA = 30;
 let productoActivo = null;
 
-console.log('[GamesUy] precios.js v18 iniciando...');
+console.log('[GamesUy] precios.js v19 iniciando...');
 
 onSnapshot(doc(db, 'settings', 'cotizaciones'), (snap) => {
   if (!snap.exists()) return;
@@ -222,6 +223,37 @@ function cerrarModal() {
   productoActivo = null;
 }
 
+// ============================================================
+// BOTÓN "VER EN PS STORE"
+// ============================================================
+function construirPsStoreBanner(prod) {
+  const tituloRaw = String(prod.title || '');
+  // Limpiar título: quitar ™ ® © y símbolos que rompen la búsqueda
+  const tituloLimpio = tituloRaw
+    .replace(/[™®©]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!tituloLimpio || tituloLimpio.length < 2) return '';
+
+  const urlBusqueda = `https://store.playstation.com/es-uy/search/${encodeURIComponent(tituloLimpio)}`;
+
+  return `
+    <div style="padding:14px 16px;margin-bottom:16px;background:linear-gradient(135deg,rgba(0,112,209,0.15),rgba(0,168,232,0.15));border:1px solid rgba(0,112,209,0.45);border-radius:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <span style="color:#6ec5ff;font-size:0.85rem;font-weight:700;letter-spacing:0.5px;">
+        🔎 Compará con PS Store oficial:
+      </span>
+      <a href="${urlBusqueda}" target="_blank" rel="noopener"
+         style="display:inline-flex;align-items:center;gap:8px;padding:10px 16px;background:linear-gradient(135deg,#0070d1,#00a8e8);color:#fff;text-decoration:none;border-radius:8px;font-weight:700;font-size:0.85rem;letter-spacing:0.5px;box-shadow:0 4px 14px rgba(0,112,209,0.5);transition:all 0.2s;cursor:pointer;">
+        🌐 Buscar "${escapeHtml(tituloLimpio)}" en PS Store
+      </a>
+      <span style="color:var(--text-muted);font-size:0.72rem;font-weight:600;letter-spacing:0.5px;">
+        Recordá: tu precio debe quedar ENTRE el costo NGS y este precio.
+      </span>
+    </div>
+  `;
+}
+
 function renderModalPrecios(prod) {
   const body = $('price-modal-precios');
   if (!body) return;
@@ -236,6 +268,8 @@ function renderModalPrecios(prod) {
     return;
   }
 
+  const psStoreBanner = construirPsStoreBanner(prod);
+
   const preventaBanner = productoEsPreventa(prod) ? `
     <div class="preventa-banner-admin">
       🚀 <strong>PREVENTA</strong>
@@ -243,7 +277,7 @@ function renderModalPrecios(prod) {
     </div>
   ` : '';
 
-  body.innerHTML = preventaBanner + variantes.map(v => renderVarianteUnificada(v)).join('');
+  body.innerHTML = psStoreBanner + preventaBanner + variantes.map(v => renderVarianteUnificada(v)).join('');
   activarListenersVariante(body, prod);
 }
 
@@ -266,6 +300,20 @@ function renderVarianteUnificada(v) {
     : (v.enOferta ? `<span class="variante-oferta-badge variante-oferta-vencida">⌛ Vencida</span>` : '');
 
   const sinStockBadge = sinStock ? '<span class="variante-sinstock-badge">SIN STOCK</span>' : '';
+
+  // Ganancia estimada (solo si hay costo y precio)
+  let gananciaHtml = '';
+  if (costoUYU > 0 && precioNormal > 0) {
+    const ganancia = precioNormal - costoUYU;
+    const pct = Math.round((ganancia / costoUYU) * 100);
+    const color = ganancia > 0 ? '#00ff9d' : '#ff8aa8';
+    const icono = ganancia > 0 ? '💰' : '⚠️';
+    gananciaHtml = `
+      <div style="margin-top:8px;padding:8px 12px;background:rgba(0,0,0,0.25);border-radius:8px;font-size:0.8rem;font-weight:700;color:${color};">
+        ${icono} Ganancia: ${ganancia > 0 ? '+' : ''}${formatUYU(ganancia)} (${pct > 0 ? '+' : ''}${pct}%)
+      </div>
+    `;
+  }
 
   const bloqueNormal = `
     <div class="precio-seccion">
@@ -293,6 +341,7 @@ function renderVarianteUnificada(v) {
           </div>
           <span class="precio-usd-preview" data-usd-normal="${v.id}">≈ ${usdNormal}</span>
         </div>
+        ${gananciaHtml}
       </div>
 
       <div class="variante-actions">
@@ -434,7 +483,6 @@ async function guardarNormal(prod, variantId, body) {
     prod.variants = nuevasVariantes;
     btn.textContent = '✅ Guardado';
 
-    // Marcar pendiente como resuelto
     marcarPendienteResuelto(prod.id);
 
     setTimeout(() => { btn.disabled = false; btn.textContent = '💾 Guardar precio normal'; render(); }, 900);
@@ -480,7 +528,6 @@ async function guardarOferta(prod, variantId, body) {
     prod.variants = nuevasVariantes;
     btn.textContent = '✅ Guardado';
 
-    // Marcar pendiente como resuelto
     marcarPendienteResuelto(prod.id);
 
     setTimeout(() => { btn.disabled = false; btn.textContent = '💾 Guardar precio de oferta'; render(); }, 900);
@@ -591,7 +638,6 @@ $('btn-save-info')?.addEventListener('click', async () => {
     Object.assign(productoActivo, data);
     btn.textContent = '✅ Guardado';
 
-    // Marcar pendiente como resuelto
     marcarPendienteResuelto(productoActivo.id);
 
     setTimeout(() => { btn.disabled = false; btn.textContent = '💾 Guardar información'; render(); }, 900);
@@ -613,8 +659,7 @@ $('precios-estado')?.addEventListener('change', (e) => { filtroEstado = e.target
 $('precios-prev')?.addEventListener('click', () => { if (pagina > 1) { pagina--; render(); } });
 $('precios-next')?.addEventListener('click', () => { pagina++; render(); });
 
-// Exponer función para el catálogo público
 window.abrirEditarProducto = abrirModal;
 
 cargarProductos();
-console.log('[GamesUy] precios.js v18 cargado (con pendientes)');
+console.log('[GamesUy] precios.js v19 cargado (con botón PS Store + ganancia visual)');

@@ -43,6 +43,53 @@
 
   <link rel="stylesheet" href="styles.css?v=40">
 
+  <!-- ESTILOS DEL CANAL DE OFERTAS -->
+  <style>
+    .channel-float {
+      position: fixed;
+      bottom: 24px;
+      left: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 20px;
+      height: 50px;
+      background: linear-gradient(135deg, #ff0055, #ff3377);
+      color: #fff;
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 700;
+      font-size: 0.9rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      text-decoration: none;
+      border-radius: 25px;
+      z-index: 999;
+      box-shadow: 0 0 24px rgba(255, 0, 85, 0.6);
+      transition: transform 0.25s ease, box-shadow 0.25s ease;
+      animation: floatChannel 3s ease-in-out infinite;
+    }
+
+    @keyframes floatChannel {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+    }
+
+    .channel-float:hover {
+      transform: scale(1.05) translateY(-2px);
+      box-shadow: 0 0 34px rgba(255, 0, 85, 0.9);
+    }
+
+    @media (max-width: 640px) {
+      .channel-float {
+        bottom: 16px;
+        left: 16px;
+        height: 44px;
+        padding: 0 16px;
+        font-size: 0.8rem;
+      }
+    }
+  </style>
+
   <!-- DATOS ESTRUCTURADOS (JSON-LD) -->
   <script type="application/ld+json">
   {
@@ -751,6 +798,11 @@
     <p>© 2026 GamesUy Store — Juegos digitales en Uruguay</p>
     <p class="footer-visitas"><span id="footer-visitas">👁️ Cargando visitas...</span></p>
   </footer>
+
+  <!-- NUEVO BOTÓN FLOTANTE DEL CANAL DE OFERTAS -->
+  <a href="https://whatsapp.com/channel/0029Vb906GBFnSz6jsTzSJ0L" class="channel-float" target="_blank" rel="noopener" title="Unite al Canal de Ofertas y Novedades">
+    📢 Canal de Ofertas
+  </a>
 
   <a href="https://wa.me/59896572226" class="chat-float" target="_blank" rel="noopener" title="Contactar por WhatsApp">💬</a>
   <button class="report-float" onclick="abrirModalPedido()" title="¿No encontrás un juego? Pedilo acá">🔍</button>

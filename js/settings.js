@@ -72,7 +72,7 @@ onSnapshot(doc(db, 'settings', 'social'), (snap) => {
 });
 
 // ============================================================
-// 3. BANNER DE ANUNCIO (CON FIX PARA QUE LA IMAGEN NO SE CORTE)
+// 3. BANNER DE ANUNCIO (AJUSTE DE TAMAÑO)
 // ============================================================
 function aplicarBanner(data) {
   const banner = $('announcement-banner');
@@ -106,8 +106,8 @@ function aplicarBanner(data) {
     if (!imgEl) {
       imgEl = document.createElement('img');
       imgEl.className = 'announcement-image';
-      // FIX: width 100%, height auto. Así la imagen se ve entera sin recortarse.
-      imgEl.style.cssText = 'width:100%; height:auto; display:block; border-radius:12px; margin-bottom:20px; border:1px solid rgba(0,240,255,.3); box-shadow: 0 4px 20px rgba(0,0,0,0.5);';
+      // Ajuste: limitamos la altura a 350px máximo y centramos
+      imgEl.style.cssText = 'max-width:100%; max-height:350px; width:auto; height:auto; object-fit:contain; display:block; margin:0 auto 20px auto; border-radius:12px; border:1px solid rgba(0,240,255,.3); box-shadow: 0 4px 20px rgba(0,0,0,0.5);';
       banner.querySelector('.announcement-content').prepend(imgEl);
     }
     imgEl.src = img;
@@ -168,4 +168,4 @@ onSnapshot(doc(db, 'settings', 'terms'), (snap) => {
   el.textContent = snap.data().text;
 });
 
-console.log('[GamesUy] settings.js cargado (con fix de banner completo)');
+console.log('[GamesUy] settings.js cargado (banner ajustado)');

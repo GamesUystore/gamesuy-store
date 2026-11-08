@@ -72,7 +72,7 @@ onSnapshot(doc(db, 'settings', 'social'), (snap) => {
 });
 
 // ============================================================
-// 3. BANNER DE ANUNCIO (AJUSTE DE TAMAÑO)
+// 3. BANNER DE ANUNCIO (FIX DEFINITIVO)
 // ============================================================
 function aplicarBanner(data) {
   const banner = $('announcement-banner');
@@ -106,12 +106,21 @@ function aplicarBanner(data) {
     if (!imgEl) {
       imgEl = document.createElement('img');
       imgEl.className = 'announcement-image';
-      // Ajuste: limitamos la altura a 350px máximo y centramos
-      imgEl.style.cssText = 'max-width:100%; max-height:350px; width:auto; height:auto; object-fit:contain; display:block; margin:0 auto 20px auto; border-radius:12px; border:1px solid rgba(0,240,255,.3); box-shadow: 0 4px 20px rgba(0,0,0,0.5);';
+      // FIX: Aplicamos estilos directamente aquí para que nada los pise
+      imgEl.style.width = '100%';
+      imgEl.style.height = 'auto';
+      imgEl.style.maxHeight = '400px';
+      imgEl.style.objectFit = 'contain';
+      imgEl.style.display = 'block';
+      imgEl.style.borderRadius = '12px';
+      imgEl.style.margin = '0 auto 20px auto';
+      imgEl.style.border = '1px solid rgba(0,240,255,.3)';
+      imgEl.style.boxShadow = '0 4px 20px rgba(0,0,0,0.5)';
+      
       banner.querySelector('.announcement-content').prepend(imgEl);
     }
     imgEl.src = img;
-    imgEl.style.display = '';
+    imgEl.style.display = 'block';
   } else if (imgEl) {
     imgEl.style.display = 'none';
   }
@@ -168,4 +177,4 @@ onSnapshot(doc(db, 'settings', 'terms'), (snap) => {
   el.textContent = snap.data().text;
 });
 
-console.log('[GamesUy] settings.js cargado (banner ajustado)');
+console.log('[GamesUy] settings.js v2 cargado (fix imagen banner)');

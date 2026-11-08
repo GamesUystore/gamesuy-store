@@ -1,6 +1,5 @@
 // ============================================================
 // GAMESUY STORE — Carga de configuración desde Firestore
-// (logo, redes, banner, FAQs, términos)
 // ============================================================
 
 import { db } from './firebase-config.js';
@@ -73,7 +72,7 @@ onSnapshot(doc(db, 'settings', 'social'), (snap) => {
 });
 
 // ============================================================
-// 3. BANNER DE ANUNCIO
+// 3. BANNER DE ANUNCIO (CON FIX PARA QUE LA IMAGEN NO SE CORTE)
 // ============================================================
 function aplicarBanner(data) {
   const banner = $('announcement-banner');
@@ -107,7 +106,8 @@ function aplicarBanner(data) {
     if (!imgEl) {
       imgEl = document.createElement('img');
       imgEl.className = 'announcement-image';
-      imgEl.style.cssText = 'width:100%;max-height:180px;object-fit:cover;border-radius:12px;margin-bottom:16px;border:1px solid rgba(0,240,255,.3);';
+      // FIX: width 100%, height auto. Así la imagen se ve entera sin recortarse.
+      imgEl.style.cssText = 'width:100%; height:auto; display:block; border-radius:12px; margin-bottom:20px; border:1px solid rgba(0,240,255,.3); box-shadow: 0 4px 20px rgba(0,0,0,0.5);';
       banner.querySelector('.announcement-content').prepend(imgEl);
     }
     imgEl.src = img;
@@ -168,4 +168,4 @@ onSnapshot(doc(db, 'settings', 'terms'), (snap) => {
   el.textContent = snap.data().text;
 });
 
-console.log('[GamesUy] settings.js cargado (con FAQs y Términos)');
+console.log('[GamesUy] settings.js cargado (con fix de banner completo)');

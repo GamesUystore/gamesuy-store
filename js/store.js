@@ -1,14 +1,13 @@
 // ============================================================
-// GAMESUY STORE — Catálogo público + Ofertas + Preventas + Destacados
+// GAMESUY STORE — Catálogo público + Ofertas + Preventas
 // Fase 8.9: Tracking de estadísticas internas
 // Fase 2 SEO: título dinámico por página
 // Fase 3 Perf: cache + countdown optimizado
-// Fase 24: Scroll de Destacados (imagen + precio normal)
 // ============================================================
 
 import { db, auth } from './firebase-config.js';
 import {
-  collection, onSnapshot, doc, deleteDoc, updateDoc
+  collection, onSnapshot, doc, deleteDoc
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { calcPrecioUSD, formatUYU, formatUSD } from './data-model.js';
@@ -289,29 +288,6 @@ function variantesDeCategoria(p, categoria, modoOferta) {
 }
 
 // ============================================================
-// PRECIO NORMAL PARA EL SCROLL DE DESTACADOS
-// ============================================================
-function obtenerPrecioNormalDestacado(p) {
-  const consolas = consolasDisponiblesDe(p, false);
-  if (consolas.length > 0) {
-    const varsPrimera = variantesDeCategoria(p, consolas[0], false);
-    const varNormal = varsPrimera.find(v => Number(v.precioFinalUYU) > 0);
-    if (varNormal) return formatUYU(varNormal.precioFinalUYU);
-  }
-
-  // Fallback: primera variante del producto que tenga precio normal cargado
-  const cualquieraNormal = (p.variants || []).find(v => Number(v.precioFinalUYU) > 0);
-  if (cualquieraNormal) return formatUYU(cualquieraNormal.precioFinalUYU);
-
-  // Si es un juego que solo tiene precio de oferta (sin precio normal)
-  const varOferta = (p.variants || []).find(v => ofertaVigente(v) !== null);
-  if (varOferta) return formatUYU(ofertaVigente(varOferta).precio);
-
-  if (productoEsPreventa(p)) return 'A confirmar';
-  return 'Consultar';
-}
-
-// ============================================================
 // FILTROS
 // ============================================================
 function filtrarProductos() {
@@ -359,135 +335,10 @@ function filtrarPreventas() {
 // RENDER GLOBAL
 // ============================================================
 function renderAll() {
-  renderDestacados();
   renderCatalogo();
   renderOfertas();
   renderPreventas();
 }
-
-// ============================================================
-// RENDER SCROLL DE DESTACADOS (SOLO IMAGEN + PRECIO NORMAL)
-// ============================================================
-function renderDestacados() {
-  const section = $('featured-section');
-  const track = $('featured-track');
-  if (!section || !track) return;
-
-  const destacados = productos
-    .filter(p => p.destacado === true && (productoVisible(p) || productoEsPreventa(p)))
-    .sort((a, b) => String(a.title || '').localeCompare(String(b.title || ''), 'es'));
-
-  if (destacados.length === 0) {
-    section.classList.add('hidden');
-    track.innerHTML = '';
-    return;
-  }
-
-  section.classList.remove('hidden');
-
-  track.innerHTML = destacados.map(p => {
-    const precio = obtenerPrecioNormalDestacado(p);
-    const imgHtml = p.coverUrl
-      ? `<img src="${safeUrl(p.coverUrl)}" alt="${escapeHtml(p.title || '')}" class="featured-card-img" loading="lazy" decoding="async">`
-      : `<span class="featured-card-placeholder">🎮</span>`;
-
-    return `
-      <div class="featured-card" onclick="irAJuegoDesdeDestacado('${p.id}')" title="${escapeHtml(p.title || '')}">
-        <div class="featured-card-img-wrap">
-          ${imgHtml}
-        </div>
-        <div class="featured-card-price">${precio}</div>
-      </div>
-    `;
-  }).join('');
-}
-
-// ============================================================
-// IR AL JUEGO EN EL CATÁLOGO AL HACER CLICK EN DESTACADOS
-// ============================================================
-window.irAJuegoDesdeDestacado = function(cardId) {
-  const prod = productos.find(p => p.id === cardId);
-  if (!prod) return;
-
-  // Limpiar buscador y resetear categoría a "Todos" para asegurar que aparezca
-  const si = $('search-input');
-  if (si) si.value = '';
-  document.querySelectorAll('#cat-nav .cat-btn').forEach(b => b.classList.remove('active'));
-  const btnAll = document.querySelector('#cat-nav .cat-btn[data-cat="all"]');
-  if (btnAll) btnAll.classList.add('active');
-
-  const esPre = productoEsPreventa(prod);
-
-  if (esPre) {
-    preState.search = '';
-    preState.cat = 'all';
-    if (typeof window.switchPage === 'function') window.switchPage('preventas');
-
-    const lista = filtrarPreventas();
-    const index = lista.findIndex(p => p.id === cardId);
-    if (index === -1) return;
-
-    preState.pagina = Math.floor(index / POR_PAGINA) + 1;
-    renderPreventas();
-
-    setTimeout(() => {
-      const card = document.querySelector(`#preventas-grid .product-card[data-card-id="${cardId}"]`);
-      if (!card) return;
-      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      card.classList.add('card-enfocada');
-      setTimeout(() => card.classList.remove('card-enfocada'), 3500);
-    }, 180);
-    return;
-  }
-
-  catState.search = '';
-  catState.cat = 'all';
-  if (typeof window.switchPage === 'function') window.switchPage('catalogo');
-
-  const filtrados = filtrarProductos();
-  const index = filtrados.findIndex(p => p.id === cardId);
-  if (index === -1) return;
-
-  catState.pagina = Math.floor(index / POR_PAGINA) + 1;
-  renderCatalogo();
-
-  setTimeout(() => {
-    const card = document.querySelector(`#product-grid .product-card[data-card-id="${cardId}"]`);
-    if (!card) return;
-    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    card.classList.add('card-enfocada');
-    setTimeout(() => card.classList.remove('card-enfocada'), 3500);
-  }, 180);
-};
-
-// ============================================================
-// BOTÓN ADMIN: DESTACAR / QUITAR DESTAQUE
-// ============================================================
-window.toggleDestacado = async function(id) {
-  if (!auth.currentUser) {
-    alert('Debés iniciar sesión como administrador.');
-    return;
-  }
-
-  const prod = productos.find(p => p.id === id);
-  if (!prod) return;
-
-  const nuevoValor = !prod.destacado;
-
-  try {
-    await updateDoc(doc(db, 'products', id), {
-      destacado: nuevoValor,
-      updatedAt: new Date().toISOString()
-    });
-    prod.destacado = nuevoValor;
-    window.__productosCache = productos;
-    guardarCacheProductos(productos);
-    renderAll();
-  } catch (err) {
-    console.error('[GamesUy] Error al destacar juego:', err);
-    alert('❌ Error al destacar: ' + err.message);
-  }
-};
 
 // ============================================================
 // RENDER CATÁLOGO
@@ -717,15 +568,11 @@ function renderCard(p, prefijo = 'cat') {
   }
 
   const tieneTrailer = p.youtubeUrl || p.gameplayUrl;
-  const esDestacado = p.destacado === true;
 
   const adminBtns = isAdmin
     ? `<div class="card-admin-actions">
          <button class="card-admin-btn card-admin-edit" title="Editar este juego"
                  onclick="abrirEditarDesdeCatalogo('${cardId}')">✏️ Editar</button>
-         <button class="card-admin-btn card-admin-feature ${esDestacado ? 'is-featured' : ''}"
-                 title="${esDestacado ? 'Quitar de destacados' : 'Agregar a destacados'}"
-                 onclick="toggleDestacado('${cardId}')">${esDestacado ? '⭐ Destacado' : '☆ Destacar'}</button>
          <button class="card-admin-btn card-admin-delete" title="Eliminar este juego"
                  onclick="eliminarDesdeCatalogo('${cardId}')">🗑️ Eliminar</button>
        </div>`
@@ -1269,17 +1116,6 @@ document.querySelectorAll('#cat-nav .cat-btn').forEach(btn => {
   });
 });
 
-// Flechas del scroll de Destacados
-$('featured-prev')?.addEventListener('click', () => {
-  const track = $('featured-track');
-  if (track) track.scrollBy({ left: -380, behavior: 'smooth' });
-});
-
-$('featured-next')?.addEventListener('click', () => {
-  const track = $('featured-track');
-  if (track) track.scrollBy({ left: 380, behavior: 'smooth' });
-});
-
 // ============================================================
 // SEO — Override switchPage con título dinámico
 // ============================================================
@@ -1320,4 +1156,4 @@ document.getElementById('trailer-modal')?.addEventListener('click', (e) => {
   if (e.target.id === 'trailer-modal') document.getElementById('trailer-modal')?.classList.add('hidden');
 });
 
-console.log('[GamesUy] store.js v19 cargado (con Destacados + cache + countdown)');
+console.log('[GamesUy] store.js v18 cargado (con cache + countdown optimizado)');

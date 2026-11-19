@@ -365,7 +365,6 @@ $('btn-crear-juego')?.addEventListener('click', async () => {
   const youtube = $('crear-youtube').value.trim();
   const descripcion = $('crear-descripcion').value.trim();
   const visible = $('crear-visible').checked;
-  const destacado = $('crear-destacado')?.checked || false;
 
   const categorias = categoriasDeJuego(cat);
 
@@ -380,7 +379,6 @@ $('btn-crear-juego')?.addEventListener('click', async () => {
     isPreorder: false,
     releaseDate: '',
     visible: visible,
-    destacado: destacado,
     manual: true,
     variants: variantesFinales,
     createdAt: new Date().toISOString(),
@@ -412,7 +410,6 @@ function resetearFormulario() {
   const youtube = $('crear-youtube'); if (youtube) youtube.value = '';
   const desc = $('crear-descripcion'); if (desc) desc.value = '';
   const visible = $('crear-visible'); if (visible) visible.checked = true;
-  const destacado = $('crear-destacado'); if (destacado) destacado.checked = false;
   const coverUrl = $('crear-cover-url'); if (coverUrl) coverUrl.value = '';
   const coverFile = $('crear-cover-file'); if (coverFile) coverFile.value = '';
   const coverStatus = $('crear-cover-status'); if (coverStatus) coverStatus.textContent = '';

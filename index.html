@@ -41,7 +41,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="styles.css?v=40">
+  <link rel="stylesheet" href="styles.css?v=41">
 
   <!-- ESTILOS DEL BOTÓN CANAL DE OFERTAS -->
   <style>
@@ -189,14 +189,36 @@
 
   <main class="container">
     <section id="page-catalogo" class="page-section active-page">
-      <div class="announcement-banner" id="announcement-banner">
-        <div class="announcement-glow"></div>
-        <div class="announcement-content">
-          <span class="announcement-label">📢 NOVEDAD</span>
-          <h2 class="announcement-title">Bienvenido a GamesUy Store</h2>
-          <p class="announcement-text">Este es el espacio editable desde el panel admin.</p>
+      
+      <!-- NUEVO LAYOUT: BANNER + DESTACADOS -->
+      <div class="hero-layout">
+        
+        <!-- Columna Izquierda: Banner Principal -->
+        <div class="announcement-banner" id="announcement-banner">
+          <div class="announcement-glow"></div>
+          <div class="announcement-content">
+            <span class="announcement-label">📢 NOVEDAD</span>
+            <h2 class="announcement-title">Bienvenido a GamesUy Store</h2>
+            <p class="announcement-text">Este es el espacio editable desde el panel admin.</p>
+          </div>
         </div>
+
+        <!-- Columna Derecha: Flash Gamers (Destacados) -->
+        <div class="flash-gamers-box">
+          <div class="flash-header">
+            <h3>⚡ DESTACADOS</h3>
+          </div>
+          <div id="flash-gamers-grid" class="flash-grid">
+            <!-- JavaScript carga los juegos aquí -->
+            <p style="color:var(--text-muted); font-size:0.75rem; grid-column:1/-1; text-align:center;">Cargando...</p>
+          </div>
+          <div class="flash-footer">
+            Desde <strong>$ 1.500</strong> pesos
+          </div>
+        </div>
+
       </div>
+
       <div class="grid-section">
         <div class="grid-header">
           <h2 class="section-title">Catálogo</h2>
@@ -1048,7 +1070,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-  <!-- SCRIPTS ACTUALIZADOS CON NUEVAS VERSIONES -->
+  <!-- SCRIPTS ACTUALIZADOS -->
   <script type="module" src="js/settings.js?v=2"></script>
   <script type="module" src="js/auth.js?v=38"></script>
   <script type="module" src="js/admin.js?v=4"></script>
@@ -1056,13 +1078,13 @@
   <script type="module" src="js/excel-importer.js?v=20"></script>
   <script type="module" src="js/maintenance.js?v=14"></script>
   <script type="module" src="js/precios.js?v=19"></script>
-  <script type="module" src="js/precios-masivo.js?v=40"></script>
-  <script type="module" src="js/manual-create.js?v=38"></script>
+  <script type="module" src="js/precios-masivo.js?v=7"></script>
+  <script type="module" src="js/manual-create.js?v=2"></script>
   <script type="module" src="js/contenido.js?v=38"></script>
   <script type="module" src="js/resenas.js?v=38"></script>
   <script type="module" src="js/reportes.js?v=38"></script>
   <script type="module" src="js/visitas.js?v=38"></script>
   <script type="module" src="js/estadisticas.js?v=39"></script>
-  <script type="module" src="js/store.js?v=40"></script>
+  <script type="module" src="js/store.js?v=20"></script>
 </body>
 </html>

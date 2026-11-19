@@ -4577,3 +4577,18 @@ body::after {
   border-color: #ff4d6d !important;
   box-shadow: 0 0 0 2px rgba(255, 77, 109, 0.15) !important;
 }
+/* Botón Destacar en la tarjeta del catálogo */
+.card-admin-btn.card-admin-destacar {
+  background: rgba(255, 184, 0, 0.1);
+  border-color: rgba(255, 184, 0, 0.4);
+  color: #ffb800;
+}
+.card-admin-btn.card-admin-destacar:hover {
+  background: rgba(255, 184, 0, 0.25);
+  border-color: #ffb800;
+}
+.card-admin-btn.card-admin-destacar.activo {
+  background: #ffb800;
+  color: #000;
+  box-shadow: 0 0 10px rgba(255, 184, 0, 0.6);
+}

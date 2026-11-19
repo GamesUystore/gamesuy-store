@@ -22,7 +22,7 @@ let ofState = { search: '', cat: 'all', pagina: 1 };
 let preState = { search: '', cat: 'all', pagina: 1 };
 const POR_PAGINA = 24;
 
-// Cache y Countdowns (Igual que antes)
+// Cache y Countdowns
 const CACHE_KEY = 'gamesuy_products_cache_v1';
 const CACHE_TTL = 5 * 60 * 1000; 
 
@@ -60,7 +60,7 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) detenerCountdowns(); else iniciarCountdowns();
 });
 
-// SEO (Igual que antes)
+// SEO
 const SEO_TITULOS = {
   'catalogo': 'Catálogo de Juegos Digitales', 'ofertas': '🔥 Ofertas Especiales', 'preventas': '🚀 Preventas',
   'faq': 'Preguntas Frecuentes', 'terminos': 'Términos y Condiciones', 'resenas': '⭐ Reseñas de Clientes',
@@ -100,7 +100,7 @@ onSnapshot(collection(db, 'products'), (snap) => {
   if (typeof window.__estRegistrarVista === 'function') window.__estRegistrarVista();
 });
 
-// Helpers de Precios (Igual que antes)
+// Helpers de Precios
 function tienePrecioNormal(v) { return Number(v?.precioFinalUYU) > 0; }
 function tieneCostoNormal(v) { return Number(v?.costoARS) > 0; }
 
@@ -214,7 +214,7 @@ function renderAll() {
 }
 
 // ============================================================
-// RENDER DESTACADOS (CARRUSEL CON SCROLL)
+// RENDER DESTACADOS (Sincroniza precio y variante)
 // ============================================================
 function renderDestacados() {
   const track = document.getElementById('flash-gamers-grid');
@@ -232,18 +232,36 @@ function renderDestacados() {
       ? `<img src="${safeUrl(p.coverUrl)}" alt="${escapeHtml(p.title)}">` 
       : `<div style="height:100%; display:flex; align-items:center; justify-content:center; font-size:3rem; background:var(--bg-0); border-radius:8px;">🎮</div>`;
     
-    // Obtener el precio más bajo para mostrar
-    let minPrice = 0;
-    (p.variants || []).forEach(v => {
-      const price = Number(v.ofertaPrecioUYU) > 0 ? Number(v.ofertaPrecioUYU) : Number(v.precioFinalUYU);
-      if (price > 0 && (minPrice === 0 || price < minPrice)) minPrice = price;
-    });
+    // LÓGICA: Buscar la variante Primaria (o la primera que tenga precio)
+    let displayPrice = 0;
+    let selectedVariantId = '';
+    
+    const primaryVariant = (p.variants || []).find(v => 
+      v.tipo === 'primaria' && (Number(v.ofertaPrecioUYU) > 0 || Number(v.precioFinalUYU) > 0)
+    );
+    
+    if (primaryVariant) {
+      displayPrice = Number(primaryVariant.ofertaPrecioUYU) > 0 ? Number(primaryVariant.ofertaPrecioUYU) : Number(primaryVariant.precioFinalUYU);
+      selectedVariantId = primaryVariant.id;
+    } else {
+      const anyVariant = (p.variants || []).find(v => 
+        (Number(v.ofertaPrecioUYU) > 0 || Number(v.precioFinalUYU) > 0)
+      );
+      if (anyVariant) {
+        displayPrice = Number(anyVariant.ofertaPrecioUYU) > 0 ? Number(anyVariant.ofertaPrecioUYU) : Number(anyVariant.precioFinalUYU);
+        selectedVariantId = anyVariant.id;
+      }
+    }
 
-    const priceHtml = minPrice > 0 ? `<div class="fc-price">${formatUYU(minPrice)}</div>` : `<div class="fc-price" style="font-size:0.8rem; color:var(--text-muted);">Ver opciones</div>`;
+    const priceHtml = displayPrice > 0 
+      ? `<div class="fc-price">${formatUYU(displayPrice)}</div>` 
+      : `<div class="fc-price" style="font-size:0.8rem; color:var(--text-muted);">Ver opciones</div>`;
+      
     const titleCorto = String(p.title).substring(0, 25);
 
+    // Navegación directa por función
     return `
-      <div class="featured-card" onclick="window.location.hash = '#producto=${p.id}'; window.switchPage('catalogo');">
+      <div class="featured-card" onclick="irAlJuegoDesdeDestacado('${p.id}', '${selectedVariantId}')">
         ${imgHtml}
         <div class="fc-title">${escapeHtml(titleCorto)}</div>
         ${priceHtml}
@@ -263,7 +281,75 @@ function renderDestacados() {
 }
 
 // ============================================================
-// RENDER CATÁLOGO (Igual que antes)
+// NAVEGACIÓN DIRECTA DESDE DESTACADOS (Click)
+// ============================================================
+window.irAlJuegoDesdeDestacado = function(id, variantId) {
+  if (typeof window.switchPage === 'function') window.switchPage('catalogo');
+  
+  catState.cat = 'all';
+  catState.search = '';
+  catState.pagina = 1;
+  const searchInput = document.getElementById('search-input');
+  if (searchInput) searchInput.value = '';
+  document.querySelectorAll('#cat-nav .cat-btn').forEach(b => b.classList.remove('active'));
+  const btnAll = document.querySelector('#cat-nav .cat-btn[data-cat="all"]');
+  if (btnAll) btnAll.classList.add('active');
+
+  const filtrados = filtrarProductos();
+  const index = filtrados.findIndex(p => p.id === id);
+  if (index === -1) return;
+
+  catState.pagina = Math.floor(index / POR_PAGINA) + 1;
+  renderCatalogo();
+
+  setTimeout(() => {
+    const card = document.querySelector(`.product-card[data-card-id="${id}"]`);
+    if (!card) return;
+
+    if (variantId) {
+      const prod = productos.find(p => p.id === id);
+      const variant = (prod.variants || []).find(v => v.id === variantId);
+      if (variant) {
+        const selConsole = document.getElementById(`sel-console-cat-${id}`);
+        const selVariant = document.getElementById(`sel-variant-cat-${id}`);
+        
+        if (selConsole && selVariant) {
+          if (selConsole.tagName === 'SELECT') {
+            selConsole.value = variant.categoria;
+            selConsole.dispatchEvent(new Event('change')); 
+          }
+          selVariant.value = variantId;
+          selVariant.dispatchEvent(new Event('change')); 
+        }
+      }
+    }
+
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    card.classList.add('card-destacada');
+    setTimeout(() => card.classList.remove('card-destacada'), 4000);
+  }, 400);
+};
+
+// ============================================================
+// PROCESAR HASH (Para links compartidos)
+// ============================================================
+function procesarHashInicial() {
+  const hash = window.location.hash;
+  if (!hash || !hash.startsWith('#producto=')) return;
+  
+  const parts = hash.replace('#producto=', '').split('&');
+  const cardId = parts[0];
+  let variantId = null;
+  parts.forEach(p => { if (p.startsWith('variant=')) variantId = p.split('=')[1]; });
+
+  if (typeof window.irAlJuegoDesdeDestacado === 'function') {
+    window.irAlJuegoDesdeDestacado(cardId, variantId);
+  }
+}
+window.addEventListener('hashchange', () => procesarHashInicial());
+
+// ============================================================
+// RESTO DE RENDERS (Catálogo, Ofertas, Preventas)
 // ============================================================
 function renderCatalogo() {
   const grid = $('product-grid');
@@ -372,7 +458,6 @@ function renderPaginacion(contId, actual, total, onPage) {
   });
 }
 
-// Render Card Individual (Igual que antes)
 function renderCard(p, prefijo = 'cat') {
   const cardId = p.id;
   const cats = p.categories || [];
@@ -433,7 +518,7 @@ function renderCard(p, prefijo = 'cat') {
   `;
 }
 
-// Acciones y demás (Igual que antes)
+// Acciones
 window.toggleDestacadoCatalogo = async function(id, currentState) {
   if (!auth.currentUser) return;
   try {
@@ -460,23 +545,6 @@ window.copiarLinkJuego = async function(cardId) {
     alert('✅ Link copiado al portapapeles');
   } catch (err) { prompt('Copiá este link:', url); }
 };
-
-function procesarHashInicial() {
-  const hash = window.location.hash;
-  if (!hash || !hash.startsWith('#producto=')) return;
-  const cardId = hash.replace('#producto=', '').split('&')[0];
-  if (!productos.find(p => p.id === cardId)) return;
-  if (typeof window.switchPage === 'function') window.switchPage('catalogo');
-  const filtrados = filtrarProductos();
-  const index = filtrados.findIndex(p => p.id === cardId);
-  if (index === -1) return;
-  catState.pagina = Math.floor(index / POR_PAGINA) + 1;
-  renderCatalogo();
-  setTimeout(() => {
-    const card = document.querySelector(`.product-card[data-card-id="${cardId}"]`);
-    if (card) { card.scrollIntoView({ behavior: 'smooth', block: 'center' }); card.classList.add('card-destacada'); setTimeout(() => card.classList.remove('card-destacada'), 4000); }
-  }, 400);
-}
 
 window.abrirEditarDesdeCatalogo = function(id) {
   if (typeof window.abrirEditarProducto === 'function') window.abrirEditarProducto(id);
@@ -631,4 +699,4 @@ window.switchPage = function(pageId) {
 document.getElementById('trailer-close')?.addEventListener('click', () => document.getElementById('trailer-modal')?.classList.add('hidden'));
 document.getElementById('trailer-modal')?.addEventListener('click', (e) => { if (e.target.id === 'trailer-modal') document.getElementById('trailer-modal')?.classList.add('hidden'); });
 
-console.log('[GamesUy] store.js v21 cargado (carrusel de destacados)');
+console.log('[GamesUy] store.js v24 cargado (navegacion directa fix)');

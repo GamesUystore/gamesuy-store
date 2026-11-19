@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=60">
+  <link rel="stylesheet" href="styles.css?v=61">
 </head>
 <body>
 
@@ -492,14 +492,18 @@
     </section>
   </main>
 
+  <!-- FOOTER ARREGLADO: Visitas arriba, Copyright abajo -->
   <footer class="site-footer">
-    <p>© 2026 GamesUy Store — Juegos digitales en Uruguay</p>
-    <p class="footer-visitas"><span id="footer-visitas">👁️ Cargando visitas...</span></p>
+    <div class="footer-visitas-wrap">
+      <span id="footer-visitas" class="footer-visitas-badge">👁️ Cargando visitas...</span>
+    </div>
+    <p class="footer-copyright">© 2026 GamesUy Store — Juegos digitales en Uruguay</p>
   </footer>
 
+  <!-- BOTONES FLOTANTES -->
   <a href="https://whatsapp.com/channel/0029Vb906GBFnSz6jsTzSJ0L" class="channel-float" target="_blank">📢 Canal de Ofertas</a>
-  <a href="https://wa.me/59896572226" class="chat-float" target="_blank">💬</a>
-  <button class="report-float" onclick="abrirModalPedido()">🔍</button>
+  <button class="report-float" onclick="abrirModalPedido()" title="¿No encontrás un juego? Pedilo acá">🔍</button>
+  <a href="https://wa.me/59896572226" class="chat-float" target="_blank" rel="noopener" title="Contactar por WhatsApp">💬</a>
 
   <!-- MODALES -->
   <div id="login-modal" class="admin-modal hidden">
@@ -640,7 +644,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-  <!-- Scripts Actualizados -->
   <script type="module" src="js/settings.js?v=2"></script>
   <script type="module" src="js/auth.js?v=38"></script>
   <script type="module" src="js/admin.js?v=4"></script>
@@ -655,6 +658,6 @@
   <script type="module" src="js/reportes.js?v=38"></script>
   <script type="module" src="js/visitas.js?v=38"></script>
   <script type="module" src="js/estadisticas.js?v=39"></script>
-  <script type="module" src="js/store.js?v=24"></script> <!-- v24 -->
+  <script type="module" src="js/store.js?v=24"></script>
 </body>
 </html>

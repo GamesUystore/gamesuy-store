@@ -41,7 +41,54 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="styles.css?v=77">
+  <link rel="stylesheet" href="styles.css?v=40">
+
+  <!-- ESTILOS DEL BOTÓN CANAL DE OFERTAS -->
+  <style>
+    .channel-float {
+      position: fixed;
+      bottom: 24px;
+      left: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 20px;
+      height: 50px;
+      background: linear-gradient(135deg, #ff0055, #ff3377);
+      color: #fff;
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 700;
+      font-size: 0.9rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      text-decoration: none;
+      border-radius: 25px;
+      z-index: 999;
+      box-shadow: 0 0 24px rgba(255, 0, 85, 0.6);
+      transition: transform 0.25s ease, box-shadow 0.25s ease;
+      animation: floatChannel 3s ease-in-out infinite;
+    }
+
+    @keyframes floatChannel {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+    }
+
+    .channel-float:hover {
+      transform: scale(1.05) translateY(-2px);
+      box-shadow: 0 0 34px rgba(255, 0, 85, 0.9);
+    }
+
+    @media (max-width: 640px) {
+      .channel-float {
+        bottom: 16px;
+        left: 16px;
+        height: 44px;
+        padding: 0 16px;
+        font-size: 0.8rem;
+      }
+    }
+  </style>
 
   <!-- DATOS ESTRUCTURADOS (JSON-LD) -->
   <script type="application/ld+json">
@@ -142,30 +189,14 @@
 
   <main class="container">
     <section id="page-catalogo" class="page-section active-page">
-      
-      <div class="hero-layout">
-        <div class="announcement-banner" id="announcement-banner">
-          <div class="announcement-glow"></div>
-          <div class="announcement-content">
-            <span class="announcement-label">📢 NOVEDAD</span>
-            <h2 class="announcement-title">Bienvenido a GamesUy Store</h2>
-            <p class="announcement-text">Este es el espacio editable desde el panel admin.</p>
-          </div>
-        </div>
-
-        <div class="flash-gamers-box">
-          <div class="flash-header">
-            <h3>⚡ DESTACADOS</h3>
-          </div>
-          <div id="flash-gamers-grid" class="flash-grid">
-            <p style="color:var(--text-muted); font-size:0.75rem; grid-column:1/-1; text-align:center;">Cargando...</p>
-          </div>
-          <div class="flash-footer">
-            Desde <strong>$ 1.500</strong> pesos
-          </div>
+      <div class="announcement-banner" id="announcement-banner">
+        <div class="announcement-glow"></div>
+        <div class="announcement-content">
+          <span class="announcement-label">📢 NOVEDAD</span>
+          <h2 class="announcement-title">Bienvenido a GamesUy Store</h2>
+          <p class="announcement-text">Este es el espacio editable desde el panel admin.</p>
         </div>
       </div>
-
       <div class="grid-section">
         <div class="grid-header">
           <h2 class="section-title">Catálogo</h2>
@@ -764,19 +795,18 @@
   </main>
 
   <footer class="site-footer">
-    <div class="footer-visitas-wrap">
-      <span id="footer-visitas" class="footer-visitas-badge">👁️ Cargando visitas...</span>
-    </div>
-    <p class="footer-copyright">© 2026 GamesUy Store — Juegos digitales en Uruguay</p>
+    <p>© 2026 GamesUy Store — Juegos digitales en Uruguay</p>
+    <p class="footer-visitas"><span id="footer-visitas">👁️ Cargando visitas...</span></p>
   </footer>
 
+  <!-- BOTÓN FLOTANTE DEL CANAL DE OFERTAS -->
   <a href="https://whatsapp.com/channel/0029Vb906GBFnSz6jsTzSJ0L" class="channel-float" target="_blank" rel="noopener" title="Unite al Canal de Ofertas y Novedades">
     📢 Canal de Ofertas
   </a>
-  <button class="report-float" onclick="abrirModalPedido()" title="¿No encontrás un juego? Pedilo acá">🔍</button>
-  <a href="https://wa.me/59896572226" class="chat-float" target="_blank" rel="noopener" title="Contactar por WhatsApp">💬</a>
 
-  <!-- MODALES -->
+  <a href="https://wa.me/59896572226" class="chat-float" target="_blank" rel="noopener" title="Contactar por WhatsApp">💬</a>
+  <button class="report-float" onclick="abrirModalPedido()" title="¿No encontrás un juego? Pedilo acá">🔍</button>
+
   <div id="login-modal" class="admin-modal hidden">
     <div class="modal-content">
       <button class="modal-close" id="login-close" aria-label="Cerrar">✕</button>
@@ -1018,6 +1048,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
+  <!-- SCRIPTS ACTUALIZADOS CON NUEVAS VERSIONES -->
   <script type="module" src="js/settings.js?v=2"></script>
   <script type="module" src="js/auth.js?v=38"></script>
   <script type="module" src="js/admin.js?v=4"></script>
@@ -1025,13 +1056,13 @@
   <script type="module" src="js/excel-importer.js?v=20"></script>
   <script type="module" src="js/maintenance.js?v=14"></script>
   <script type="module" src="js/precios.js?v=19"></script>
-  <script type="module" src="js/precios-masivo.js?v=7"></script>
-  <script type="module" src="js/manual-create.js?v=2"></script>
+  <script type="module" src="js/precios-masivo.js?v=40"></script>
+  <script type="module" src="js/manual-create.js?v=38"></script>
   <script type="module" src="js/contenido.js?v=38"></script>
   <script type="module" src="js/resenas.js?v=38"></script>
   <script type="module" src="js/reportes.js?v=38"></script>
   <script type="module" src="js/visitas.js?v=38"></script>
   <script type="module" src="js/estadisticas.js?v=39"></script>
-  <script type="module" src="js/store.js?v=24"></script>
+  <script type="module" src="js/store.js?v=40"></script>
 </body>
 </html>

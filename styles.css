@@ -492,3 +492,77 @@ body::after {
   .featured-card .fc-price { font-size: 0.95rem; }
   .featured-title { font-size: 1.1rem; }
 }
+/* ============================================================
+   FIX: Paginación del Catálogo
+   ============================================================ */
+
+.catalog-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  margin-top: 40px;
+  flex-wrap: wrap;
+  padding: 10px 0;
+  width: 100%;
+}
+
+.pag-btn {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  min-width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0 12px;
+}
+
+.pag-btn:hover:not(:disabled) {
+  border-color: var(--cyan);
+  color: var(--cyan);
+  background: var(--cyan-soft);
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+.pag-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pag-num {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.9rem;
+}
+
+.pag-active {
+  background: linear-gradient(135deg, var(--cyan), #00b4d8) !important;
+  color: #000 !important;
+  border-color: var(--cyan) !important;
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.6) !important;
+  transform: translateY(0) !important;
+}
+
+.pag-ellipsis {
+  color: var(--text-muted);
+  font-weight: 700;
+  font-size: 1.2rem;
+  padding: 0 4px;
+  display: flex;
+  align-items: flex-end;
+}
+
+/* Ajuste para móviles */
+@media (max-width: 640px) {
+  .catalog-pagination { gap: 6px; margin-top: 24px; }
+  .pag-btn { min-width: 36px; height: 36px; font-size: 0.85rem; padding: 0 8px; }
+  .pag-num { font-size: 0.8rem; }
+}

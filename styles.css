@@ -356,6 +356,10 @@ body::after {
 .admin-card input:focus, .admin-card textarea:focus { border-color: var(--cyan); box-shadow: 0 0 0 3px var(--cyan-soft); }
 
 /* MODAL PRECIOS (DISEÑO INTERNO) */
+/* AQUI ESTABAN FALTANDO LAS REGLAS DE LAS PESTAÑAS */
+.modal-tab-content { display: none; }
+.modal-tab-content.active { display: block; }
+
 .price-modal-body { display: flex; flex-direction: column; gap: 16px; max-height: 60vh; overflow-y: auto; padding-right: 8px; }
 .price-modal-body::-webkit-scrollbar { width: 6px; }
 .price-modal-body::-webkit-scrollbar-track { background: var(--bg-0); }

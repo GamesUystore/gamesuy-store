@@ -356,7 +356,7 @@ body::after {
 .admin-card input:focus, .admin-card textarea:focus { border-color: var(--cyan); box-shadow: 0 0 0 3px var(--cyan-soft); }
 
 /* MODAL PRECIOS (DISEÑO INTERNO) */
-/* AQUI ESTABAN FALTANDO LAS REGLAS DE LAS PESTAÑAS */
+/* FIX: ESTAS 2 LINEAS SON LAS QUE OCULTAN LAS PESTAÑAS NO SELECCIONADAS */
 .modal-tab-content { display: none; }
 .modal-tab-content.active { display: block; }
 

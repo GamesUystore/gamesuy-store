@@ -566,3 +566,190 @@ body::after {
   .pag-btn { min-width: 36px; height: 36px; font-size: 0.85rem; padding: 0 8px; }
   .pag-num { font-size: 0.8rem; }
 }
+/* ============================================================
+   ARREGLO FINAL: FOOTER Y BOTONES FLOTANTES
+   ============================================================ */
+
+/* 1. El Footer (Visitas al medio, Copyright abajo) */
+.site-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 30px 20px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  border-top: 1px solid var(--border);
+  background: var(--bg-1);
+  gap: 12px;
+}
+
+.footer-visitas-wrap {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.footer-visitas-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-weight: 600;
+  color: var(--cyan);
+  transition: all 0.25s ease;
+}
+
+.footer-copyright {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+/* 2. Botones Flotantes */
+.chat-float {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  text-decoration: none;
+  color: #fff;
+  background: #25d366;
+  border-radius: 50%;
+  box-shadow: 0 0 20px rgba(37, 211, 102, 0.5);
+  z-index: 999;
+  transition: transform 0.25s ease;
+}
+
+.chat-float:hover {
+  transform: scale(1.1);
+}
+
+.report-float {
+  position: fixed;
+  bottom: 92px; /* Justo arriba del WhatsApp */
+  right: 24px;
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  background: linear-gradient(135deg, #ffb800, #ff8c00);
+  color: #000;
+  border: none;
+  border-radius: 50%;
+  box-shadow: 0 0 20px rgba(255, 184, 0, 0.5);
+  z-index: 999;
+  cursor: pointer;
+  transition: transform 0.25s ease;
+}
+
+.report-float:hover {
+  transform: scale(1.1);
+}
+
+.channel-float {
+  position: fixed;
+  bottom: 24px;
+  left: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 20px;
+  height: 50px;
+  background: linear-gradient(135deg, #ff0055, #ff3377);
+  color: #fff;
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700;
+  font-size: 0.9rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-decoration: none;
+  border-radius: 25px;
+  z-index: 999;
+  box-shadow: 0 0 20px rgba(255, 0, 85, 0.5);
+  transition: transform 0.25s ease;
+  animation: floatChannel 3s ease-in-out infinite;
+}
+
+@keyframes floatChannel {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+.channel-float:hover {
+  transform: scale(1.05) translateY(-2px);
+}
+
+@media (max-width: 640px) {
+  .chat-float { width: 50px; height: 50px; font-size: 1.4rem; bottom: 16px; right: 16px; }
+  .report-float { width: 50px; height: 50px; font-size: 1.3rem; bottom: 80px; right: 16px; }
+  .channel-float { height: 44px; padding: 0 16px; font-size: 0.8rem; bottom: 16px; left: 16px; }
+}
+
+/* 3. FIX: Paginación del Catálogo (Los numeritos) */
+.catalog-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  margin-top: 40px;
+  flex-wrap: wrap;
+  padding: 10px 0;
+  width: 100%;
+}
+.pag-btn {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  min-width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0 12px;
+}
+.pag-btn:hover:not(:disabled) {
+  border-color: var(--cyan);
+  color: var(--cyan);
+  background: var(--cyan-soft);
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.3);
+  transform: translateY(-2px);
+}
+.pag-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.pag-num { font-family: 'Orbitron', sans-serif; font-size: 0.9rem; }
+.pag-active {
+  background: linear-gradient(135deg, var(--cyan), #00b4d8) !important;
+  color: #000 !important;
+  border-color: var(--cyan) !important;
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.6) !important;
+  transform: translateY(0) !important;
+}
+.pag-ellipsis {
+  color: var(--text-muted);
+  font-weight: 700;
+  font-size: 1.2rem;
+  padding: 0 4px;
+  display: flex;
+  align-items: flex-end;
+}
+@media (max-width: 640px) {
+  .catalog-pagination { gap: 6px; margin-top: 24px; }
+  .pag-btn { min-width: 36px; height: 36px; font-size: 0.85rem; padding: 0 8px; }
+  .pag-num { font-size: 0.8rem; }
+}

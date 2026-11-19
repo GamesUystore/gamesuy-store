@@ -10,13 +10,13 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=50">
+  <link rel="stylesheet" href="styles.css?v=51">
 </head>
 <body>
 
   <header class="site-header">
     <div class="header-inner">
-      <a href="#" class="brand" onclick="window.switchPage('catalogo')">
+      <a href="#" class="brand" onclick="window.switchPage('catalogo'); return false;">
         <img id="store-logo" src="" alt="GamesUy" class="brand-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
         <div class="brand-logo-fallback">🎮</div>
         <div class="brand-text">
@@ -31,21 +31,33 @@
       </div>
 
       <div class="header-actions">
-        <button class="icon-btn" title="Canal de Ofertas">📢</button>
-        <button class="icon-btn" title="Mi cuenta">👤</button>
-        <button class="btn-cart">🛒 Carrito <span class="cart-badge">0</span></button>
+        <a href="https://whatsapp.com/channel/0029Vb906GBFnSz6jsTzSJ0L" target="_blank" class="icon-btn" title="Canal de Ofertas">📢</a>
+        <button class="icon-btn" onclick="window.switchPage('admin')" title="Admin">👤</button>
+        <button class="btn-cart" onclick="window.switchPage('catalogo')">🛒 Tienda</button>
       </div>
     </div>
   </header>
 
-  <nav class="categories-nav">
+  <!-- MENÚ DE PÁGINAS (Oculto visualmente para el nuevo diseño, pero funcional) -->
+  <div class="top-nav" id="top-nav" style="display:none;">
+    <button class="nav-btn active" data-page="catalogo">Catálogo</button>
+    <button class="nav-btn" data-page="ofertas">Ofertas</button>
+    <button class="nav-btn" data-page="preventas">Preventas</button>
+    <button class="nav-btn" data-page="faq">Preguntas</button>
+    <button class="nav-btn" data-page="terminos">Términos</button>
+    <button class="nav-btn" data-page="resenas">Reseñas</button>
+    <button class="nav-btn" data-page="contacto">Contacto</button>
+    <button class="nav-btn nav-btn-admin" data-page="admin">Admin</button>
+  </div>
+
+  <nav class="categories-nav" id="cat-nav">
     <div class="nav-inner">
       <button class="cat-btn active" data-cat="all">TODOS</button>
       <button class="cat-btn" data-cat="ps5">PS5</button>
       <button class="cat-btn" data-cat="ps4">PS4</button>
       <button class="cat-btn" data-cat="ps3">PS3</button>
       <button class="cat-btn" data-cat="steam">STEAM</button>
-      <button class="cat-btn" data-cat="psplus">MEMBRESÍAS</button>
+      <button class="cat-btn" data-cat="psplus">PS PLUS</button>
       <button class="cat-btn" data-cat="streaming">STREAMING</button>
       <button class="cat-btn" data-cat="otros">OTROS</button>
     </div>
@@ -54,9 +66,7 @@
   <main class="container">
     <section id="page-catalogo" class="page-section active-page">
       
-      <!-- HERO SECTION -->
       <div class="hero-layout">
-        <!-- Banner Principal (Izquierda) -->
         <div class="hero-banner" id="announcement-banner">
           <div class="hero-content">
             <span class="hero-badge">NOVEDAD</span>
@@ -65,13 +75,12 @@
           </div>
         </div>
 
-        <!-- Flash Gamers (Derecha) -->
         <div class="flash-gamers-box">
           <div class="flash-header">
             <h3>FLASH ⚡ GAMERS</h3>
           </div>
           <div id="flash-gamers-grid" class="flash-grid">
-            <p style="color:var(--text-muted); font-size:0.8rem; text-align:center; grid-column: 1/-1;">Cargando...</p>
+            <p style="color:#94A3B8; font-size:0.8rem; text-align:center; grid-column: 1/-1;">Cargando...</p>
           </div>
           <div class="flash-footer">
             Desde <span class="text-accent">$ 1.500</span> pesos
@@ -79,7 +88,6 @@
         </div>
       </div>
 
-      <!-- SECCION PRODUCTOS -->
       <div class="grid-section">
         <div class="grid-header">
           <h2 class="section-title">Catálogo</h2>
@@ -92,11 +100,10 @@
       </div>
     </section>
 
-    <!-- OTRAS SECCIONES (Ofertas, Preventas, etc) -->
     <section id="page-ofertas" class="page-section">
       <div class="grid-section">
         <div class="grid-header">
-          <h2 class="section-title">🔥 Ofertas Especiales</h2>
+          <h2 class="section-title">🔥 Ofertas</h2>
           <span class="results-count" id="ofertas-count">Cargando...</span>
         </div>
         <div id="ofertas-grid" class="product-grid"></div>
@@ -128,6 +135,7 @@
     <section id="page-resenas" class="page-section">
       <div class="grid-header">
         <h2 class="section-title">⭐ Reseñas</h2>
+        <span class="results-count" id="resenas-count">Cargando...</span>
       </div>
       <button class="btn btn-primary" onclick="abrirModalResena()" style="max-width:320px;margin-bottom:24px;">✍️ Dejar mi reseña</button>
       <div id="resenas-list" class="resenas-list"></div>
@@ -148,16 +156,15 @@
       </form>
     </section>
 
-    <!-- PANEL ADMIN (Oculto por defecto) -->
     <section id="page-admin" class="page-section">
-      <h2 class="section-title">Panel de Administración</h2>
-      <div id="pendientes-banner" class="pendientes-banner hidden">
-        <div class="pendientes-header">
-          <h3 class="pendientes-titulo">¡ATENCIÓN! Juegos pendientes</h3>
-          <p class="pendientes-subtitulo" id="pendientes-count-text">Cargando...</p>
-        </div>
+      <h2 class="section-title" style="color: #3B82F6;">Panel de Administración</h2>
+      
+      <div id="pendientes-banner" class="pendientes-banner hidden" style="background: rgba(245, 158, 11, 0.1); border: 1px solid #F59E0B; padding: 20px; border-radius: 12px; margin-bottom: 24px;">
+        <button class="pendientes-cerrar" onclick="cerrarBannerPendientes()">✕</button>
+        <h3 style="color: #F59E0B; margin-bottom: 8px;">¡Atención! Juegos pendientes</h3>
+        <p id="pendientes-count-text" style="color: #fff;">Cargando...</p>
         <div class="pendientes-lista" id="pendientes-lista"></div>
-        <button class="btn btn-warning" onclick="irAPendientes()">🎯 Ir a editarlos</button>
+        <button class="btn btn-warning" style="margin-top: 12px; background: #F59E0B; color: #000; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer;" onclick="irAPendientes()">🎯 Ir a editarlos</button>
       </div>
 
       <div id="admin-not-logged" class="admin-placeholder">
@@ -176,8 +183,8 @@
         
         <div class="admin-tabs">
           <button class="admin-tab active" data-tab="precios">💰 Precios</button>
-          <button class="admin-tab" data-tab="crear">➕ Crear</button>
-          <button class="admin-tab" data-tab="masivo">⚡ Carga Masiva</button>
+          <button class="admin-tab" data-tab="crear">➕ Crear juego</button>
+          <button class="admin-tab" data-tab="masivo">⚡ Carga masiva</button>
           <button class="admin-tab" data-tab="contenido">📄 Contenido</button>
           <button class="admin-tab" data-tab="resenas">⭐ Reseñas</button>
           <button class="admin-tab" data-tab="reportes">📢 Reportes</button>
@@ -188,10 +195,9 @@
           <button class="admin-tab" data-tab="mantenimiento">🧹 Mantenimiento</button>
         </div>
 
-        <!-- TABS CONTENT (Mantenemos todo igual que antes, solo cambiamos clases visuales si hace falta) -->
         <div class="admin-tab-content active" data-tab-content="precios">
           <div class="admin-card admin-card-wide">
-            <h3>💰 Gestionar precios</h3>
+            <h3>💰 Gestionar precios (uno por uno)</h3>
             <div class="precios-stats">
               <span class="stat-badge">📊 Total: <strong id="stat-total">0</strong></span>
               <span class="stat-badge stat-pending">⏳ Pendientes: <strong id="stat-pending">0</strong></span>
@@ -200,7 +206,7 @@
             <div class="precios-filters">
               <input type="text" id="precios-search" placeholder="🔍 Buscar...">
               <select id="precios-cat">
-                <option value="all">Todas</option>
+                <option value="all">Todas las categorías</option>
                 <option value="ps5">PS5</option>
                 <option value="ps4">PS4</option>
                 <option value="ps3">PS3</option>
@@ -211,77 +217,353 @@
               </select>
               <select id="precios-estado">
                 <option value="todos">Todos</option>
-                <option value="pendientes">Pendientes</option>
-                <option value="completos">Completos</option>
+                <option value="con-stock">🟢 Con stock</option>
+                <option value="sin-stock">⚫ Sin stock</option>
+                <option value="preventas">🚀 Preventas</option>
+                <option value="pendientes">⏳ Pendientes</option>
+                <option value="completos">✅ Completos</option>
               </select>
             </div>
             <div id="precios-list" class="precios-list"></div>
             <div class="precios-pagination">
-              <button id="precios-prev" class="btn btn-secondary">←</button>
-              <span id="precios-page-info">Pág 1 de 1</span>
-              <button id="precios-next" class="btn btn-secondary">→</button>
+              <button id="precios-prev" class="btn btn-secondary">← Anterior</button>
+              <span id="precios-page-info">Página 1 de 1</span>
+              <button id="precios-next" class="btn btn-secondary">Siguiente →</button>
             </div>
           </div>
         </div>
 
-        <!-- ... (El resto de los tabs de admin, igual que antes, para no hacer el código infinito, asumo que se mantienen igual) ... -->
-        <!-- Como esto es muy largo, voy a poner solo la estructura de los primeros para que no se corte. -->
-        <!-- Nota: Estoy reemplazando todo el HTML visual, pero manteniendo los IDs que usa JS. -->
-        
         <div class="admin-tab-content" data-tab-content="crear">
           <div class="admin-card admin-card-wide">
-            <h3>➕ Crear producto</h3>
+            <h3>➕ Crear juego / producto manual</h3>
             <select id="crear-categoria" class="crear-select">
-              <option value="">— Categoría —</option>
+              <option value="">— Elegí una categoría —</option>
               <option value="ps4">PS4</option>
               <option value="ps5">PS5</option>
-              <option value="ps4_ps5">PS4/PS5</option>
+              <option value="ps4_ps5">PS4 y PS5</option>
               <option value="ps3">PS3</option>
               <option value="steam">Steam</option>
               <option value="psplus">PS Plus</option>
               <option value="streaming">Streaming</option>
               <option value="otros">Otros</option>
             </select>
-            <input type="text" id="crear-titulo" placeholder="Título">
-            <input type="text" id="crear-cover-url" placeholder="URL de Portada">
-            <input type="text" id="crear-youtube" placeholder="Trailer YouTube">
-            <textarea id="crear-descripcion" placeholder="Descripción"></textarea>
-            <label class="check-label"><input type="checkbox" id="crear-visible" checked> Visible</label>
+            <input type="text" id="crear-titulo" placeholder="Título del producto">
+            <div class="upload-group">
+              <input type="file" id="crear-cover-file" accept="image/*" class="admin-file">
+              <input type="text" id="crear-cover-url" placeholder="O pegar URL..." class="upload-url">
+            </div>
+            <div id="crear-cover-preview-wrap" class="upload-preview hidden">
+              <img id="crear-cover-preview" alt="Portada" class="upload-preview-img">
+              <button type="button" class="upload-preview-clear" data-clear="crear">✕ Quitar</button>
+            </div>
+            <div id="crear-cover-status" class="upload-status"></div>
+            <input type="text" id="crear-youtube" placeholder="Trailer de YouTube">
+            <textarea id="crear-descripcion" placeholder="Descripción del producto"></textarea>
+            <label class="check-label"><input type="checkbox" id="crear-visible" checked> Visible en la tienda</label>
+            
+            <h4 class="crear-variantes-titulo">💠 Variantes de este producto</h4>
             <div id="crear-variantes-list" class="crear-variantes-list"></div>
             <div class="admin-actions">
-              <button type="button" id="btn-add-variante" class="btn btn-secondary">➕ Variante</button>
-              <button type="button" id="btn-crear-juego" class="btn btn-primary">💾 Crear</button>
+              <button type="button" id="btn-add-variante" class="btn btn-secondary" disabled>➕ Agregar variante</button>
+              <button type="button" id="btn-crear-juego" class="btn btn-primary" disabled>💾 Crear producto</button>
+              <button type="button" id="btn-reset-crear" class="btn btn-secondary">🔄 Limpiar</button>
             </div>
           </div>
         </div>
 
-        <!-- El resto de los tabs los podés dejar como estaban, o si querés después te los paso con el diseño nuevo. -->
-        
+        <div class="admin-tab-content" data-tab-content="masivo">
+          <div class="admin-card admin-card-wide">
+            <h3>⚡ Carga masiva de precios</h3>
+            <div class="masivo-toolbar">
+              <input type="text" id="masivo-search" placeholder="🔍 Buscar juego...">
+              <select id="masivo-cat">
+                <option value="all">Todas las categorías</option>
+                <option value="ps5">PS5</option>
+                <option value="ps4">PS4</option>
+                <option value="ps3">PS3</option>
+                <option value="steam">Steam</option>
+                <option value="psplus">PS Plus</option>
+                <option value="streaming">Streaming</option>
+                <option value="otros">Otros</option>
+              </select>
+              <select id="masivo-estado">
+                <option value="sin-precio">⏳ Sin precio</option>
+                <option value="con-precio">✅ Con precio</option>
+                <option value="ofertas">🔥 Ofertas</option>
+                <option value="preventas">🚀 Preventas</option>
+                <option value="pendientes">⚠️ Pendientes</option>
+                <option value="todos">Todos</option>
+              </select>
+              <span class="masivo-count" id="masivo-count">Cargando...</span>
+            </div>
+            <div class="masivo-save-bar">
+              <span class="masivo-changes" id="masivo-changes">0 cambios pendientes</span>
+              <button id="btn-save-masivo" class="btn btn-primary" disabled>💾 Guardar cambios</button>
+            </div>
+            <div id="masivo-list" class="masivo-list"></div>
+            <div class="masivo-pagination">
+              <button id="masivo-prev" class="btn btn-secondary">← Anterior</button>
+              <span id="masivo-page-info">Página 1 de 1</span>
+              <button id="masivo-next" class="btn btn-secondary">Siguiente →</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="admin-tab-content" data-tab-content="contenido">
+          <div class="admin-card admin-card-wide">
+            <h3>❓ Preguntas Frecuentes</h3>
+            <input type="text" id="faq-q" placeholder="Pregunta">
+            <textarea id="faq-a" placeholder="Respuesta" rows="3"></textarea>
+            <button id="btn-add-faq" class="btn btn-primary">💾 Guardar FAQ</button>
+            <div id="admin-faq-list" class="admin-list-box"></div>
+          </div>
+          <div class="admin-card admin-card-wide">
+            <h3>📜 Términos y Condiciones</h3>
+            <textarea id="admin-terms-input" rows="10"></textarea>
+            <button id="btn-save-terms" class="btn btn-primary">💾 Guardar Términos</button>
+          </div>
+        </div>
+
+        <div class="admin-tab-content" data-tab-content="resenas">
+          <div class="admin-card admin-card-wide">
+            <h3>⏳ Reseñas pendientes</h3>
+            <div id="admin-resenas-pendientes" class="admin-resenas-list"></div>
+            <h3>✅ Reseñas aprobadas</h3>
+            <div id="admin-resenas-aprobadas" class="admin-resenas-list"></div>
+          </div>
+        </div>
+
+        <div class="admin-tab-content" data-tab-content="reportes">
+          <div class="admin-card admin-card-wide">
+            <h3>⚠️ Reportes</h3>
+            <div id="admin-reportes-pendientes" class="admin-resenas-list"></div>
+            <h3>✅ Resueltos</h3>
+            <div id="admin-reportes-resueltos" class="admin-resenas-list"></div>
+          </div>
+          <div class="admin-card admin-card-wide">
+            <h3>🔍 Juegos solicitados</h3>
+            <div id="admin-pedidos-pendientes" class="admin-resenas-list"></div>
+            <h3>✅ Resueltos</h3>
+            <div id="admin-pedidos-resueltos" class="admin-resenas-list"></div>
+          </div>
+        </div>
+
+        <div class="admin-tab-content" data-tab-content="visitas">
+          <div class="admin-card admin-card-wide">
+            <h3>📊 Visitas</h3>
+            <div class="visitas-stats">
+              <div class="visita-stat-card visita-stat-hoy">Hoy: <span id="visita-hoy">0</span></div>
+              <div class="visita-stat-card visita-stat-semana">7 Días: <span id="visita-semana">0</span></div>
+              <div class="visita-stat-card visita-stat-mes">Mes: <span id="visita-mes">0</span></div>
+              <div class="visita-stat-card visita-stat-total">Total: <span id="visita-total">0</span></div>
+            </div>
+            <div id="visitas-ultimos" class="visitas-ultimos"></div>
+          </div>
+        </div>
+
+        <div class="admin-tab-content" data-tab-content="estadisticas">
+          <div class="admin-card admin-card-wide">
+            <h3>📈 Resumen general</h3>
+            <div class="estadisticas-resumen">
+              <div class="estadistica-card-grande">Vistas: <span id="est-total-vistas">0</span></div>
+            </div>
+          </div>
+          <div class="admin-card admin-card-wide">
+            <h3>🎬 Top Trailers</h3>
+            <div id="est-top-trailers" class="estadisticas-lista"></div>
+          </div>
+          <div class="admin-card admin-card-wide">
+            <h3>💬 Top WhatsApp</h3>
+            <div id="est-top-whatsapp" class="estadisticas-lista"></div>
+          </div>
+          <div class="admin-card">
+            <h3>📂 Categorías</h3>
+            <div id="est-top-categorias" class="estadisticas-lista"></div>
+          </div>
+          <div class="admin-card">
+            <h3>🔍 Búsquedas vacías</h3>
+            <div id="est-top-busquedas" class="estadisticas-lista"></div>
+          </div>
+        </div>
+
+        <div class="admin-tab-content" data-tab-content="excel">
+          <div class="admin-card admin-card-wide">
+            <h3>📥 1. Importar STOCK - NGS</h3>
+            <input type="file" id="excel-stock" accept=".xlsx,.xls" class="admin-file">
+            <div id="stock-log" class="import-log"></div>
+            <button id="btn-process-stock" class="btn btn-primary" disabled>📥 Procesar Stock NGS</button>
+          </div>
+          <div class="admin-card admin-card-wide">
+            <h3>🔥 2. Importar OFERTAS - NGS</h3>
+            <input type="date" id="oferta-fecha-hasta">
+            <input type="file" id="excel-ofertas" accept=".xlsx,.xls" class="admin-file">
+            <div id="ofertas-log" class="import-log"></div>
+            <button id="btn-process-ofertas" class="btn btn-primary" disabled>🔥 Procesar Ofertas NGS</button>
+            <button id="btn-clean-ofertas" class="btn btn-secondary">🧹 Limpiar ofertas vencidas</button>
+          </div>
+        </div>
+
+        <div class="admin-tab-content" data-tab-content="config">
+          <div class="admin-card">
+            <h3>💱 Cotizaciones</h3>
+            <label>Peso Argentino → Peso Uruguayo</label>
+            <input type="number" id="admin-cot-ars" step="0.0001" min="0.0001">
+            <label>Dólar → Peso Uruguayo</label>
+            <input type="number" id="admin-cot-usd" step="0.01" min="0.01">
+            <button id="btn-save-cot" class="btn btn-primary">Guardar cotizaciones</button>
+            <button id="btn-recalcular-precios" class="btn btn-warning" type="button">🔄 Recalcular precios</button>
+            <p id="admin-cot-updated" style="margin-top:12px; font-size:0.8rem; color:#94A3B8;"></p>
+          </div>
+          <div class="admin-card">
+            <h3>🖼️ Logo</h3>
+            <input type="file" id="admin-logo-file" accept="image/*" class="admin-file">
+            <input type="text" id="admin-logo-url" placeholder="O pegar URL">
+            <button id="btn-save-logo" class="btn btn-primary">Guardar</button>
+          </div>
+          <div class="admin-card">
+            <h3>📱 Redes</h3>
+            <input type="text" id="admin-social-wa" placeholder="WhatsApp">
+            <input type="text" id="admin-social-ig" placeholder="Instagram">
+            <input type="text" id="admin-social-fb" placeholder="Facebook">
+            <input type="text" id="admin-social-tt" placeholder="TikTok">
+            <button id="btn-save-social" class="btn btn-primary">Guardar Redes</button>
+          </div>
+          <div class="admin-card admin-card-wide">
+            <h3>📢 Banner de anuncio (Home)</h3>
+            <input type="text" id="admin-banner-label" placeholder="Etiqueta (ej: NOVEDAD)">
+            <input type="text" id="admin-banner-title" placeholder="Título">
+            <textarea id="admin-banner-text" placeholder="Texto"></textarea>
+            <input type="file" id="admin-banner-file" accept="image/*" class="admin-file">
+            <input type="text" id="admin-banner-img" placeholder="O pegar URL de imagen">
+            <input type="text" id="admin-banner-link" placeholder="Link (opcional)">
+            <button id="btn-save-banner" class="btn btn-primary">Guardar Banner</button>
+            <button id="btn-clear-banner" class="btn btn-secondary">Ocultar Banner</button>
+            <button id="btn-clear-banner-img" class="btn btn-secondary" type="button">🖼️ Quitar Imagen</button>
+          </div>
+        </div>
+
+        <div class="admin-tab-content" data-tab-content="mantenimiento">
+          <div class="admin-card admin-card-wide" style="border-color: #EF4444;">
+            <h3 style="color: #EF4444;">🧹 Limpiar productos</h3>
+            <div id="clean-log" class="import-log"></div>
+            <button id="btn-analyze-clean" class="btn btn-secondary">🔍 Analizar sin matchKey</button>
+            <button id="btn-analyze-recent" class="btn btn-warning">⏰ Analizar recientes</button>
+            <button id="btn-do-clean" class="btn btn-danger" disabled>🗑️ Borrar productos</button>
+            <input type="text" id="clean-confirm" placeholder="Escribí BORRAR" disabled style="margin-top:16px;">
+          </div>
+        </div>
       </div>
     </section>
   </main>
 
-  <footer class="site-footer">
-    <p>© 2026 GamesUy Store — Juegos digitales en Uruguay</p>
-  </footer>
-
-  <a href="https://whatsapp.com/channel/0029Vb906GBFnSz6jsTzSJ0L" class="channel-float" target="_blank">
-    📢 Canal de Ofertas
-  </a>
-
-  <!-- MODALES (Igual que antes) -->
+  <!-- MODALES -->
   <div id="login-modal" class="admin-modal hidden">
     <div class="modal-content">
       <button class="modal-close" id="login-close">✕</button>
       <h3 class="modal-title">🔐 Acceso</h3>
       <input type="email" id="admin-email" placeholder="Email">
       <input type="password" id="admin-pass" placeholder="Contraseña">
-      <button id="btn-login" class="btn btn-primary">Ingresar</button>
+      <button id="btn-login" class="btn btn-primary" style="width:100%;">Ingresar</button>
       <p id="login-error" class="login-error hidden"></p>
     </div>
   </div>
 
-  <!-- ... Otros modales (price-modal, etc) ... -->
+  <div id="price-modal" class="admin-modal hidden">
+    <div class="modal-content modal-content-large">
+      <button class="modal-close" id="price-modal-close">✕</button>
+      <h3 class="modal-title" id="price-modal-title">Editar</h3>
+      <div class="modal-tabs">
+        <button class="modal-tab active" data-mtab="precios">💰 Precios</button>
+        <button class="modal-tab" data-mtab="info">📷 Info</button>
+      </div>
+      <div class="modal-tab-content active" data-mtab-content="precios"><div id="price-modal-precios" class="price-modal-body"></div></div>
+      <div class="modal-tab-content" data-mtab-content="info">
+        <div id="price-modal-info" class="price-modal-body">
+          <input type="text" id="info-title" placeholder="Título">
+          <input type="text" id="info-categories" placeholder="Categorías (ps4, ps5)">
+          <input type="file" id="info-cover-file" accept="image/*">
+          <input type="text" id="info-cover-url" placeholder="URL Portada">
+          <div id="info-cover-preview-wrap" class="upload-preview hidden"><img id="info-cover-preview"></div>
+          <input type="file" id="info-gameplay-file" accept="image/*">
+          <input type="text" id="info-gameplay-url" placeholder="URL Gameplay">
+          <div id="info-gameplay-preview-wrap" class="upload-preview hidden"><img id="info-gameplay-preview"></div>
+          <input type="text" id="info-youtube" placeholder="YouTube Trailer">
+          <textarea id="info-description" placeholder="Descripción"></textarea>
+          <label class="check-label"><input type="checkbox" id="info-preorder"> Preventa</label>
+          <label class="check-label"><input type="checkbox" id="info-visible" checked> Visible</label>
+          <input type="date" id="info-release">
+          <button id="btn-save-info" class="btn btn-primary">💾 Guardar Info</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="trailer-modal" class="admin-modal hidden">
+    <div class="modal-content modal-content-large">
+      <button class="modal-close" id="trailer-close">✕</button>
+      <h3 class="modal-title" id="trailer-title">Trailer</h3>
+      <div id="trailer-body"></div>
+    </div>
+  </div>
+
+  <div id="resena-modal" class="admin-modal hidden">
+    <div class="modal-content modal-content-large">
+      <button class="modal-close" onclick="cerrarModalResena()">✕</button>
+      <h3 class="modal-title">✍️ Dejá tu reseña</h3>
+      <form id="resena-form">
+        <input type="text" id="resena-nombre" placeholder="Tu nombre" required>
+        <input type="text" id="resena-juego" placeholder="Juego que compraste">
+        <select id="resena-estrellas">
+          <option value="5">⭐⭐⭐⭐⭐ Excelente</option>
+          <option value="4">⭐⭐⭐⭐ Muy bueno</option>
+          <option value="3">⭐⭐⭐ Bueno</option>
+        </select>
+        <textarea id="resena-texto" placeholder="Tu experiencia..." required></textarea>
+        <input type="file" id="resena-captura-file" accept="image/*">
+        <div id="resena-captura-preview-wrap" class="upload-preview hidden"><img id="resena-captura-preview"></div>
+        <button type="submit" id="resena-submit" class="btn btn-primary">📩 Enviar</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="reporte-modal" class="admin-modal hidden">
+    <div class="modal-content modal-content-large">
+      <button class="modal-close" onclick="cerrarModalReporte()">✕</button>
+      <h3 class="modal-title">⚠️ Reportar problema</h3>
+      <form id="reporte-form">
+        <input type="text" id="reporte-juego" readonly>
+        <select id="reporte-tipo" required>
+          <option value="">— Tipo de problema —</option>
+          <option value="precio">Precio incorrecto</option>
+          <option value="no-funciona">No funciona</option>
+          <option value="otro">Otro</option>
+        </select>
+        <textarea id="reporte-descripcion" placeholder="Contanos el problema..." required></textarea>
+        <input type="email" id="reporte-email" placeholder="Tu email (opcional)">
+        <input type="text" id="reporte-whatsapp" placeholder="Tu WhatsApp (opcional)">
+        <button type="submit" id="reporte-submit" class="btn btn-primary">📩 Enviar</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="pedido-modal" class="admin-modal hidden">
+    <div class="modal-content modal-content-large">
+      <button class="modal-close" onclick="cerrarModalPedido()">✕</button>
+      <h3 class="modal-title">🔍 Pedir juego</h3>
+      <form id="pedido-form">
+        <input type="text" id="pedido-juego" placeholder="¿Qué juego buscás?" required>
+        <input type="text" id="pedido-plataforma" placeholder="Plataforma (opcional)">
+        <textarea id="pedido-descripcion" placeholder="Aclaración"></textarea>
+        <button type="submit" id="pedido-submit" class="btn btn-primary">📩 Enviar</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- BOTONES FLOTANTES -->
+  <a href="https://whatsapp.com/channel/0029Vb906GBFnSz6jsTzSJ0L" class="channel-float" target="_blank">
+    📢 Canal de Ofertas
+  </a>
+  <a href="https://wa.me/59896572226" class="chat-float" target="_blank">💬</a>
 
   <script>
     window.switchPage = function(pageId) {
@@ -308,11 +590,21 @@
     document.querySelectorAll('.admin-tab').forEach(tab => {
       tab.addEventListener('click', () => window.switchTab(tab.dataset.tab));
     });
+    window.switchModalTab = function(tabId) {
+      document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.modal-tab-content').forEach(c => c.classList.remove('active'));
+      const tab = document.querySelector('.modal-tab[data-mtab="' + tabId + '"]');
+      const content = document.querySelector('.modal-tab-content[data-mtab-content="' + tabId + '"]');
+      if (tab) tab.classList.add('active');
+      if (content) content.classList.add('active');
+    };
+    document.querySelectorAll('.modal-tab').forEach(tab => {
+      tab.addEventListener('click', () => window.switchModalTab(tab.dataset.mtab));
+    });
   </script>
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-  <!-- Scripts (Mantenemos los scripts tal cual) -->
   <script type="module" src="js/settings.js?v=2"></script>
   <script type="module" src="js/auth.js?v=38"></script>
   <script type="module" src="js/admin.js?v=4"></script>

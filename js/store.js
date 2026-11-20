@@ -13,7 +13,6 @@ const $ = (id) => document.getElementById(id);
 
 let productos = [];
 let cotizaciones = { arsAUYU: 0.055, usdAUYU: 39.50 };
-// ACTUALIZAMOS ESTA LÍNEA CON TUS NUEVOS MÉTODOS
 let pagosTexto = 'Brou / Prex / Red Pagos / Abitab / Mercado Pago / Binance Pay / Global66 / Pix / Mi Dinero / Paypal';
 let isAdmin = false;
 let hashProcesado = false;
@@ -81,7 +80,6 @@ onSnapshot(doc(db, 'settings', 'cotizaciones'), (snap) => {
   renderAll();
 });
 
-// ESCUCHA DE MÉTODOS DE PAGO
 onSnapshot(doc(db, 'settings', 'payments'), (snap) => {
   pagosTexto = (snap.exists() && snap.data().text) ? snap.data().text : 'Brou / Prex / Red Pagos / Abitab / Mercado Pago / Binance Pay / Global66 / Pix / Mi Dinero / Paypal';
   renderAll();
@@ -217,16 +215,19 @@ function renderAll() {
 }
 
 // ============================================================
-// RENDER DESTACADOS (Sincroniza precio y variante)
+// RENDER DESTACADOS (GRILLA DE 12 JUEGOS)
 // ============================================================
 function renderDestacados() {
   const track = document.getElementById('flash-gamers-grid');
   if (!track) return;
 
-  const destacados = productos.filter(p => p.destacado === true && p.visible !== false);
+  // Filtramos y limitamos a 12 juegos para llenar 2 filas de 6
+  const destacados = productos
+    .filter(p => p.destacado === true && p.visible !== false)
+    .slice(0, 12);
 
   if (destacados.length === 0) {
-    track.innerHTML = '<p style="color:var(--text-muted); text-align:center; width:100%; padding: 20px;">No hay juegos destacados. Marcá algunos con la ⭐ en el catálogo.</p>';
+    track.innerHTML = '<p style="color:var(--text-muted); text-align:center; grid-column: 1/-1; padding: 20px;">No hay juegos destacados. Marcá algunos con la ⭐ en el catálogo.</p>';
     return;
   }
 
@@ -269,17 +270,11 @@ function renderDestacados() {
       </div>
     `;
   }).join('');
-
-  const btnPrev = document.getElementById('btn-prev-featured');
-  const btnNext = document.getElementById('btn-next-featured');
-  const wrapper = document.querySelector('.carousel-wrapper');
-
-  if (btnPrev && btnNext && wrapper) {
-    btnPrev.onclick = () => wrapper.scrollBy({ left: -280, behavior: 'smooth' });
-    btnNext.onclick = () => wrapper.scrollBy({ left: 280, behavior: 'smooth' });
-  }
 }
 
+// ============================================================
+// NAVEGACIÓN DIRECTA DESDE DESTACADOS (Click)
+// ============================================================
 window.irAlJuegoDesdeDestacado = function(id, variantId) {
   if (typeof window.switchPage === 'function') window.switchPage('catalogo');
   
@@ -693,4 +688,4 @@ window.switchPage = function(pageId) {
 document.getElementById('trailer-close')?.addEventListener('click', () => document.getElementById('trailer-modal')?.classList.add('hidden'));
 document.getElementById('trailer-modal')?.addEventListener('click', (e) => { if (e.target.id === 'trailer-modal') document.getElementById('trailer-modal')?.classList.add('hidden'); });
 
-console.log('[GamesUy] store.js v25 cargado (pagos custom)');
+console.log('[GamesUy] store.js v26 cargado (grilla de 2 filas para destacados)');

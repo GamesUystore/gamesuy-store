@@ -1,6 +1,7 @@
 // ============================================================
 // GAMESUY STORE — Panel de Administración
 // Fase 3.5: Recalculo automático de precios al cambiar cotización
+// + Editor de Medios de Pago inyectado en Configuración
 // ============================================================
 
 import { db } from './firebase-config.js';
@@ -88,7 +89,6 @@ async function recalcularTodosLosPrecios(viejaCot, nuevaCot) {
   const factor = nuevaCot / viejaCot;
   const porcentaje = Math.round((factor - 1) * 100 * 100) / 100;
 
-  // Confirmar antes de proceder
   const confirmado = confirm(
     `🔄 RECALCULAR TODOS LOS PRECIOS\n\n` +
     `Cotización anterior: ${viejaCot}\n` +
@@ -130,19 +130,16 @@ async function recalcularTodosLosPrecios(viejaCot, nuevaCot) {
           ? Number(v.gananciaPct)
           : null;
 
-        // Sin costo: no se puede recalcular
         if (costoARS <= 0) {
           variantesSinCosto++;
           return v;
         }
 
-        // Sin ganancia % (precio cargado a mano): no lo tocamos, avisamos
         if (gananciaPct === null || isNaN(gananciaPct)) {
           variantesSinGanancia++;
           return v;
         }
 
-        // Recalcular precio normal
         const nuevoPrecioBase = costoARS * nuevaCot * (1 + gananciaPct);
         const nuevoPrecioUYU = roundUYU(nuevoPrecioBase);
 
@@ -152,7 +149,6 @@ async function recalcularTodosLosPrecios(viejaCot, nuevaCot) {
           updatedAt: new Date().toISOString()
         };
 
-        // Si tiene oferta activa con ganancia definida, recalcular oferta también
         const ofertaCostoARS = Number(v.ofertaCostoARS) || 0;
         const ofertaGanancia = (v.ofertaGananciaPct !== null && v.ofertaGananciaPct !== undefined)
           ? Number(v.ofertaGananciaPct)
@@ -187,7 +183,6 @@ async function recalcularTodosLosPrecios(viejaCot, nuevaCot) {
       return;
     }
 
-    // Guardar en lotes
     const TAM = 400;
     for (let i = 0; i < operaciones.length; i += TAM) {
       const lote = operaciones.slice(i, i + TAM);
@@ -196,7 +191,6 @@ async function recalcularTodosLosPrecios(viejaCot, nuevaCot) {
       await batch.commit();
     }
 
-    // Resumen final
     const resumen =
       `✅ RECÁLCULO COMPLETO\n\n` +
       `Juegos actualizados:      ${operaciones.length}\n` +
@@ -237,7 +231,6 @@ $('btn-save-cot')?.addEventListener('click', async () => {
     const arsVieja = cotizacionesActuales.arsAUYU;
     const cambióARS = Math.abs(arsNueva - arsVieja) > 0.0000001;
 
-    // Guardar cotizaciones
     await setDoc(doc(db, 'settings', 'cotizaciones'), {
       arsAUYU: arsNueva,
       usdAUYU: usdNueva,
@@ -249,7 +242,6 @@ $('btn-save-cot')?.addEventListener('click', async () => {
 
     mostrarToast('✅ Cotizaciones guardadas');
 
-    // Si cambió la cotización ARS → recalcular todos los precios
     if (cambióARS) {
       setTimeout(async () => {
         await recalcularTodosLosPrecios(arsVieja, arsNueva);
@@ -269,8 +261,6 @@ $('btn-save-cot')?.addEventListener('click', async () => {
 // ============================================================
 $('btn-recalcular-precios')?.addEventListener('click', async () => {
   const arsActual = cotizacionesActuales.arsAUYU;
-  // Factor 1: usar la misma cotización (recalcula desde cero)
-  // Pero necesitamos un factor distinto a 1. Entonces usamos la fórmula directa.
   if (!confirm(
     `🔄 RECALCULAR PRECIOS (manual)\n\n` +
     `Cotización actual: ${arsActual}\n\n` +
@@ -533,4 +523,59 @@ $('btn-clear-banner')?.addEventListener('click', async () => {
   mostrarToast('Banner oculto');
 });
 
-console.log('[GamesUy] admin.js v2 cargado (con recálculo automático de precios)');
+// ============================================================
+// MEDIOS DE PAGO (inyectado en Configuración sin tocar index.html)
+// ============================================================
+
+function inyectarCardPagos() {
+  const grid = document.querySelector('[data-tab-content="config"] .admin-grid');
+  if (!grid || document.getElementById('admin-payments-card')) return;
+
+  grid.insertAdjacentHTML('beforeend', `
+    <div class="admin-card admin-card-wide" id="admin-payments-card">
+      <h3>💳 Medios de pago</h3>
+      <p class="admin-help">Este texto aparece en todas las tarjetas de juegos del catálogo, ofertas y preventas.</p>
+      <label class="admin-label">Texto de medios de pago</label>
+      <textarea id="admin-payments-text" rows="3" placeholder="Ej: Prex / Mercado Pago / BROU / Abitab / RedPagos"></textarea>
+      <div class="admin-actions">
+        <button id="btn-save-payments" class="btn btn-primary" type="button">💾 Guardar medios de pago</button>
+      </div>
+    </div>
+  `);
+
+  const input = $('admin-payments-text');
+  if (input) {
+    input.addEventListener('input', () => { input.dataset.dirty = '1'; });
+  }
+
+  $('btn-save-payments')?.addEventListener('click', async () => {
+    try {
+      const text = ($('admin-payments-text')?.value || '').trim();
+      if (!text) {
+        mostrarToast('Escribí los medios de pago antes de guardar.', 'error');
+        return;
+      }
+
+      await setDoc(doc(db, 'settings', 'payments'), {
+        text,
+        actualizado: new Date().toISOString()
+      }, { merge: true });
+
+      if ($('admin-payments-text')) delete $('admin-payments-text').dataset.dirty;
+      mostrarToast('✅ Medios de pago actualizados');
+    } catch (err) {
+      console.error('[GamesUy] Error al guardar medios de pago:', err);
+      mostrarToast('❌ ' + err.message, 'error');
+    }
+  });
+}
+
+inyectarCardPagos();
+
+onSnapshot(doc(db, 'settings', 'payments'), (snap) => {
+  const el = $('admin-payments-text');
+  if (!el || el.dataset.dirty) return;
+  el.value = (snap.exists() && snap.data().text) ? snap.data().text : 'Prex / Mercado Pago / BROU';
+});
+
+console.log('[GamesUy] admin.js v5 cargado (con editor de medios de pago)');

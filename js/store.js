@@ -1,13 +1,11 @@
 // ============================================================
-// GAMESUY STORE — Catálogo público + Ofertas + Preventas
-// Fase 8.9: Tracking de estadísticas internas
-// Fase 2 SEO: título dinámico por página
-// Fase 3 Perf: cache + countdown optimizado
+// GAMESUY STORE — Catálogo público + Ofertas + Preventas + Destacados
+// Todo autocontenido: no requiere editar index.html ni styles.css
 // ============================================================
 
 import { db, auth } from './firebase-config.js';
 import {
-  collection, onSnapshot, doc, deleteDoc
+  collection, onSnapshot, doc, deleteDoc, updateDoc
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { calcPrecioUSD, formatUYU, formatUSD } from './data-model.js';
@@ -24,6 +22,309 @@ let catState = { search: '', cat: 'all', pagina: 1 };
 let ofState = { search: '', cat: 'all', pagina: 1 };
 let preState = { search: '', cat: 'all', pagina: 1 };
 const POR_PAGINA = 24;
+
+// ============================================================
+// INYECTAR ESTILOS Y CONTENEDOR DE DESTACADOS
+// ============================================================
+function inyectarEstilosDestacados() {
+  if (document.getElementById('destacados-auto-css')) return;
+
+  const style = document.createElement('style');
+  style.id = 'destacados-auto-css';
+  style.textContent = `
+    /* Ocultar el banner viejo */
+    #announcement-banner {
+      display: none !important;
+    }
+
+    /* Bloque principal de Destacados */
+    .featured-section {
+      display: block;
+      width: 100%;
+      max-width: 100%;
+      margin-bottom: 30px;
+      padding: 20px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, #0a0d1a 0%, #131829 55%, #0a0d1a 100%);
+      border: 1px solid rgba(0, 240, 255, 0.4);
+      box-shadow: 0 0 28px rgba(0, 240, 255, 0.14);
+      overflow: hidden;
+    }
+
+    .featured-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .featured-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.05rem;
+      font-weight: 800;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--cyan, #00f0ff);
+      text-shadow: 0 0 12px rgba(0, 240, 255, 0.4);
+      margin: 0;
+    }
+
+    .featured-nav-btns {
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .featured-arrow {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: 1px solid #2a3358;
+      background: #0a0d1a;
+      color: #00f0ff;
+      font-size: 1.35rem;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .featured-arrow:hover {
+      background: #00f0ff;
+      color: #000;
+      border-color: #00f0ff;
+      box-shadow: 0 0 14px rgba(0, 240, 255, 0.55);
+    }
+
+    .featured-track {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: nowrap;
+      gap: 14px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scroll-behavior: smooth;
+      scroll-snap-type: x mandatory;
+      padding: 4px 2px 10px;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .featured-track::-webkit-scrollbar {
+      height: 6px;
+    }
+    .featured-track::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.04);
+      border-radius: 999px;
+    }
+    .featured-track::-webkit-scrollbar-thumb {
+      background: rgba(0, 240, 255, 0.38);
+      border-radius: 999px;
+    }
+    .featured-track::-webkit-scrollbar-thumb:hover {
+      background: #00f0ff;
+    }
+
+    .featured-card {
+      flex: 0 0 165px;
+      width: 165px;
+      min-width: 165px;
+      max-width: 165px;
+      scroll-snap-align: start;
+      display: flex;
+      flex-direction: column;
+      background: #0b0f1c;
+      border: 1px solid #1d2440;
+      border-radius: 12px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+    }
+
+    .featured-card:hover {
+      transform: translateY(-4px);
+      border-color: #00f0ff;
+      box-shadow: 0 10px 24px rgba(0, 240, 255, 0.24);
+    }
+
+    .featured-card-img-wrap {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      background: #070a12;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      padding: 4px;
+    }
+
+    .featured-card-img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+      border-radius: 8px;
+    }
+
+    .featured-card-placeholder {
+      font-size: 2.5rem;
+      opacity: 0.4;
+    }
+
+    .featured-card-price {
+      padding: 10px 6px;
+      text-align: center;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.98rem;
+      font-weight: 800;
+      color: #00ff9d;
+      background: #0a0d1a;
+      border-top: 1px solid #1d2440;
+      text-shadow: 0 0 10px rgba(0, 255, 157, 0.28);
+      white-space: nowrap;
+    }
+
+    .featured-empty-admin {
+      color: #8892b0;
+      font-size: 0.9rem;
+      padding: 12px 4px;
+      margin: 0;
+    }
+
+    /* Botones admin en las cards del catálogo */
+    .card-admin-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 10px;
+      padding-right: 92px;
+      position: relative;
+      z-index: 4;
+    }
+
+    .card-admin-actions .card-admin-btn {
+      position: static !important;
+      padding: 5px 9px;
+      font-family: inherit;
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 0.4px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .card-admin-actions .card-admin-btn:hover {
+      transform: scale(1.05);
+    }
+
+    .card-admin-actions .card-admin-delete {
+      background: linear-gradient(135deg, #b71c1c, #d63031);
+      color: #fff;
+      box-shadow: 0 2px 8px rgba(214, 48, 49, 0.4);
+    }
+
+    .card-admin-actions .card-admin-feature {
+      background: #0a0d1a;
+      color: #eaf2ff;
+      border: 1px solid #2a3358;
+    }
+
+    .card-admin-actions .card-admin-feature:hover {
+      color: #ffb800;
+      border-color: #ffb800;
+    }
+
+    .card-admin-actions .card-admin-feature.is-featured {
+      background: linear-gradient(135deg, #ffb800, #ffdd77);
+      color: #000;
+      border: 1px solid #ffb800;
+      box-shadow: 0 0 14px rgba(255, 184, 0, 0.55);
+    }
+
+    /* Resaltado cuando se hace click en un destacado */
+    .card-enfocada {
+      border-color: #00f0ff !important;
+      box-shadow:
+        0 0 30px rgba(0, 240, 255, 0.55),
+        0 0 60px rgba(0, 240, 255, 0.25),
+        0 18px 50px rgba(0, 0, 0, 0.7) !important;
+      transform: translateY(-4px);
+    }
+
+    @media (max-width: 640px) {
+      .featured-section {
+        padding: 14px 12px;
+        margin-bottom: 20px;
+      }
+      .featured-title {
+        font-size: 0.92rem;
+      }
+      .featured-card {
+        flex: 0 0 135px;
+        width: 135px;
+        min-width: 135px;
+        max-width: 135px;
+      }
+      .featured-card-price {
+        padding: 8px 5px;
+        font-size: 0.85rem;
+      }
+      .card-admin-actions {
+        padding-right: 70px;
+      }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+function asegurarContenedorDestacados() {
+  let section = $('featured-section');
+  if (section) return section;
+
+  const pageCatalogo = $('page-catalogo');
+  if (!pageCatalogo) return null;
+
+  section = document.createElement('div');
+  section.id = 'featured-section';
+  section.className = 'featured-section hidden';
+  section.innerHTML = `
+    <div class="featured-header">
+      <h2 class="featured-title">⚡ Destacados</h2>
+      <div class="featured-nav-btns">
+        <button type="button" class="featured-arrow" id="featured-prev" aria-label="Anterior">‹</button>
+        <button type="button" class="featured-arrow" id="featured-next" aria-label="Siguiente">›</button>
+      </div>
+    </div>
+    <div class="featured-track" id="featured-track"></div>
+  `;
+
+  const banner = $('announcement-banner');
+  if (banner && banner.parentNode === pageCatalogo) {
+    pageCatalogo.insertBefore(section, banner);
+  } else {
+    pageCatalogo.prepend(section);
+  }
+
+  $('featured-prev')?.addEventListener('click', () => {
+    const track = $('featured-track');
+    if (track) track.scrollBy({ left: -360, behavior: 'smooth' });
+  });
+
+  $('featured-next')?.addEventListener('click', () => {
+    const track = $('featured-track');
+    if (track) track.scrollBy({ left: 360, behavior: 'smooth' });
+  });
+
+  return section;
+}
+
+inyectarEstilosDestacados();
+asegurarContenedorDestacados();
 
 // ============================================================
 // PERFORMANCE — Cache de productos en localStorage
@@ -63,12 +364,11 @@ let countdownInterval = null;
 function iniciarCountdowns() {
   detenerCountdowns();
 
-  // Solo arranca si hay al menos un countdown activo en el DOM
   const hay = document.querySelector('.card-countdown[data-end]');
   if (!hay) return;
 
   countdownInterval = setInterval(() => {
-    if (document.hidden) return; // pausa si la pestaña no está visible
+    if (document.hidden) return;
     document.querySelectorAll('.card-countdown[data-end]').forEach(actualizarCountdown);
   }, 1000);
 }
@@ -80,7 +380,6 @@ function detenerCountdowns() {
   }
 }
 
-// Pausar/reanudar countdowns según visibilidad de la pestaña
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     detenerCountdowns();
@@ -288,6 +587,27 @@ function variantesDeCategoria(p, categoria, modoOferta) {
 }
 
 // ============================================================
+// PRECIO NORMAL PARA EL SCROLL DE DESTACADOS
+// ============================================================
+function obtenerPrecioNormalDestacado(p) {
+  const consolas = consolasDisponiblesDe(p, false);
+  if (consolas.length > 0) {
+    const varsPrimera = variantesDeCategoria(p, consolas[0], false);
+    const varNormal = varsPrimera.find(v => Number(v.precioFinalUYU) > 0);
+    if (varNormal) return formatUYU(varNormal.precioFinalUYU);
+  }
+
+  const cualquieraNormal = (p.variants || []).find(v => Number(v.precioFinalUYU) > 0);
+  if (cualquieraNormal) return formatUYU(cualquieraNormal.precioFinalUYU);
+
+  const varOferta = (p.variants || []).find(v => ofertaVigente(v) !== null);
+  if (varOferta) return formatUYU(ofertaVigente(varOferta).precio);
+
+  if (productoEsPreventa(p)) return 'A confirmar';
+  return 'Consultar';
+}
+
+// ============================================================
 // FILTROS
 // ============================================================
 function filtrarProductos() {
@@ -335,10 +655,142 @@ function filtrarPreventas() {
 // RENDER GLOBAL
 // ============================================================
 function renderAll() {
+  renderDestacados();
   renderCatalogo();
   renderOfertas();
   renderPreventas();
 }
+
+// ============================================================
+// RENDER SCROLL DE DESTACADOS (SOLO IMAGEN + PRECIO NORMAL)
+// ============================================================
+function renderDestacados() {
+  const section = asegurarContenedorDestacados();
+  const track = $('featured-track');
+  if (!section || !track) return;
+
+  const destacados = productos
+    .filter(p => p.destacado === true && (productoVisible(p) || productoEsPreventa(p)))
+    .sort((a, b) => String(a.title || '').localeCompare(String(b.title || ''), 'es'));
+
+  if (destacados.length === 0) {
+    if (isAdmin) {
+      section.classList.remove('hidden');
+      track.innerHTML = `<p class="featured-empty-admin">Todavía no hay juegos destacados. Hacé clic en <strong>☆ Destacar</strong> en cualquier juego del catálogo para mostrarlo acá.</p>`;
+    } else {
+      section.classList.add('hidden');
+      track.innerHTML = '';
+    }
+    return;
+  }
+
+  section.classList.remove('hidden');
+
+  track.innerHTML = destacados.map(p => {
+    const precio = obtenerPrecioNormalDestacado(p);
+    const imgHtml = p.coverUrl
+      ? `<img src="${safeUrl(p.coverUrl)}" alt="${escapeHtml(p.title || '')}" class="featured-card-img" loading="lazy" decoding="async">`
+      : `<span class="featured-card-placeholder">🎮</span>`;
+
+    return `
+      <div class="featured-card" onclick="irAJuegoDesdeDestacado('${p.id}')" title="${escapeHtml(p.title || '')}">
+        <div class="featured-card-img-wrap">
+          ${imgHtml}
+        </div>
+        <div class="featured-card-price">${precio}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ============================================================
+// IR AL JUEGO EN EL CATÁLOGO AL HACER CLICK EN DESTACADOS
+// ============================================================
+window.irAJuegoDesdeDestacado = function(cardId) {
+  const prod = productos.find(p => p.id === cardId);
+  if (!prod) return;
+
+  // Limpiar buscador y resetear filtro de categoría a "Todos"
+  const si = $('search-input');
+  if (si) si.value = '';
+  document.querySelectorAll('#cat-nav .cat-btn').forEach(b => b.classList.remove('active'));
+  const btnAll = document.querySelector('#cat-nav .cat-btn[data-cat="all"]');
+  if (btnAll) btnAll.classList.add('active');
+
+  const esPre = productoEsPreventa(prod);
+
+  if (esPre) {
+    preState.search = '';
+    preState.cat = 'all';
+    if (originalSwitchPage) originalSwitchPage('preventas');
+    actualizarSEOPagina('preventas');
+
+    const lista = filtrarPreventas();
+    const index = lista.findIndex(p => p.id === cardId);
+    if (index === -1) return;
+
+    preState.pagina = Math.floor(index / POR_PAGINA) + 1;
+    renderPreventas();
+
+    setTimeout(() => {
+      const card = document.querySelector(`#preventas-grid .product-card[data-card-id="${cardId}"]`);
+      if (!card) return;
+      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      card.classList.add('card-enfocada');
+      setTimeout(() => card.classList.remove('card-enfocada'), 3500);
+    }, 150);
+    return;
+  }
+
+  catState.search = '';
+  catState.cat = 'all';
+  if (originalSwitchPage) originalSwitchPage('catalogo');
+  actualizarSEOPagina('catalogo');
+
+  const filtrados = filtrarProductos();
+  const index = filtrados.findIndex(p => p.id === cardId);
+  if (index === -1) return;
+
+  catState.pagina = Math.floor(index / POR_PAGINA) + 1;
+  renderCatalogo();
+
+  setTimeout(() => {
+    const card = document.querySelector(`#product-grid .product-card[data-card-id="${cardId}"]`);
+    if (!card) return;
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    card.classList.add('card-enfocada');
+    setTimeout(() => card.classList.remove('card-enfocada'), 3500);
+  }, 150);
+};
+
+// ============================================================
+// BOTÓN ADMIN: DESTACAR / QUITAR DESTAQUE
+// ============================================================
+window.toggleDestacado = async function(id) {
+  if (!auth.currentUser) {
+    alert('Debés iniciar sesión como administrador.');
+    return;
+  }
+
+  const prod = productos.find(p => p.id === id);
+  if (!prod) return;
+
+  const nuevoValor = !prod.destacado;
+
+  try {
+    await updateDoc(doc(db, 'products', id), {
+      destacado: nuevoValor,
+      updatedAt: new Date().toISOString()
+    });
+    prod.destacado = nuevoValor;
+    window.__productosCache = productos;
+    guardarCacheProductos(productos);
+    renderAll();
+  } catch (err) {
+    console.error('[GamesUy] Error al destacar juego:', err);
+    alert('❌ Error al destacar: ' + err.message);
+  }
+};
 
 // ============================================================
 // RENDER CATÁLOGO
@@ -568,13 +1020,17 @@ function renderCard(p, prefijo = 'cat') {
   }
 
   const tieneTrailer = p.youtubeUrl || p.gameplayUrl;
+  const esDestacado = p.destacado === true;
 
   const adminBtns = isAdmin
     ? `<div class="card-admin-actions">
          <button class="card-admin-btn card-admin-edit" title="Editar este juego"
                  onclick="abrirEditarDesdeCatalogo('${cardId}')">✏️ Editar</button>
+         <button class="card-admin-btn card-admin-feature ${esDestacado ? 'is-featured' : ''}"
+                 title="${esDestacado ? 'Quitar de destacados' : 'Agregar a destacados'}"
+                 onclick="toggleDestacado('${cardId}')">${esDestacado ? '⭐ Destacado' : '☆ Destacar'}</button>
          <button class="card-admin-btn card-admin-delete" title="Eliminar este juego"
-                 onclick="eliminarDesdeCatalogo('${cardId}')">🗑️ Eliminar</button>
+                 onclick="eliminarDesdeCatalogo('${cardId}')">🗑️</button>
        </div>`
     : '';
 
@@ -721,9 +1177,8 @@ function procesarHashInicial() {
     return;
   }
 
-  if (typeof window.switchPage === 'function') {
-    window.switchPage('catalogo');
-  }
+  if (originalSwitchPage) originalSwitchPage('catalogo');
+  actualizarSEOPagina('catalogo');
 
   const filtrados = filtrarProductos();
   const index = filtrados.findIndex(p => p.id === cardId);
@@ -1156,4 +1611,4 @@ document.getElementById('trailer-modal')?.addEventListener('click', (e) => {
   if (e.target.id === 'trailer-modal') document.getElementById('trailer-modal')?.classList.add('hidden');
 });
 
-console.log('[GamesUy] store.js v18 cargado (con cache + countdown optimizado)');
+console.log('[GamesUy] store.js v20 cargado (Destacados autocontenido)');

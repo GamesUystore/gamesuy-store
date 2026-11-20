@@ -1,6 +1,6 @@
 // ============================================================
 // GAMESUY STORE — Crear juego manual
-// Formulario para agregar productos sin Excel
+// Formulario para agregar productos sin Excel + opción Destacar
 // ============================================================
 
 import { db, auth } from './firebase-config.js';
@@ -20,6 +20,22 @@ let coverB64 = '';         // imagen portada en Base64
 let formIdCounter = 0;
 
 console.log('[GamesUy] manual-create.js iniciando...');
+
+// ============================================================
+// INYECTAR CASILLA "DESTACAR" SIN EDITAR index.html
+// ============================================================
+function asegurarCheckboxDestacado() {
+  if ($('crear-destacado')) return;
+  const visibleInput = $('crear-visible');
+  if (!visibleInput) return;
+  const visibleLabel = visibleInput.closest('label');
+  if (!visibleLabel) return;
+
+  const label = document.createElement('label');
+  label.className = 'check-label';
+  label.innerHTML = `<input type="checkbox" id="crear-destacado"> ⭐ Destacar en el inicio`;
+  visibleLabel.insertAdjacentElement('afterend', label);
+}
 
 // ============================================================
 // COTIZACIONES
@@ -132,7 +148,6 @@ $('crear-categoria')?.addEventListener('change', (e) => {
     actualizarBotones();
     return;
   }
-  // Resetear variantes con las del tipo nuevo
   variantes = getVariantesDefault(cat).map(v => ({
     formId: nextFormId(),
     ...v
@@ -175,7 +190,6 @@ function renderizarVariantes() {
 
 function renderVarianteRow(v) {
   const formId = v.formId;
-  // Valores guardados en el DOM si existen (evita perderlos al re-renderizar)
   const existente = document.querySelector(`.crear-variante-row[data-form-id="${formId}"]`);
   const costoActual = existente ? (existente.querySelector('.crear-var-costo')?.value || '') : '';
   const precioActual = existente ? (existente.querySelector('.crear-var-precio')?.value || '') : '';
@@ -236,7 +250,6 @@ function activarListenersVariantes() {
     });
 
     deleteBtn?.addEventListener('click', () => {
-      // Guardar valores actuales antes de eliminar
       variantes = variantes.filter(v => v.formId !== formId);
       renderizarVariantes();
     });
@@ -316,14 +329,12 @@ document.querySelector('.upload-preview-clear[data-clear="crear"]')?.addEventLis
 $('btn-crear-juego')?.addEventListener('click', async () => {
   const btn = $('btn-crear-juego');
 
-  // Validaciones
   const cat = $('crear-categoria').value;
   const titulo = $('crear-titulo').value.trim();
 
   if (!cat) { alert('Elegí una categoría.'); return; }
   if (!titulo) { alert('Poné un título al producto.'); return; }
 
-  // Leer variantes del DOM
   const rows = document.querySelectorAll('.crear-variante-row');
   if (rows.length === 0) { alert('Agregá al menos una variante.'); return; }
 
@@ -339,7 +350,6 @@ $('btn-crear-juego')?.addEventListener('click', async () => {
       ganancia = calcGananciaPct(precio, costo, cotizaciones.arsAUYU);
     }
 
-    // ID único para esta variante
     const slug = label.toLowerCase()
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
       .replace(/[^a-z0-9]+/g, '_')
@@ -365,6 +375,7 @@ $('btn-crear-juego')?.addEventListener('click', async () => {
   const youtube = $('crear-youtube').value.trim();
   const descripcion = $('crear-descripcion').value.trim();
   const visible = $('crear-visible').checked;
+  const destacado = $('crear-destacado')?.checked || false;
 
   const categorias = categoriasDeJuego(cat);
 
@@ -379,6 +390,7 @@ $('btn-crear-juego')?.addEventListener('click', async () => {
     isPreorder: false,
     releaseDate: '',
     visible: visible,
+    destacado: destacado,
     manual: true,
     variants: variantesFinales,
     createdAt: new Date().toISOString(),
@@ -410,6 +422,7 @@ function resetearFormulario() {
   const youtube = $('crear-youtube'); if (youtube) youtube.value = '';
   const desc = $('crear-descripcion'); if (desc) desc.value = '';
   const visible = $('crear-visible'); if (visible) visible.checked = true;
+  const destacado = $('crear-destacado'); if (destacado) destacado.checked = false;
   const coverUrl = $('crear-cover-url'); if (coverUrl) coverUrl.value = '';
   const coverFile = $('crear-cover-file'); if (coverFile) coverFile.value = '';
   const coverStatus = $('crear-cover-status'); if (coverStatus) coverStatus.textContent = '';
@@ -429,5 +442,6 @@ $('btn-reset-crear')?.addEventListener('click', () => {
 // ============================================================
 // INIT
 // ============================================================
+asegurarCheckboxDestacado();
 actualizarBotones();
-console.log('[GamesUy] manual-create.js cargado');
+console.log('[GamesUy] manual-create.js cargado (con opción Destacar)');

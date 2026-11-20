@@ -212,43 +212,24 @@ body::after {
 .section-title-admin { color: #ff8a8a; }
 .section-title-admin::after { background: linear-gradient(90deg, var(--magenta), transparent); }
 
-/* HERO LAYOUT (Banner + Flash) */
-.hero-layout { display: grid; grid-template-columns: 2.5fr 1fr; gap: 22px; margin-bottom: 34px; }
-@media (max-width: 900px) { .hero-layout { grid-template-columns: 1fr; } }
-
-.hero-layout .announcement-banner {
-  margin-bottom: 0; height: 100%; display: flex; flex-direction: column; justify-content: center;
-}
-
-/* FLASH GAMERS (Destacados) */
+/* DESTACADOS - NUEVA GRILLA A PANTALLA COMPLETA */
 .flash-gamers-box {
   background: linear-gradient(160deg, var(--surface) 0%, var(--surface-2) 100%);
   border: 1px solid var(--cyan); border-radius: var(--r-lg); padding: 20px;
-  display: flex; flex-direction: column; box-shadow: 0 0 20px rgba(0, 240, 255, 0.15);
-  overflow: hidden;
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.15);
+  margin-bottom: 34px;
 }
 .flash-header { margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
-.flash-header h3 { font-family: 'Orbitron', sans-serif; font-size: 1rem; color: var(--cyan); margin: 0; letter-spacing: 1px; }
+.flash-header h3 { font-family: 'Orbitron', sans-serif; font-size: 1.1rem; color: var(--cyan); margin: 0; letter-spacing: 1px; }
 
-/* HORIZONTAL SCROLL TRACK */
+/* LA GRILLA DE 2 FILAS */
 .flash-grid {
-  display: flex;
-  gap: 12px;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  padding-bottom: 8px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--cyan) var(--bg-2);
-  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 16px;
 }
-.flash-grid::-webkit-scrollbar { height: 6px; }
-.flash-grid::-webkit-scrollbar-track { background: var(--bg-2); border-radius: 3px; }
-.flash-grid::-webkit-scrollbar-thumb { background: var(--cyan); border-radius: 3px; }
 
-/* TARJETA INDIVIDUAL CHICA */
 .featured-card {
-  flex: 0 0 140px; /* Tamaño fijo chico */
-  scroll-snap-align: start;
   background: var(--bg-0);
   border: 1px solid var(--border-hi);
   border-radius: var(--r-md);
@@ -268,32 +249,16 @@ body::after {
   border-radius: var(--r-sm); border: 1px solid var(--border);
 }
 .featured-card .fc-title {
-  font-size: 0.72rem; font-weight: 700; color: var(--text);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: 0.75rem; font-weight: 700; color: var(--text);
+  height: 2.2em; overflow: hidden; line-height: 1.1;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
 }
 .featured-card .fc-price {
-  font-family: 'Orbitron', sans-serif; font-size: 0.85rem;
+  font-family: 'Orbitron', sans-serif; font-size: 0.95rem;
   font-weight: 800; color: var(--green); margin-top: auto;
 }
 
-.flash-footer { margin-top: 16px; text-align: center; font-size: 0.8rem; color: var(--text-muted); }
-.flash-footer strong { color: var(--gold); }
-
-/* BANNER */
-.announcement-banner {
-  position: relative; padding: 32px 30px; border-radius: var(--r-lg);
-  background: linear-gradient(135deg, #0a0d1a 0%, #131829 55%, #0a0d1a 100%);
-  border: 1px solid rgba(0, 240, 255, 0.4); overflow: hidden;
-  box-shadow: 0 0 30px rgba(0, 240, 255, 0.15), inset 0 0 40px rgba(139, 92, 246, 0.06);
-}
-.announcement-banner::before { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent, transparent 40px, rgba(0, 240, 255, 0.03) 41px); pointer-events: none; }
-.announcement-glow { position: absolute; top: -60%; right: -10%; width: 300px; height: 300px; border-radius: 50%; background: radial-gradient(circle, rgba(0, 240, 255, 0.25), transparent 70%); filter: blur(40px); pointer-events: none; }
-.announcement-content { position: relative; z-index: 1; }
-.announcement-label { display: inline-block; font-size: 0.72rem; font-weight: 800; letter-spacing: 2px; color: var(--cyan); padding: 4px 12px; margin-bottom: 12px; border-radius: var(--r-pill); background: var(--cyan-soft); border: 1px solid rgba(0, 240, 255, 0.35); }
-.announcement-title { font-family: 'Orbitron', sans-serif; font-size: clamp(1.2rem, 2.8vw, 1.7rem); font-weight: 700; letter-spacing: 1px; margin-bottom: 10px; color: #fff; text-shadow: 0 0 18px rgba(0, 240, 255, 0.35); }
-.announcement-text { color: var(--text-dim); font-size: 1rem; line-height: 1.6; max-width: 720px; }
-
-/* GRID */
+/* GRID CATÁLOGO */
 .grid-section { margin-top: 12px; }
 .grid-header { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
 .results-count { font-size: 0.85rem; color: var(--text-muted); letter-spacing: 0.5px; }
@@ -468,7 +433,8 @@ body::after {
   .header-inner { flex-wrap: wrap; }
   .search-bar { order: 3; max-width: 100%; margin-top: 12px; }
   .product-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
-  .hero-layout { grid-template-columns: 1fr; }
+  .flash-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+  .featured-card img { aspect-ratio: 1; }
   .admin-actions { flex-direction: column; }
   .admin-actions .btn { width: 100%; }
   .catalog-pagination { gap: 6px; margin-top: 24px; }

@@ -1,13 +1,10 @@
 // ============================================================
 // GAMESUY STORE — Catálogo público + Ofertas + Preventas
-// Fase 8.9: Tracking de estadísticas internas
-// Fase 2 SEO: título dinámico por página
-// Fase 3 Perf: cache + countdown optimizado
 // ============================================================
 
 import { db, auth } from './firebase-config.js';
 import {
-  collection, onSnapshot, doc, deleteDoc
+  collection, onSnapshot, doc, deleteDoc, updateDoc
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { calcPrecioUSD, formatUYU, formatUSD } from './data-model.js';
@@ -16,7 +13,8 @@ const $ = (id) => document.getElementById(id);
 
 let productos = [];
 let cotizaciones = { arsAUYU: 0.055, usdAUYU: 39.50 };
-let pagosTexto = 'Prex / Mercado Pago / BROU';
+// ACTUALIZAMOS ESTA LÍNEA CON TUS NUEVOS MÉTODOS
+let pagosTexto = 'Brou / Prex / Red Pagos / Abitab / Mercado Pago / Binance Pay / Global66 / Pix / Mi Dinero / Paypal';
 let isAdmin = false;
 let hashProcesado = false;
 
@@ -25,11 +23,9 @@ let ofState = { search: '', cat: 'all', pagina: 1 };
 let preState = { search: '', cat: 'all', pagina: 1 };
 const POR_PAGINA = 24;
 
-// ============================================================
-// PERFORMANCE — Cache de productos en localStorage
-// ============================================================
+// Cache y Countdowns
 const CACHE_KEY = 'gamesuy_products_cache_v1';
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+const CACHE_TTL = 5 * 60 * 1000; 
 
 function leerCacheProductos() {
   try {
@@ -39,104 +35,44 @@ function leerCacheProductos() {
     if (!Array.isArray(data) || data.length === 0) return null;
     if (Date.now() - timestamp > CACHE_TTL) return null;
     return data;
-  } catch (e) {
-    return null;
-  }
+  } catch (e) { return null; }
 }
 
 function guardarCacheProductos(data) {
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({
-      data,
-      timestamp: Date.now()
-    }));
-  } catch (e) {
-    // localStorage lleno o bloqueado, ignoramos
-  }
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ data, timestamp: Date.now() }));
+  } catch (e) { }
 }
 
-// ============================================================
-// PERFORMANCE — Countdown optimizado
-// ============================================================
 let countdownInterval = null;
-
 function iniciarCountdowns() {
   detenerCountdowns();
-
-  // Solo arranca si hay al menos un countdown activo en el DOM
   const hay = document.querySelector('.card-countdown[data-end]');
   if (!hay) return;
-
   countdownInterval = setInterval(() => {
-    if (document.hidden) return; // pausa si la pestaña no está visible
+    if (document.hidden) return;
     document.querySelectorAll('.card-countdown[data-end]').forEach(actualizarCountdown);
   }, 1000);
 }
-
 function detenerCountdowns() {
-  if (countdownInterval) {
-    clearInterval(countdownInterval);
-    countdownInterval = null;
-  }
+  if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
 }
-
-// Pausar/reanudar countdowns según visibilidad de la pestaña
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) {
-    detenerCountdowns();
-  } else {
-    iniciarCountdowns();
-  }
+  if (document.hidden) detenerCountdowns(); else iniciarCountdowns();
 });
 
-// ============================================================
-// SEO — Títulos dinámicos por página
-// ============================================================
+// SEO
 const SEO_TITULOS = {
-  'catalogo':   'Catálogo de Juegos Digitales',
-  'ofertas':    '🔥 Ofertas Especiales',
-  'preventas':  '🚀 Preventas',
-  'faq':        'Preguntas Frecuentes',
-  'terminos':   'Términos y Condiciones',
-  'resenas':    '⭐ Reseñas de Clientes',
-  'contacto':   'Contacto',
-  'admin':      'Panel de Administración'
+  'catalogo': 'Catálogo de Juegos Digitales', 'ofertas': '🔥 Ofertas Especiales', 'preventas': '🚀 Preventas',
+  'faq': 'Preguntas Frecuentes', 'terminos': 'Términos y Condiciones', 'resenas': '⭐ Reseñas de Clientes',
+  'contacto': 'Contacto', 'admin': 'Panel de Administración'
 };
-
-const SEO_DESCRIPCIONES = {
-  'catalogo':   'Catálogo completo de juegos digitales para PS5, PS4, PS3, Steam, PS Plus y streaming en Uruguay. Entrega inmediata y los mejores precios.',
-  'ofertas':    'Ofertas especiales en juegos digitales y suscripciones. Descuentos por tiempo limitado en GamesUy Store.',
-  'preventas':  'Reservá los próximos lanzamientos antes que nadie. Preventas de juegos digitales en Uruguay.',
-  'faq':        'Preguntas frecuentes sobre cómo comprar juegos digitales en GamesUy Store.',
-  'terminos':   'Términos y condiciones de compra en GamesUy Store.',
-  'resenas':    'Reseñas reales de clientes que compraron juegos digitales en GamesUy Store.',
-  'contacto':   'Contactate con GamesUy Store. Atención personalizada por WhatsApp.'
-};
-
 function actualizarSEOPagina(pageId) {
   const base = 'GamesUy Store';
-  const titulo = SEO_TITULOS[pageId];
-  document.title = titulo ? `${titulo} | ${base}` : `${base} | Tienda Digital Gamer en Uruguay`;
-
-  const desc = SEO_DESCRIPCIONES[pageId];
-  if (desc) {
-    const metaDesc = document.querySelector('meta[name="description"]');
-    if (metaDesc) metaDesc.setAttribute('content', desc);
-
-    const ogTitle = document.querySelector('meta[property="og:title"]');
-    if (ogTitle && titulo) ogTitle.setAttribute('content', `${titulo} | ${base}`);
-
-    const ogDesc = document.querySelector('meta[property="og:description"]');
-    if (ogDesc) ogDesc.setAttribute('content', desc);
-  }
+  document.title = SEO_TITULOS[pageId] ? `${SEO_TITULOS[pageId]} | ${base}` : `${base} | Tienda Digital Gamer`;
 }
 
-// Detectar si el usuario es admin
-onAuthStateChanged(auth, (user) => {
-  isAdmin = !!user;
-  renderAll();
-});
-
+onAuthStateChanged(auth, (user) => { isAdmin = !!user; renderAll(); });
 onSnapshot(doc(db, 'settings', 'cotizaciones'), (snap) => {
   if (!snap.exists()) return;
   const c = snap.data();
@@ -145,55 +81,38 @@ onSnapshot(doc(db, 'settings', 'cotizaciones'), (snap) => {
   renderAll();
 });
 
+// ESCUCHA DE MÉTODOS DE PAGO
 onSnapshot(doc(db, 'settings', 'payments'), (snap) => {
-  pagosTexto = (snap.exists() && snap.data().text) ? snap.data().text : 'Prex / Mercado Pago / BROU';
+  pagosTexto = (snap.exists() && snap.data().text) ? snap.data().text : 'Brou / Prex / Red Pagos / Abitab / Mercado Pago / Binance Pay / Global66 / Pix / Mi Dinero / Paypal';
   renderAll();
 });
 
-// Mostrar cache primero (render instantáneo)
 const productosCache = leerCacheProductos();
 if (productosCache) {
   productos = productosCache;
   window.__productosCache = productos;
-  console.log('[GamesUy] Mostrando cache:', productos.length, 'productos');
   renderAll();
 }
 
-// Después escuchar cambios reales desde Firestore
 onSnapshot(collection(db, 'products'), (snap) => {
   productos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   window.__productosCache = productos;
   guardarCacheProductos(productos);
-  console.log('[GamesUy] Catálogo desde Firestore:', productos.length, 'productos');
   renderAll();
-
-  if (!hashProcesado) {
-    hashProcesado = true;
-    setTimeout(procesarHashInicial, 300);
-  }
-
-  if (typeof window.__estRegistrarVista === 'function') {
-    window.__estRegistrarVista();
-  }
+  if (!hashProcesado) { hashProcesado = true; setTimeout(procesarHashInicial, 300); }
+  if (typeof window.__estRegistrarVista === 'function') window.__estRegistrarVista();
 });
 
-// ============================================================
-// HELPERS
-// ============================================================
+// Helpers de Precios
 function tienePrecioNormal(v) { return Number(v?.precioFinalUYU) > 0; }
 function tieneCostoNormal(v) { return Number(v?.costoARS) > 0; }
-function tieneCostoOferta(v) { return Number(v?.ofertaCostoARS) > 0; }
 
 function ofertaVigente(v) {
   if (!v.enOferta || !v.ofertaHasta) return null;
   const hoy = new Date().toISOString().split('T')[0];
   if (v.ofertaHasta < hoy) return null;
   if (!(Number(v.ofertaPrecioUYU) > 0)) return null;
-  return {
-    precio: Number(v.ofertaPrecioUYU),
-    original: Number(v.precioFinalUYU) || 0,
-    hasta: v.ofertaHasta
-  };
+  return { precio: Number(v.ofertaPrecioUYU), original: Number(v.precioFinalUYU) || 0, hasta: v.ofertaHasta };
 }
 
 function varianteConStock(v) {
@@ -206,16 +125,15 @@ function esPreventaActiva(p) {
   if (p.visible === false) return false;
   if (p.isPreorder !== true) return false;
   if (!p.releaseDate) return true;
+  const releaseDateStr = String(p.releaseDate).split('T')[0];
   const hoy = new Date().toISOString().split('T')[0];
-  return p.releaseDate > hoy;
+  return releaseDateStr > hoy;
 }
 
 function productoVisible(p) {
   if (p.visible === false) return false;
   if (esPreventaActiva(p)) return false;
-  if (p.soloOferta && !p.soloPreventa) {
-    return (p.variants || []).some(v => ofertaVigente(v));
-  }
+  if (p.soloOferta && !p.soloPreventa) return (p.variants || []).some(v => ofertaVigente(v));
   return (p.variants || []).some(varianteConStock);
 }
 
@@ -225,14 +143,8 @@ function productoTieneOferta(p) {
   return (p.variants || []).some(v => ofertaVigente(v));
 }
 
-function productoEsPreventa(p) {
-  return esPreventaActiva(p);
-}
-
 function escapeHtml(str) {
-  return String(str ?? '').replace(/[&<>'"]/g, ch => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
-  }[ch]));
+  return String(str ?? '').replace(/[&<>'"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[ch]));
 }
 
 function safeUrl(url) {
@@ -245,51 +157,26 @@ function formatearFecha(dateStr) {
   return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : dateStr;
 }
 
-// ============================================================
-// CATEGORÍAS DISPONIBLES
-// ============================================================
 function consolasDisponiblesDe(p, modoOferta) {
   const cats = p.categories || [];
-  const esOferta = modoOferta === true;
-
   const conStock = cats.filter(c => {
     return (p.variants || []).some(v => {
       if (v.categoria !== c) return false;
-      if (esOferta) return ofertaVigente(v) !== null;
+      if (modoOferta === true) return ofertaVigente(v) !== null;
       return varianteConStock(v);
     });
   });
-
   if (conStock.length > 0) return conStock;
-
-  return cats.filter(c => {
-    return (p.variants || []).some(v => {
-      if (v.categoria !== c) return false;
-      return Number(v.costoARS) > 0 || v.disponible === false;
-    });
-  });
+  return cats.filter(c => (p.variants || []).some(v => v.categoria === c && (Number(v.costoARS) > 0 || v.disponible === false)));
 }
 
 function variantesDeCategoria(p, categoria, modoOferta) {
-  const esOferta = modoOferta === true;
-
-  const todas = (p.variants || []).filter(v => {
-    if (v.categoria !== categoria) return false;
-    return Number(v.costoARS) > 0 || Number(v.ofertaCostoARS) > 0 || v.disponible === false;
-  });
-
-  const conStock = todas.filter(v => {
-    if (esOferta) return ofertaVigente(v) !== null;
-    return varianteConStock(v);
-  });
-
-  if (conStock.length > 0) return conStock;
-  return todas;
+  const todas = (p.variants || []).filter(v => v.categoria === categoria && (Number(v.costoARS) > 0 || Number(v.ofertaCostoARS) > 0 || v.disponible === false));
+  const conStock = todas.filter(v => modoOferta ? ofertaVigente(v) !== null : varianteConStock(v));
+  return conStock.length > 0 ? conStock : todas;
 }
 
-// ============================================================
-// FILTROS
-// ============================================================
+// Filtros
 function filtrarProductos() {
   let lista = productos.filter(productoVisible);
   if (catState.cat !== 'all') lista = lista.filter(p => (p.categories || []).includes(catState.cat));
@@ -308,40 +195,155 @@ function filtrarOfertas() {
     const q = ofState.search.toLowerCase().trim();
     lista = lista.filter(p => String(p.title || '').toLowerCase().includes(q));
   }
-  lista.sort((a, b) => {
-    const fa = (a.variants || []).map(v => v.ofertaHasta).filter(Boolean).sort()[0] || '9999';
-    const fb = (b.variants || []).map(v => v.ofertaHasta).filter(Boolean).sort()[0] || '9999';
-    return fa.localeCompare(fb);
-  });
   return lista;
 }
 
 function filtrarPreventas() {
-  let lista = productos.filter(productoEsPreventa);
+  let lista = productos.filter(esPreventaActiva);
   if (preState.cat !== 'all') lista = lista.filter(p => (p.categories || []).includes(preState.cat));
   if (preState.search) {
     const q = preState.search.toLowerCase().trim();
     lista = lista.filter(p => String(p.title || '').toLowerCase().includes(q));
   }
-  lista.sort((a, b) => {
-    const fa = a.releaseDate || '9999';
-    const fb = b.releaseDate || '9999';
-    return fa.localeCompare(fb);
-  });
   return lista;
 }
 
-// ============================================================
-// RENDER GLOBAL
-// ============================================================
+// Render Global
 function renderAll() {
+  renderDestacados();
   renderCatalogo();
   renderOfertas();
   renderPreventas();
 }
 
 // ============================================================
-// RENDER CATÁLOGO
+// RENDER DESTACADOS (Sincroniza precio y variante)
+// ============================================================
+function renderDestacados() {
+  const track = document.getElementById('flash-gamers-grid');
+  if (!track) return;
+
+  const destacados = productos.filter(p => p.destacado === true && p.visible !== false);
+
+  if (destacados.length === 0) {
+    track.innerHTML = '<p style="color:var(--text-muted); text-align:center; width:100%; padding: 20px;">No hay juegos destacados. Marcá algunos con la ⭐ en el catálogo.</p>';
+    return;
+  }
+
+  track.innerHTML = destacados.map(p => {
+    const imgHtml = p.coverUrl 
+      ? `<img src="${safeUrl(p.coverUrl)}" alt="${escapeHtml(p.title)}">` 
+      : `<div style="height:100%; display:flex; align-items:center; justify-content:center; font-size:3rem; background:var(--bg-0); border-radius:8px;">🎮</div>`;
+    
+    let displayPrice = 0;
+    let selectedVariantId = '';
+    
+    const primaryVariant = (p.variants || []).find(v => 
+      v.tipo === 'primaria' && (Number(v.ofertaPrecioUYU) > 0 || Number(v.precioFinalUYU) > 0)
+    );
+    
+    if (primaryVariant) {
+      displayPrice = Number(primaryVariant.ofertaPrecioUYU) > 0 ? Number(primaryVariant.ofertaPrecioUYU) : Number(primaryVariant.precioFinalUYU);
+      selectedVariantId = primaryVariant.id;
+    } else {
+      const anyVariant = (p.variants || []).find(v => 
+        (Number(v.ofertaPrecioUYU) > 0 || Number(v.precioFinalUYU) > 0)
+      );
+      if (anyVariant) {
+        displayPrice = Number(anyVariant.ofertaPrecioUYU) > 0 ? Number(anyVariant.ofertaPrecioUYU) : Number(anyVariant.precioFinalUYU);
+        selectedVariantId = anyVariant.id;
+      }
+    }
+
+    const priceHtml = displayPrice > 0 
+      ? `<div class="fc-price">${formatUYU(displayPrice)}</div>` 
+      : `<div class="fc-price" style="font-size:0.8rem; color:var(--text-muted);">Ver opciones</div>`;
+      
+    const titleCorto = String(p.title).substring(0, 25);
+
+    return `
+      <div class="featured-card" onclick="irAlJuegoDesdeDestacado('${p.id}', '${selectedVariantId}')">
+        ${imgHtml}
+        <div class="fc-title">${escapeHtml(titleCorto)}</div>
+        ${priceHtml}
+      </div>
+    `;
+  }).join('');
+
+  const btnPrev = document.getElementById('btn-prev-featured');
+  const btnNext = document.getElementById('btn-next-featured');
+  const wrapper = document.querySelector('.carousel-wrapper');
+
+  if (btnPrev && btnNext && wrapper) {
+    btnPrev.onclick = () => wrapper.scrollBy({ left: -280, behavior: 'smooth' });
+    btnNext.onclick = () => wrapper.scrollBy({ left: 280, behavior: 'smooth' });
+  }
+}
+
+window.irAlJuegoDesdeDestacado = function(id, variantId) {
+  if (typeof window.switchPage === 'function') window.switchPage('catalogo');
+  
+  catState.cat = 'all';
+  catState.search = '';
+  catState.pagina = 1;
+  const searchInput = document.getElementById('search-input');
+  if (searchInput) searchInput.value = '';
+  document.querySelectorAll('#cat-nav .cat-btn').forEach(b => b.classList.remove('active'));
+  const btnAll = document.querySelector('#cat-nav .cat-btn[data-cat="all"]');
+  if (btnAll) btnAll.classList.add('active');
+
+  const filtrados = filtrarProductos();
+  const index = filtrados.findIndex(p => p.id === id);
+  if (index === -1) return;
+
+  catState.pagina = Math.floor(index / POR_PAGINA) + 1;
+  renderCatalogo();
+
+  setTimeout(() => {
+    const card = document.querySelector(`.product-card[data-card-id="${id}"]`);
+    if (!card) return;
+
+    if (variantId) {
+      const prod = productos.find(p => p.id === id);
+      const variant = (prod.variants || []).find(v => v.id === variantId);
+      if (variant) {
+        const selConsole = document.getElementById(`sel-console-cat-${id}`);
+        const selVariant = document.getElementById(`sel-variant-cat-${id}`);
+        
+        if (selConsole && selVariant) {
+          if (selConsole.tagName === 'SELECT') {
+            selConsole.value = variant.categoria;
+            selConsole.dispatchEvent(new Event('change')); 
+          }
+          selVariant.value = variantId;
+          selVariant.dispatchEvent(new Event('change')); 
+        }
+      }
+    }
+
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    card.classList.add('card-destacada');
+    setTimeout(() => card.classList.remove('card-destacada'), 4000);
+  }, 400);
+};
+
+function procesarHashInicial() {
+  const hash = window.location.hash;
+  if (!hash || !hash.startsWith('#producto=')) return;
+  
+  const parts = hash.replace('#producto=', '').split('&');
+  const cardId = parts[0];
+  let variantId = null;
+  parts.forEach(p => { if (p.startsWith('variant=')) variantId = p.split('=')[1]; });
+
+  if (typeof window.irAlJuegoDesdeDestacado === 'function') {
+    window.irAlJuegoDesdeDestacado(cardId, variantId);
+  }
+}
+window.addEventListener('hashchange', () => procesarHashInicial());
+
+// ============================================================
+// RESTO DE RENDERS (Catálogo, Ofertas, Preventas)
 // ============================================================
 function renderCatalogo() {
   const grid = $('product-grid');
@@ -354,18 +356,11 @@ function renderCatalogo() {
   const inicio = (catState.pagina - 1) * POR_PAGINA;
   const enPagina = filtrados.slice(inicio, inicio + POR_PAGINA);
 
-  if (count) count.textContent = filtrados.length === 0
-    ? 'Sin productos'
-    : `${filtrados.length} producto${filtrados.length !== 1 ? 's' : ''}`;
+  if (count) count.textContent = filtrados.length === 0 ? 'Sin productos' : `${filtrados.length} productos`;
 
   if (enPagina.length === 0) {
-    grid.innerHTML = `
-      <div class="catalog-empty">
-        <span class="catalog-empty-icon">🎮</span>
-        <p>No hay juegos con precio cargado por ahora.</p>
-        <p class="catalog-empty-sub">Volvé pronto — estamos actualizando el catálogo.</p>
-      </div>`;
-    renderPaginacion('catalog-pagination', 0, 0, (p) => { catState.pagina = p; renderCatalogo(); });
+    grid.innerHTML = `<div class="catalog-empty"><p>No hay juegos con precio cargado por ahora.</p></div>`;
+    renderPaginacion('catalog-pagination', 0, 0, () => {});
     return;
   }
 
@@ -375,78 +370,41 @@ function renderCatalogo() {
   iniciarCountdowns();
 }
 
-// ============================================================
-// RENDER OFERTAS
-// ============================================================
 function renderOfertas() {
   const grid = $('ofertas-grid');
-  const count = $('ofertas-count');
   if (!grid) return;
-
   const filtrados = filtrarOfertas();
   const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA));
   if (ofState.pagina > totalPaginas) ofState.pagina = totalPaginas;
-  const inicio = (ofState.pagina - 1) * POR_PAGINA;
-  const enPagina = filtrados.slice(inicio, inicio + POR_PAGINA);
+  const enPagina = filtrados.slice((ofState.pagina - 1) * POR_PAGINA, (ofState.pagina - 1) * POR_PAGINA + POR_PAGINA);
+  
+  const count = $('ofertas-count');
+  if (count) count.textContent = `${filtrados.length} ofertas`;
 
-  if (count) count.textContent = filtrados.length === 0
-    ? 'Sin ofertas activas'
-    : `${filtrados.length} oferta${filtrados.length !== 1 ? 's' : ''} disponible${filtrados.length !== 1 ? 's' : ''}`;
-
-  if (enPagina.length === 0) {
-    grid.innerHTML = `
-      <div class="catalog-empty">
-        <span class="catalog-empty-icon">🔥</span>
-        <p>No hay ofertas activas en este momento.</p>
-        <p class="catalog-empty-sub">Volvé pronto — renovamos las ofertas cada 15 días.</p>
-      </div>`;
-    renderPaginacion('ofertas-pagination', 0, 0, (p) => { ofState.pagina = p; renderOfertas(); });
-    return;
-  }
-
+  if (enPagina.length === 0) { grid.innerHTML = `<p class="empty-message">No hay ofertas activas.</p>`; return; }
   grid.innerHTML = enPagina.map(p => renderCard(p, 'oferta')).join('');
   activarCards(enPagina, 'oferta');
   renderPaginacion('ofertas-pagination', ofState.pagina, totalPaginas, (p) => { ofState.pagina = p; renderOfertas(); });
   iniciarCountdowns();
 }
 
-// ============================================================
-// RENDER PREVENTAS
-// ============================================================
 function renderPreventas() {
   const grid = $('preventas-grid');
-  const count = $('preventas-count');
   if (!grid) return;
-
   const filtrados = filtrarPreventas();
   const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA));
   if (preState.pagina > totalPaginas) preState.pagina = totalPaginas;
-  const inicio = (preState.pagina - 1) * POR_PAGINA;
-  const enPagina = filtrados.slice(inicio, inicio + POR_PAGINA);
+  const enPagina = filtrados.slice((preState.pagina - 1) * POR_PAGINA, (preState.pagina - 1) * POR_PAGINA + POR_PAGINA);
+  
+  const count = $('preventas-count');
+  if (count) count.textContent = `${filtrados.length} preventas`;
 
-  if (count) count.textContent = filtrados.length === 0
-    ? 'Sin preventas disponibles'
-    : `${filtrados.length} preventa${filtrados.length !== 1 ? 's' : ''} disponible${filtrados.length !== 1 ? 's' : ''}`;
-
-  if (enPagina.length === 0) {
-    grid.innerHTML = `
-      <div class="catalog-empty">
-        <span class="catalog-empty-icon">🚀</span>
-        <p>No hay preventas publicadas en este momento.</p>
-        <p class="catalog-empty-sub">Volvé pronto — actualizamos las preventas cada mes.</p>
-      </div>`;
-    renderPaginacion('preventas-pagination', 0, 0, (p) => { preState.pagina = p; renderPreventas(); });
-    return;
-  }
-
+  if (enPagina.length === 0) { grid.innerHTML = `<p class="empty-message">No hay preventas publicadas.</p>`; return; }
   grid.innerHTML = enPagina.map(p => renderCard(p, 'preventa')).join('');
   activarCards(enPagina, 'preventa');
   renderPaginacion('preventas-pagination', preState.pagina, totalPaginas, (p) => { preState.pagina = p; renderPreventas(); });
 }
 
-// ============================================================
-// ACTIVAR CARDS
-// ============================================================
 function activarCards(lista, prefijo) {
   lista.forEach(p => {
     const cardId = p.id;
@@ -463,73 +421,37 @@ function activarCards(lista, prefijo) {
     if (waBtn && !waBtn.dataset.tracked) {
       waBtn.dataset.tracked = '1';
       waBtn.addEventListener('click', () => {
-        if (typeof window.__estRegistrarWhatsApp === 'function') {
-          window.__estRegistrarWhatsApp(p.id, p.title || '');
-        }
+        if (typeof window.__estRegistrarWhatsApp === 'function') window.__estRegistrarWhatsApp(p.id, p.title || '');
       });
     }
   });
 }
 
-// ============================================================
-// PAGINACIÓN MEJORADA
-// ============================================================
 function renderPaginacion(contId, actual, total, onPage) {
   const cont = document.getElementById(contId);
   if (!cont) return;
-
-  if (total <= 1) {
-    cont.innerHTML = '';
-    return;
-  }
-
-  const paginas = new Set();
-  paginas.add(1);
-  if (total >= 2) paginas.add(2);
-  paginas.add(actual - 1);
-  paginas.add(actual);
-  paginas.add(actual + 1);
-  if (total >= 3) paginas.add(total - 1);
-  paginas.add(total);
-
-  const listaNumeros = Array.from(paginas)
-    .filter(n => n >= 1 && n <= total)
-    .sort((a, b) => a - b);
-
-  let html = '';
-
-  html += `<button class="pag-btn pag-nav" data-pag="1" ${actual <= 1 ? 'disabled' : ''} title="Primera página">«</button>`;
-  html += `<button class="pag-btn pag-nav" data-pag="${actual - 1}" ${actual <= 1 ? 'disabled' : ''} title="Anterior">←</button>`;
-
+  if (total <= 1) { cont.innerHTML = ''; return; }
+  const paginas = new Set([1, total, actual - 1, actual, actual + 1].filter(n => n >= 1 && n <= total));
+  const lista = Array.from(paginas).sort((a, b) => a - b);
+  
+  let html = `<button class="pag-btn pag-nav" data-pag="${actual - 1}" ${actual <= 1 ? 'disabled' : ''}>«</button>`;
   let previo = 0;
-  listaNumeros.forEach(p => {
-    if (previo && p - previo > 1) {
-      html += `<span class="pag-ellipsis">…</span>`;
-    }
-    const activa = p === actual ? 'pag-active' : '';
-    html += `<button class="pag-btn pag-num ${activa}" data-pag="${p}">${p}</button>`;
+  lista.forEach(p => {
+    if (previo && p - previo > 1) html += `<span class="pag-ellipsis">…</span>`;
+    html += `<button class="pag-btn pag-num ${p === actual ? 'pag-active' : ''}" data-pag="${p}">${p}</button>`;
     previo = p;
   });
-
-  html += `<button class="pag-btn pag-nav" data-pag="${actual + 1}" ${actual >= total ? 'disabled' : ''} title="Siguiente">→</button>`;
-  html += `<button class="pag-btn pag-nav" data-pag="${total}" ${actual >= total ? 'disabled' : ''} title="Última página">»</button>`;
-
+  html += `<button class="pag-btn pag-nav" data-pag="${actual + 1}" ${actual >= total ? 'disabled' : ''}>»</button>`;
+  
   cont.innerHTML = html;
-
   cont.querySelectorAll('.pag-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const p = parseInt(btn.dataset.pag, 10);
-      if (!isNaN(p) && p >= 1 && p <= total && p !== actual) {
-        onPage(p);
-        window.scrollTo({ top: 200, behavior: 'smooth' });
-      }
+      if (!isNaN(p) && p >= 1 && p <= total && p !== actual) { onPage(p); window.scrollTo({ top: 200, behavior: 'smooth' }); }
     });
   });
 }
 
-// ============================================================
-// CARD
-// ============================================================
 function renderCard(p, prefijo = 'cat') {
   const cardId = p.id;
   const cats = p.categories || [];
@@ -540,13 +462,8 @@ function renderCard(p, prefijo = 'cat') {
     ? `<div class="card-image"><img src="${safeUrl(p.coverUrl)}" alt="${escapeHtml(p.title || '')}" class="card-image-img" loading="lazy" decoding="async"></div>`
     : `<div class="card-image card-image-empty"><span class="card-image-placeholder">🎮</span></div>`;
 
-  const esPreventa = prefijo === 'preventa';
-  const preorderBadge = esPreventa
-    ? `<div class="card-preorder-badge">🚀 PREVENTA${p.releaseDate ? ` · Estreno: ${formatearFecha(p.releaseDate)}` : ''}</div>`
-    : '';
-
-  const esModoOferta = prefijo === 'oferta';
-  const consolas = consolasDisponiblesDe(p, esModoOferta);
+  const preorderBadge = prefijo === 'preventa' ? `<div class="card-preorder-badge">🚀 PREVENTA${p.releaseDate ? ` · Estreno: ${formatearFecha(p.releaseDate)}` : ''}</div>` : '';
+  const consolas = consolasDisponiblesDe(p, prefijo === 'oferta');
   const tieneSelectores = consolas.length > 0;
 
   let selectoresHtml = '';
@@ -554,29 +471,22 @@ function renderCard(p, prefijo = 'cat') {
     const selectConsolaHtml = consolas.length > 1
       ? `<select id="sel-console-${prefijo}-${cardId}" class="card-select">${consolas.map(c => `<option value="${c}">${c.toUpperCase()}</option>`).join('')}</select>`
       : `<input type="hidden" id="sel-console-${prefijo}-${cardId}" value="${consolas[0]}">`;
-
     selectoresHtml = `
       <div class="card-variant-selectors">
         ${selectConsolaHtml}
         <select id="sel-variant-${prefijo}-${cardId}" class="card-select"></select>
-        <select id="sel-currency-${prefijo}-${cardId}" class="card-select">
-          <option value="UYU">$ UYU</option>
-          <option value="USD">US$ USD</option>
-        </select>
-      </div>
-    `;
+        <select id="sel-currency-${prefijo}-${cardId}" class="card-select"><option value="UYU">$ UYU</option><option value="USD">US$</option></select>
+      </div>`;
   }
 
-  const tieneTrailer = p.youtubeUrl || p.gameplayUrl;
-
-  const adminBtns = isAdmin
-    ? `<div class="card-admin-actions">
-         <button class="card-admin-btn card-admin-edit" title="Editar este juego"
-                 onclick="abrirEditarDesdeCatalogo('${cardId}')">✏️ Editar</button>
-         <button class="card-admin-btn card-admin-delete" title="Eliminar este juego"
-                 onclick="eliminarDesdeCatalogo('${cardId}')">🗑️ Eliminar</button>
-       </div>`
-    : '';
+  const btnDestacarLabel = p.destacado ? '🌟 Destacado' : '⭐ Destacar';
+  const btnDestacarClase = p.destacado ? 'card-admin-destacar activo' : 'card-admin-destacar';
+  const adminBtns = isAdmin ? `
+    <div class="card-admin-actions">
+      <button class="card-admin-btn card-admin-edit" onclick="abrirEditarDesdeCatalogo('${cardId}')">✏️ Editar</button>
+      <button class="card-admin-btn ${btnDestacarClase}" onclick="toggleDestacadoCatalogo('${cardId}', ${!!p.destacado})">${btnDestacarLabel}</button>
+      <button class="card-admin-btn card-admin-delete" onclick="eliminarDesdeCatalogo('${cardId}')">🗑️</button>
+    </div>` : '';
 
   return `
     <article class="product-card" data-card-id="${cardId}">
@@ -592,246 +502,68 @@ function renderCard(p, prefijo = 'cat') {
       <div class="card-payments">💳 ${escapeHtml(pagosTexto)}</div>
       <div class="card-countdown" id="countdown-${prefijo}-${cardId}"></div>
       <a class="btn btn-buy" id="wa-${prefijo}-${cardId}" href="#" target="_blank" rel="noopener">💬 Comprar por WhatsApp</a>
-      ${tieneTrailer ? `<button class="btn btn-secondary" onclick="abrirTrailer('${cardId}')">🎬 Ver Trailer</button>` : ''}
+      ${(p.youtubeUrl || p.gameplayUrl) ? `<button class="btn btn-secondary" onclick="abrirTrailer('${cardId}')">🎬 Ver Trailer</button>` : ''}
       <div class="card-share-btns">
-        <button class="btn btn-share" onclick="compartirWhatsapp('${cardId}', '${prefijo}')" title="Compartir por WhatsApp">📱 WhatsApp</button>
-        <button class="btn btn-share" data-share-copy="${cardId}" onclick="copiarLinkJuego('${cardId}')" title="Copiar link del juego">🔗 Copiar link</button>
+        <button class="btn btn-share" onclick="compartirWhatsapp('${cardId}', '${prefijo}')">📱 WhatsApp</button>
+        <button class="btn btn-share" data-share-copy="${cardId}" onclick="copiarLinkJuego('${cardId}')">🔗 Link</button>
       </div>
-      <button class="btn btn-reporte" onclick="abrirModalReporte('${cardId}')">⚠️ Reportar problema</button>
+      <button class="btn btn-reporte" onclick="abrirModalReporte('${cardId}')">⚠️ Reportar</button>
     </article>
   `;
 }
 
-// ============================================================
-// COMPARTIR POR WHATSAPP
-// ============================================================
+// Acciones
+window.toggleDestacadoCatalogo = async function(id, currentState) {
+  if (!auth.currentUser) return;
+  try {
+    await updateDoc(doc(db, 'products', id), { destacado: !currentState });
+    const prod = productos.find(p => p.id === id);
+    if (prod) prod.destacado = !currentState;
+    guardarCacheProductos(productos);
+    renderAll();
+  } catch (err) { alert('❌ Error: ' + err.message); }
+};
+
 window.compartirWhatsapp = function(cardId, prefijo = 'cat') {
   const prod = productos.find(p => p.id === cardId);
   if (!prod) return;
-
-  const selConsole = document.getElementById(`sel-console-${prefijo}-${cardId}`);
-  const selVariant = document.getElementById(`sel-variant-${prefijo}-${cardId}`);
-  const selCurrency = document.getElementById(`sel-currency-${prefijo}-${cardId}`);
-
-  let precioTexto = '';
-  let varianteLabel = '';
-  let categoriaLabel = '';
-
-  if (selConsole && selVariant && selCurrency) {
-    const variante = (prod.variants || []).find(v => v.id === selVariant.value);
-    if (variante) {
-      const oferta = ofertaVigente(variante);
-      const tieneNormal = Number(variante.costoARS) > 0 && Number(variante.precioFinalUYU) > 0;
-      const moneda = selCurrency.value;
-
-      varianteLabel = variante.label || '';
-      categoriaLabel = (selConsole.value || '').toUpperCase();
-
-      if (oferta && tieneNormal) {
-        const precioMostrar = moneda === 'USD'
-          ? formatUSD(calcPrecioUSD(oferta.precio, cotizaciones.usdAUYU))
-          : formatUYU(oferta.precio);
-        const precioOriginal = moneda === 'USD'
-          ? formatUSD(calcPrecioUSD(oferta.original, cotizaciones.usdAUYU))
-          : formatUYU(oferta.original);
-        precioTexto = `🔥 *${precioMostrar}* (antes ${precioOriginal})`;
-      } else if (oferta && !tieneNormal) {
-        const precioMostrar = moneda === 'USD'
-          ? formatUSD(calcPrecioUSD(oferta.precio, cotizaciones.usdAUYU))
-          : formatUYU(oferta.precio);
-        precioTexto = `🔥 ${precioMostrar}`;
-      } else if (tieneNormal) {
-        const precioMostrar = moneda === 'USD'
-          ? formatUSD(calcPrecioUSD(variante.precioFinalUYU, cotizaciones.usdAUYU))
-          : formatUYU(variante.precioFinalUYU);
-        precioTexto = precioMostrar;
-      }
-    }
-  }
-
   const url = `${window.location.origin}${window.location.pathname}#producto=${cardId}`;
-
-  let mensaje = `¡Mirá este juego en GamesUy Store!\n\n`;
-  mensaje += `🎮 *${prod.title}*`;
-  if (categoriaLabel) mensaje += `\n📦 ${categoriaLabel}`;
-  if (varianteLabel) mensaje += ` · ${varianteLabel}`;
-  if (precioTexto) mensaje += `\n💰 ${precioTexto}`;
-  mensaje += `\n\n${url}`;
-
-  const wa = `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
-  window.open(wa, '_blank', 'noopener');
+  const msg = `¡Mirá este juego en GamesUy Store!\n\n🎮 *${prod.title}*\n\n${url}`;
+  window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank', 'noopener');
 };
 
-// ============================================================
-// COPIAR LINK DEL JUEGO
-// ============================================================
 window.copiarLinkJuego = async function(cardId) {
   const url = `${window.location.origin}${window.location.pathname}#producto=${cardId}`;
-
-  const btn = document.querySelector(`[data-share-copy="${cardId}"]`);
-  const originalHtml = btn ? btn.innerHTML : '';
-
   try {
     await navigator.clipboard.writeText(url);
-    if (btn) {
-      btn.innerHTML = '✅ ¡Copiado!';
-      btn.classList.add('btn-copiado');
-      setTimeout(() => {
-        btn.innerHTML = originalHtml;
-        btn.classList.remove('btn-copiado');
-      }, 2000);
-    }
-  } catch (err) {
-    const input = document.createElement('input');
-    input.value = url;
-    document.body.appendChild(input);
-    input.select();
-    try {
-      document.execCommand('copy');
-      if (btn) {
-        btn.innerHTML = '✅ ¡Copiado!';
-        btn.classList.add('btn-copiado');
-        setTimeout(() => {
-          btn.innerHTML = originalHtml;
-          btn.classList.remove('btn-copiado');
-        }, 2000);
-      }
-    } catch (e) {
-      prompt('Copiá este link:', url);
-    }
-    document.body.removeChild(input);
-  }
+    alert('✅ Link copiado al portapapeles');
+  } catch (err) { prompt('Copiá este link:', url); }
 };
 
-// ============================================================
-// PROCESAR HASH DE URL (link compartido)
-// ============================================================
-function procesarHashInicial() {
-  const hash = window.location.hash;
-  if (!hash || !hash.startsWith('#producto=')) return;
-
-  const cardId = hash.replace('#producto=', '').split('&')[0];
-  if (!cardId) return;
-
-  console.log('[GamesUy] Procesando link compartido para:', cardId);
-
-  const prod = productos.find(p => p.id === cardId);
-  if (!prod) {
-    console.log('[GamesUy] Producto no encontrado en el catálogo:', cardId);
-    return;
-  }
-
-  if (typeof window.switchPage === 'function') {
-    window.switchPage('catalogo');
-  }
-
-  const filtrados = filtrarProductos();
-  const index = filtrados.findIndex(p => p.id === cardId);
-
-  if (index === -1) {
-    console.log('[GamesUy] Producto no está en la lista filtrada');
-    return;
-  }
-
-  const pag = Math.floor(index / POR_PAGINA) + 1;
-  catState.pagina = pag;
-  renderCatalogo();
-
-  setTimeout(() => {
-    const card = document.querySelector(`.product-card[data-card-id="${cardId}"]`);
-    if (!card) return;
-
-    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    card.classList.add('card-destacada');
-
-    setTimeout(() => {
-      card.classList.remove('card-destacada');
-    }, 4000);
-  }, 400);
-}
-
-window.addEventListener('hashchange', () => {
-  procesarHashInicial();
-});
-
-// ============================================================
-// ABRIR EDITAR DESDE EL CATÁLOGO
-// ============================================================
 window.abrirEditarDesdeCatalogo = function(id) {
-  if (typeof window.abrirEditarProducto === 'function') {
-    window.abrirEditarProducto(id);
-  } else {
-    alert('No se pudo abrir el editor. Recargá la página e intentá de nuevo.');
-  }
+  if (typeof window.abrirEditarProducto === 'function') window.abrirEditarProducto(id);
 };
-
-// ============================================================
-// ELIMINAR DESDE EL CATÁLOGO
-// ============================================================
 window.eliminarDesdeCatalogo = async function(id) {
-  if (!auth.currentUser) {
-    alert('Debés iniciar sesión como administrador.');
-    return;
-  }
-
-  const prod = productos.find(p => p.id === id);
-  const titulo = prod ? (prod.title || '(sin título)') : 'este juego';
-
-  const primera = confirm(
-    `⚠️ ¿ELIMINAR ESTE JUEGO?\n\n` +
-    `"${titulo}"\n\n` +
-    `Esta acción NO se puede deshacer.`
-  );
-  if (!primera) return;
-
-  const segunda = confirm(
-    `⚠️ CONFIRMACIÓN FINAL\n\n` +
-    `Se van a borrar TODAS las variantes de este juego.\n\n` +
-    `¿Estás completamente seguro?`
-  );
-  if (!segunda) return;
-
+  if (!auth.currentUser) return alert('Iniciá sesión.');
+  if (!confirm('¿Eliminar juego?')) return;
   try {
     await deleteDoc(doc(db, 'products', id));
     productos = productos.filter(p => p.id !== id);
-    window.__productosCache = productos;
     guardarCacheProductos(productos);
-    console.log('[GamesUy] Juego eliminado:', titulo);
-    alert(`✅ Juego eliminado:\n\n${titulo}`);
     renderAll();
-  } catch (err) {
-    console.error('[GamesUy] Error al eliminar:', err);
-    alert('❌ Error: ' + err.message);
-  }
+  } catch (err) { alert('Error: ' + err.message); }
 };
 
-// ============================================================
-// SELECTOR DE VARIANTE
-// ============================================================
 function actualizarSelectorVariante(p, cardId, prefijo) {
   const selConsole = document.getElementById(`sel-console-${prefijo}-${cardId}`);
   const selVariant = document.getElementById(`sel-variant-${prefijo}-${cardId}`);
   if (!selConsole || !selVariant || selVariant.tagName === 'INPUT') return;
-
-  const catActual = selConsole.value;
-  const esModoOferta = prefijo === 'oferta';
-  const variantes = variantesDeCategoria(p, catActual, esModoOferta);
-
+  const variantes = variantesDeCategoria(p, selConsole.value, prefijo === 'oferta');
   const valorActual = selVariant.value;
-
-  if (variantes.length === 0) {
-    selVariant.innerHTML = '<option value="">—</option>';
-    return;
-  }
-
-  selVariant.innerHTML = variantes.map(v =>
-    `<option value="${v.id}" ${v.id === valorActual ? 'selected' : ''}>${escapeHtml(v.label)}</option>`
-  ).join('');
+  if (variantes.length === 0) { selVariant.innerHTML = '<option value="">—</option>'; return; }
+  selVariant.innerHTML = variantes.map(v => `<option value="${v.id}" ${v.id === valorActual ? 'selected' : ''}>${escapeHtml(v.label)}</option>`).join('');
 }
 
-// ============================================================
-// PRECIO
-// ============================================================
 function actualizarPrecio(p, cardId, prefijo) {
   const priceWrap = document.getElementById(`price-wrap-${prefijo}-${cardId}`);
   const stockWrap = document.getElementById(`stock-wrap-${prefijo}-${cardId}`);
@@ -840,177 +572,56 @@ function actualizarPrecio(p, cardId, prefijo) {
   const waBtn = document.getElementById(`wa-${prefijo}-${cardId}`);
   if (!priceWrap) return;
 
-  const selConsole = document.getElementById(`sel-console-${prefijo}-${cardId}`);
-  const selVariant = document.getElementById(`sel-variant-${prefijo}-${cardId}`);
-  const selCurrency = document.getElementById(`sel-currency-${prefijo}-${cardId}`);
-  if (!selConsole || !selVariant || !selCurrency) return;
-
-  const cat = selConsole.value;
-  const variantId = selVariant.value;
-  const moneda = selCurrency.value;
-
+  const cat = document.getElementById(`sel-console-${prefijo}-${cardId}`).value;
+  const variantId = document.getElementById(`sel-variant-${prefijo}-${cardId}`).value;
+  const moneda = document.getElementById(`sel-currency-${prefijo}-${cardId}`).value;
   const variante = (p.variants || []).find(v => v.id === variantId);
 
   if (!variante) {
     priceWrap.innerHTML = `<div class="card-price card-price-empty">AGOTADO</div>`;
     if (stockWrap) stockWrap.innerHTML = `<span class="stock-badge stock-out">Sin stock</span>`;
-    if (offerWrap) offerWrap.innerHTML = '';
-    if (countdown) { countdown.textContent = ''; delete countdown.dataset.end; }
-    if (waBtn) {
-      waBtn.href = `https://wa.me/59896572226?text=${encodeURIComponent(`Hola GamesUy Store! Quiero reservar *${p.title}* cuando vuelva a estar disponible.`)}`;
-      waBtn.innerText = '🔔 Reservar por WhatsApp';
-      waBtn.classList.remove('btn-buy', 'btn-preorder');
-      waBtn.classList.add('btn-secondary');
-    }
+    if (waBtn) { waBtn.href = `https://wa.me/59896572226?text=Reservar ${p.title}`; waBtn.innerText = '🔔 Reservar'; waBtn.className = 'btn btn-secondary'; }
     return;
   }
 
   const oferta = ofertaVigente(variante);
   const tieneNormal = Number(variante.costoARS) > 0 && Number(variante.precioFinalUYU) > 0;
-  const esPreventa = prefijo === 'preventa';
 
-  if (esPreventa) {
+  if (prefijo === 'preventa') {
     if (tieneNormal) {
-      const precioMostrar = moneda === 'USD'
-        ? formatUSD(calcPrecioUSD(variante.precioFinalUYU, cotizaciones.usdAUYU))
-        : formatUYU(variante.precioFinalUYU);
-      const precioSecundario = moneda === 'USD'
-        ? formatUYU(variante.precioFinalUYU)
-        : '≈ ' + formatUSD(calcPrecioUSD(variante.precioFinalUYU, cotizaciones.usdAUYU));
-
-      priceWrap.innerHTML = `
-        <div class="card-price-tag">PRECIO DE RESERVA</div>
-        <div class="card-price">${precioMostrar}</div>
-        <div class="card-price-usd">${precioSecundario}</div>
-      `;
+      const precioMostrar = moneda === 'USD' ? formatUSD(calcPrecioUSD(variante.precioFinalUYU, cotizaciones.usdAUYU)) : formatUYU(variante.precioFinalUYU);
+      priceWrap.innerHTML = `<div class="card-price-tag">PRECIO DE RESERVA</div><div class="card-price">${precioMostrar}</div>`;
     } else {
-      priceWrap.innerHTML = `
-        <div class="card-price-tag">PRECIO</div>
-        <div class="card-price card-price-preorder">🔒 A CONFIRMAR</div>
-      `;
+      priceWrap.innerHTML = `<div class="card-price-tag">PRECIO</div><div class="card-price card-price-preorder">🔒 A CONFIRMAR</div>`;
     }
     if (stockWrap) stockWrap.innerHTML = `<span class="stock-badge stock-preorder">🚀 Preventa</span>`;
-    if (offerWrap) offerWrap.innerHTML = '';
-    if (countdown) { countdown.textContent = ''; delete countdown.dataset.end; countdown.style.display = 'none'; }
-    if (waBtn) {
-      const varianteLabel = variante.label || 'Estándar';
-      const catLabel = cat.toUpperCase();
-      const fecha = p.releaseDate ? ` (estreno: ${formatearFecha(p.releaseDate)})` : '';
-      const msg = `Hola GamesUy Store! Quiero RESERVAR *${p.title}* (${catLabel} - ${varianteLabel})${fecha}`;
-      waBtn.href = `https://wa.me/59896572226?text=${encodeURIComponent(msg)}`;
-      waBtn.innerText = '🚀 Reservar Preventa';
-      waBtn.classList.add('btn-preorder');
-      waBtn.classList.remove('btn-buy', 'btn-secondary');
-    }
+    if (waBtn) { waBtn.href = `https://wa.me/59896572226?text=Reservar ${p.title}`; waBtn.innerText = '🚀 Reservar Preventa'; waBtn.className = 'btn btn-preorder'; }
     return;
   }
 
   if (oferta && tieneNormal) {
-    const precioMostrar = moneda === 'USD'
-      ? formatUSD(calcPrecioUSD(oferta.precio, cotizaciones.usdAUYU))
-      : formatUYU(oferta.precio);
-    const precioOriginalMostrar = moneda === 'USD'
-      ? formatUSD(calcPrecioUSD(oferta.original, cotizaciones.usdAUYU))
-      : formatUYU(oferta.original);
-    const precioSecundario = moneda === 'USD'
-      ? formatUYU(oferta.precio)
-      : '≈ ' + formatUSD(calcPrecioUSD(oferta.precio, cotizaciones.usdAUYU));
-
-    priceWrap.innerHTML = `
-      <div class="card-price-original">${precioOriginalMostrar}</div>
-      <div class="card-price card-price-offer">${precioMostrar}</div>
-      <div class="card-price-usd">${precioSecundario}</div>
-    `;
-    if (offerWrap) offerWrap.innerHTML = `<div class="offer-banner-tag">🔥 OFERTA ESPECIAL</div>`;
+    const precioMostrar = moneda === 'USD' ? formatUSD(calcPrecioUSD(oferta.precio, cotizaciones.usdAUYU)) : formatUYU(oferta.precio);
+    const precioOriginalMostrar = moneda === 'USD' ? formatUSD(calcPrecioUSD(oferta.original, cotizaciones.usdAUYU)) : formatUYU(oferta.original);
+    priceWrap.innerHTML = `<div class="card-price-original">${precioOriginalMostrar}</div><div class="card-price card-price-offer">${precioMostrar}</div>`;
+    if (offerWrap) offerWrap.innerHTML = `<div class="offer-banner-tag">🔥 OFERTA</div>`;
     if (stockWrap) stockWrap.innerHTML = `<span class="stock-badge stock-ok">✓ Disponible</span>`;
-    if (countdown) {
-      countdown.dataset.end = oferta.hasta + 'T23:59:59';
-      countdown.style.display = '';
-      actualizarCountdown(countdown);
-    }
-    if (waBtn) {
-      const varianteLabel = variante.label || '';
-      const msg = `Hola GamesUy Store! Quiero comprar *${p.title}* (${cat.toUpperCase()} - ${varianteLabel}) en oferta por ${precioMostrar}`;
-      waBtn.href = `https://wa.me/59896572226?text=${encodeURIComponent(msg)}`;
-      waBtn.innerText = '💬 Comprar por WhatsApp';
-      waBtn.classList.add('btn-buy');
-      waBtn.classList.remove('btn-secondary', 'btn-preorder');
-    }
-    return;
-  }
-
-  if (oferta && !tieneNormal) {
-    const precioMostrar = moneda === 'USD'
-      ? formatUSD(calcPrecioUSD(oferta.precio, cotizaciones.usdAUYU))
-      : formatUYU(oferta.precio);
-    const precioSecundario = moneda === 'USD'
-      ? formatUYU(oferta.precio)
-      : '≈ ' + formatUSD(calcPrecioUSD(oferta.precio, cotizaciones.usdAUYU));
-
-    priceWrap.innerHTML = `
-      <div class="card-price-tag">PRECIO ESPECIAL</div>
-      <div class="card-price card-price-offer">${precioMostrar}</div>
-      <div class="card-price-usd">${precioSecundario}</div>
-    `;
-    if (offerWrap) offerWrap.innerHTML = `<div class="offer-banner-tag">🔥 OFERTA ESPECIAL</div>`;
-    if (stockWrap) stockWrap.innerHTML = `<span class="stock-badge stock-ok">✓ Disponible</span>`;
-    if (countdown) {
-      countdown.dataset.end = oferta.hasta + 'T23:59:59';
-      countdown.style.display = '';
-      actualizarCountdown(countdown);
-    }
-    if (waBtn) {
-      const varianteLabel = variante.label || '';
-      const msg = `Hola GamesUy Store! Quiero comprar *${p.title}* (${cat.toUpperCase()} - ${varianteLabel}) en oferta por ${precioMostrar}`;
-      waBtn.href = `https://wa.me/59896572226?text=${encodeURIComponent(msg)}`;
-      waBtn.innerText = '💬 Comprar por WhatsApp';
-      waBtn.classList.add('btn-buy');
-      waBtn.classList.remove('btn-secondary', 'btn-preorder');
-    }
+    if (countdown) { countdown.dataset.end = oferta.hasta + 'T23:59:59'; countdown.style.display = ''; actualizarCountdown(countdown); }
+    if (waBtn) { waBtn.href = `https://wa.me/59896572226?text=Comprar ${p.title} en oferta`; waBtn.innerText = '💬 Comprar'; waBtn.className = 'btn btn-buy'; }
     return;
   }
 
   if (tieneNormal) {
-    const precioMostrar = moneda === 'USD'
-      ? formatUSD(calcPrecioUSD(variante.precioFinalUYU, cotizaciones.usdAUYU))
-      : formatUYU(variante.precioFinalUYU);
-    const precioSecundario = moneda === 'USD'
-      ? formatUYU(variante.precioFinalUYU)
-      : '≈ ' + formatUSD(calcPrecioUSD(variante.precioFinalUYU, cotizaciones.usdAUYU));
-
-    priceWrap.innerHTML = `
-      <div class="card-price">${precioMostrar}</div>
-      <div class="card-price-usd">${precioSecundario}</div>
-    `;
-    if (offerWrap) offerWrap.innerHTML = '';
+    const precioMostrar = moneda === 'USD' ? formatUSD(calcPrecioUSD(variante.precioFinalUYU, cotizaciones.usdAUYU)) : formatUYU(variante.precioFinalUYU);
+    priceWrap.innerHTML = `<div class="card-price">${precioMostrar}</div>`;
     if (stockWrap) stockWrap.innerHTML = `<span class="stock-badge stock-ok">✓ Disponible</span>`;
-    if (countdown) { countdown.textContent = ''; delete countdown.dataset.end; countdown.style.display = 'none'; }
-    if (waBtn) {
-      const varianteLabel = variante.label || '';
-      const msg = `Hola GamesUy Store! Quiero comprar *${p.title}* (${cat.toUpperCase()} - ${varianteLabel}) por ${precioMostrar}`;
-      waBtn.href = `https://wa.me/59896572226?text=${encodeURIComponent(msg)}`;
-      waBtn.innerText = '💬 Comprar por WhatsApp';
-      waBtn.classList.add('btn-buy');
-      waBtn.classList.remove('btn-secondary', 'btn-preorder');
-    }
+    if (waBtn) { waBtn.href = `https://wa.me/59896572226?text=Comprar ${p.title}`; waBtn.innerText = '💬 Comprar'; waBtn.className = 'btn btn-buy'; }
     return;
   }
 
   priceWrap.innerHTML = `<div class="card-price card-price-empty">AGOTADO</div>`;
   if (stockWrap) stockWrap.innerHTML = `<span class="stock-badge stock-out">Sin stock</span>`;
-  if (offerWrap) offerWrap.innerHTML = '';
-  if (countdown) { countdown.textContent = ''; delete countdown.dataset.end; countdown.style.display = 'none'; }
-  if (waBtn) {
-    waBtn.href = `https://wa.me/59896572226?text=${encodeURIComponent(`Hola GamesUy Store! Quiero reservar *${p.title}* cuando vuelva a estar disponible.`)}`;
-    waBtn.innerText = '🔔 Reservar por WhatsApp';
-    waBtn.classList.remove('btn-buy', 'btn-preorder');
-    waBtn.classList.add('btn-secondary');
-  }
 }
 
-// ============================================================
-// COUNTDOWN
-// ============================================================
 function actualizarCountdown(el) {
   if (!el || !el.dataset.end) return;
   const end = new Date(el.dataset.end).getTime();
@@ -1023,74 +634,34 @@ function actualizarCountdown(el) {
   el.textContent = `⌛ Termina en: ${d}d ${h}h ${m}m ${s}s`;
 }
 
-// ============================================================
-// TRAILER (con tracking)
-// ============================================================
 window.abrirTrailer = function(cardId) {
   const p = productos.find(x => x.id === cardId);
   if (!p) return;
-
-  if (typeof window.__estRegistrarTrailer === 'function') {
-    window.__estRegistrarTrailer(p.id, p.title || '');
-  }
-
+  if (typeof window.__estRegistrarTrailer === 'function') window.__estRegistrarTrailer(p.id, p.title || '');
   const modal = document.getElementById('trailer-modal');
-  const title = document.getElementById('trailer-title');
   const body = document.getElementById('trailer-body');
   if (!modal || !body) return;
-  if (title) title.textContent = p.title || 'Trailer';
+  document.getElementById('trailer-title').textContent = p.title || 'Trailer';
   let html = '';
   if (p.youtubeUrl) {
-    const embed = getYouTubeEmbed(p.youtubeUrl);
+    const m = p.youtubeUrl.match(/^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=|shorts\/)([^#\&\?]*).*/);
+    const embed = (m && m[2].length === 11) ? `https://www.youtube.com/embed/${m[2]}` : null;
     if (embed) html += `<div class="video-container"><iframe src="${embed}" allowfullscreen></iframe></div>`;
   }
-  if (p.gameplayUrl) {
-    html += `<div style="margin-top:12px;"><h4 style="color:var(--cyan);margin-bottom:8px;">🎮 Gameplay</h4><img src="${safeUrl(p.gameplayUrl)}" style="width:100%;border-radius:12px;border:1px solid var(--border);" loading="lazy"></div>`;
-  }
-  if (!html) html = '<p class="empty-message">Sin contenido disponible.</p>';
+  if (!html) html = '<p class="empty-message">Sin contenido.</p>';
   body.innerHTML = html;
   modal.classList.remove('hidden');
 };
 
-function getYouTubeEmbed(url) {
-  if (!url) return null;
-  const m = url.match(/^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=|shorts\/)([^#\&\?]*).*/);
-  return (m && m[2].length === 11) ? `https://www.youtube.com/embed/${m[2]}` : null;
-}
-
-// ============================================================
-// LISTENERS (con tracking de búsquedas vacías y categorías)
-// ============================================================
 const searchInput = $('search-input');
 if (searchInput) {
-  let timeoutBusqueda = null;
-
   searchInput.addEventListener('input', (e) => {
     const val = e.target.value;
     const enOfertas = $('page-ofertas')?.classList.contains('active-page');
     const enPreventas = $('page-preventas')?.classList.contains('active-page');
-
-    if (enOfertas) {
-      ofState.search = val; ofState.pagina = 1; renderOfertas();
-    } else if (enPreventas) {
-      preState.search = val; preState.pagina = 1; renderPreventas();
-    } else {
-      catState.search = val; catState.pagina = 1; renderCatalogo();
-    }
-
-    clearTimeout(timeoutBusqueda);
-    timeoutBusqueda = setTimeout(() => {
-      const q = String(val || '').trim();
-      if (q.length < 3) return;
-      if (enOfertas || enPreventas) return;
-
-      const resultados = filtrarProductos();
-      if (resultados.length === 0) {
-        if (typeof window.__estRegistrarBusquedaVacia === 'function') {
-          window.__estRegistrarBusquedaVacia(q);
-        }
-      }
-    }, 1500);
+    if (enOfertas) { ofState.search = val; ofState.pagina = 1; renderOfertas(); }
+    else if (enPreventas) { preState.search = val; preState.pagina = 1; renderPreventas(); }
+    else { catState.search = val; catState.pagina = 1; renderCatalogo(); }
   });
 }
 
@@ -1101,59 +672,25 @@ document.querySelectorAll('#cat-nav .cat-btn').forEach(btn => {
     const cat = btn.dataset.cat || 'all';
     const enOfertas = $('page-ofertas')?.classList.contains('active-page');
     const enPreventas = $('page-preventas')?.classList.contains('active-page');
-
-    if (cat !== 'all' && typeof window.__estRegistrarCategoria === 'function') {
-      window.__estRegistrarCategoria(cat);
-    }
-
-    if (enOfertas) {
-      ofState.cat = cat; ofState.pagina = 1; renderOfertas();
-    } else if (enPreventas) {
-      preState.cat = cat; preState.pagina = 1; renderPreventas();
-    } else {
-      catState.cat = cat; catState.pagina = 1; renderCatalogo();
-    }
+    if (cat !== 'all' && typeof window.__estRegistrarCategoria === 'function') window.__estRegistrarCategoria(cat);
+    if (enOfertas) { ofState.cat = cat; ofState.pagina = 1; renderOfertas(); }
+    else if (enPreventas) { preState.cat = cat; preState.pagina = 1; renderPreventas(); }
+    else { catState.cat = cat; catState.pagina = 1; renderCatalogo(); }
   });
 });
 
-// ============================================================
-// SEO — Override switchPage con título dinámico
-// ============================================================
 const originalSwitchPage = window.switchPage;
 window.switchPage = function(pageId) {
   if (originalSwitchPage) originalSwitchPage(pageId);
-
   actualizarSEOPagina(pageId);
-
   const si = $('search-input');
-  const catActiva = document.querySelector('#cat-nav .cat-btn.active');
-  const cat = catActiva ? (catActiva.dataset.cat || 'all') : 'all';
-
-  if (pageId === 'ofertas') {
-    if (si) ofState.search = si.value;
-    ofState.cat = cat;
-    ofState.pagina = 1;
-    setTimeout(() => renderOfertas(), 50);
-  }
-  if (pageId === 'preventas') {
-    if (si) preState.search = si.value;
-    preState.cat = cat;
-    preState.pagina = 1;
-    setTimeout(() => renderPreventas(), 50);
-  }
-  if (pageId === 'catalogo') {
-    if (si) catState.search = si.value;
-    catState.cat = cat;
-    catState.pagina = 1;
-    setTimeout(() => renderCatalogo(), 50);
-  }
+  const cat = document.querySelector('#cat-nav .cat-btn.active')?.dataset.cat || 'all';
+  if (pageId === 'ofertas') { if (si) ofState.search = si.value; ofState.cat = cat; ofState.pagina = 1; setTimeout(() => renderOfertas(), 50); }
+  if (pageId === 'preventas') { if (si) preState.search = si.value; preState.cat = cat; preState.pagina = 1; setTimeout(() => renderPreventas(), 50); }
+  if (pageId === 'catalogo') { if (si) catState.search = si.value; catState.cat = cat; catState.pagina = 1; setTimeout(() => renderCatalogo(), 50); }
 };
 
-document.getElementById('trailer-close')?.addEventListener('click', () => {
-  document.getElementById('trailer-modal')?.classList.add('hidden');
-});
-document.getElementById('trailer-modal')?.addEventListener('click', (e) => {
-  if (e.target.id === 'trailer-modal') document.getElementById('trailer-modal')?.classList.add('hidden');
-});
+document.getElementById('trailer-close')?.addEventListener('click', () => document.getElementById('trailer-modal')?.classList.add('hidden'));
+document.getElementById('trailer-modal')?.addEventListener('click', (e) => { if (e.target.id === 'trailer-modal') document.getElementById('trailer-modal')?.classList.add('hidden'); });
 
-console.log('[GamesUy] store.js v18 cargado (con cache + countdown optimizado)');
+console.log('[GamesUy] store.js v25 cargado (pagos custom)');

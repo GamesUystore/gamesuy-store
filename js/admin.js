@@ -1,24 +1,14 @@
 // ============================================================
 // GAMESUY STORE — Panel de Administración
-// Fase 3.5: Recalculo automático de precios al cambiar cotización
 // ============================================================
 
 import { db } from './firebase-config.js';
 import {
-  doc,
-  setDoc,
-  onSnapshot,
-  collection,
-  getDocs,
-  writeBatch
+  doc, setDoc, onSnapshot, collection, getDocs, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { roundUYU, roundUSD } from './data-model.js';
 
 const $ = (id) => document.getElementById(id);
-
-// ============================================================
-// UTILIDADES
-// ============================================================
 
 function mostrarToast(msg, tipo = 'success') {
   const toast = $('admin-toast');
@@ -47,9 +37,39 @@ async function validarImagen(file, maxKB) {
 }
 
 // ============================================================
-// COTIZACIONES + RECÁLCULO AUTOMÁTICO DE PRECIOS
+// 0. MÉTODOS DE PAGO
 // ============================================================
+onSnapshot(doc(db, 'settings', 'payments'), (snap) => {
+  const input = $('admin-payments-text');
+  if (input && !input.dataset.dirty) {
+    input.value = (snap.exists() && snap.data().text) ? snap.data().text : 'Brou / Prex / Red Pagos / Abitab / Mercado Pago / Binance Pay / Global66 / Pix / Mi Dinero / Paypal';
+  }
+});
 
+$('admin-payments-text')?.addEventListener('input', (e) => {
+  e.target.dataset.dirty = '1';
+});
+
+$('btn-save-payments')?.addEventListener('click', async () => {
+  const btn = $('btn-save-payments');
+  const text = $('admin-payments-text').value.trim();
+  btn.disabled = true; btn.textContent = '⏳ Guardando...';
+  
+  try {
+    await setDoc(doc(db, 'settings', 'payments'), { text }, { merge: true });
+    delete $('admin-payments-text').dataset.dirty;
+    mostrarToast('✅ Métodos de pago actualizados');
+  } catch (err) {
+    console.error('[GamesUy] Error:', err);
+    mostrarToast('❌ Error: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Guardar métodos de pago';
+  }
+});
+
+// ============================================================
+// 1. COTIZACIONES
+// ============================================================
 let cotizacionesActuales = { arsAUYU: 0.055, usdAUYU: 39.50 };
 
 onSnapshot(doc(db, 'settings', 'cotizaciones'), (snap) => {
@@ -76,9 +96,6 @@ onSnapshot(doc(db, 'settings', 'cotizaciones'), (snap) => {
   if (el) el.addEventListener('input', () => { el.dataset.dirty = '1'; });
 });
 
-// ============================================================
-// RECALCULAR TODOS LOS PRECIOS
-// ============================================================
 async function recalcularTodosLosPrecios(viejaCot, nuevaCot) {
   if (!viejaCot || viejaCot <= 0) {
     mostrarToast('⚠️ No se puede recalcular: la cotización vieja no es válida.', 'error');
@@ -88,31 +105,23 @@ async function recalcularTodosLosPrecios(viejaCot, nuevaCot) {
   const factor = nuevaCot / viejaCot;
   const porcentaje = Math.round((factor - 1) * 100 * 100) / 100;
 
-  // Confirmar antes de proceder
-  const confirmado = confirm(
+  if (!confirm(
     `🔄 RECALCULAR TODOS LOS PRECIOS\n\n` +
     `Cotización anterior: ${viejaCot}\n` +
     `Cotización nueva:    ${nuevaCot}\n\n` +
     `Factor: ×${factor.toFixed(4)} (${porcentaje >= 0 ? '+' : ''}${porcentaje}%)\n\n` +
-    `Esto actualizará los precios de TODOS los juegos ` +
-    `que tengan ganancia % guardada.\n\n` +
-    `¿Proceder con el recálculo?`
-  );
+    `Esto actualizará los precios de TODOS los juegos que tengan ganancia % guardada.\n\n` +
+    `¿Proceder?`
+  )) return;
 
-  if (!confirmado) {
-    mostrarToast('Recálculo cancelado', 'error');
-    return;
-  }
-
-  mostrarToast(`🔄 Recalculando precios de todos los juegos...`, 'success');
+  mostrarToast(`🔄 Recalculando precios...`, 'success');
 
   try {
     const snap = await getDocs(collection(db, 'products'));
     const operaciones = [];
-    let totalVariantes = 0;
-    let variantesRecalculadas = 0;
-    let variantesSinGanancia = 0;
-    let variantesSinCosto = 0;
+    let recalculadas = 0;
+    let sinGanancia = 0;
+    let sinCosto = 0;
     let ofertasRecalculadas = 0;
 
     snap.docs.forEach(d => {
@@ -123,71 +132,38 @@ async function recalcularTodosLosPrecios(viejaCot, nuevaCot) {
       let huboCambios = false;
 
       const nuevasVariantes = variantes.map(v => {
-        totalVariantes++;
-
         const costoARS = Number(v.costoARS) || 0;
-        const gananciaPct = (v.gananciaPct !== null && v.gananciaPct !== undefined)
-          ? Number(v.gananciaPct)
-          : null;
+        const gananciaPct = (v.gananciaPct !== null && v.gananciaPct !== undefined) ? Number(v.gananciaPct) : null;
 
-        // Sin costo: no se puede recalcular
-        if (costoARS <= 0) {
-          variantesSinCosto++;
-          return v;
-        }
+        if (costoARS <= 0) { sinCosto++; return v; }
+        if (gananciaPct === null || isNaN(gananciaPct)) { sinGanancia++; return v; }
 
-        // Sin ganancia % (precio cargado a mano): no lo tocamos, avisamos
-        if (gananciaPct === null || isNaN(gananciaPct)) {
-          variantesSinGanancia++;
-          return v;
-        }
+        const nuevoPrecioUYU = roundUYU(costoARS * nuevaCot * (1 + gananciaPct));
+        const resultado = { ...v, precioFinalUYU: nuevoPrecioUYU, updatedAt: new Date().toISOString() };
 
-        // Recalcular precio normal
-        const nuevoPrecioBase = costoARS * nuevaCot * (1 + gananciaPct);
-        const nuevoPrecioUYU = roundUYU(nuevoPrecioBase);
-
-        const resultado = {
-          ...v,
-          precioFinalUYU: nuevoPrecioUYU,
-          updatedAt: new Date().toISOString()
-        };
-
-        // Si tiene oferta activa con ganancia definida, recalcular oferta también
         const ofertaCostoARS = Number(v.ofertaCostoARS) || 0;
-        const ofertaGanancia = (v.ofertaGananciaPct !== null && v.ofertaGananciaPct !== undefined)
-          ? Number(v.ofertaGananciaPct)
-          : null;
+        const ofertaGanancia = (v.ofertaGananciaPct !== null && v.ofertaGananciaPct !== undefined) ? Number(v.ofertaGananciaPct) : null;
 
         if (ofertaCostoARS > 0 && ofertaGanancia !== null && !isNaN(ofertaGanancia)) {
-          const nuevoOfertaBase = ofertaCostoARS * nuevaCot * (1 + ofertaGanancia);
-          resultado.ofertaPrecioUYU = roundUYU(nuevoOfertaBase);
+          resultado.ofertaPrecioUYU = roundUYU(ofertaCostoARS * nuevaCot * (1 + ofertaGanancia));
           ofertasRecalculadas++;
         }
 
         huboCambios = true;
-        variantesRecalculadas++;
+        recalculadas++;
         return resultado;
       });
 
       if (huboCambios) {
-        operaciones.push({
-          ref: doc(db, 'products', prod.id),
-          data: { variants: nuevasVariantes, updatedAt: new Date().toISOString() }
-        });
+        operaciones.push({ ref: doc(db, 'products', prod.id), data: { variants: nuevasVariantes, updatedAt: new Date().toISOString() } });
       }
     });
 
     if (operaciones.length === 0) {
-      mostrarToast(
-        `No se recalculó nada.\n` +
-        `Variantes sin costo: ${variantesSinCosto}\n` +
-        `Variantes sin ganancia %: ${variantesSinGanancia}`,
-        'error'
-      );
+      mostrarToast(`No se recalculó nada. Sin costo: ${sinCosto}. Sin ganancia %: ${sinGanancia}`, 'error');
       return;
     }
 
-    // Guardar en lotes
     const TAM = 400;
     for (let i = 0; i < operaciones.length; i += TAM) {
       const lote = operaciones.slice(i, i + TAM);
@@ -196,19 +172,7 @@ async function recalcularTodosLosPrecios(viejaCot, nuevaCot) {
       await batch.commit();
     }
 
-    // Resumen final
-    const resumen =
-      `✅ RECÁLCULO COMPLETO\n\n` +
-      `Juegos actualizados:      ${operaciones.length}\n` +
-      `Variantes recalculadas:   ${variantesRecalculadas}\n` +
-      `Ofertas recalculadas:     ${ofertasRecalculadas}\n\n` +
-      `⚠️  Sin ganancia %:        ${variantesSinGanancia}\n` +
-      `⚠️  Sin costo ARS:         ${variantesSinCosto}\n\n` +
-      (variantesSinGanancia > 0
-        ? `Las variantes "sin ganancia %" fueron cargadas con precio a mano.\nRevisalas una por una en Admin → Carga masiva.`
-        : `Todo calculado automáticamente.`);
-
-    alert(resumen);
+    alert(`✅ RECÁLCULO COMPLETO\n\nJuegos: ${operaciones.length}\nVariantes: ${recalculadas}\nOfertas: ${ofertasRecalculadas}\n\nSin ganancia %: ${sinGanancia}\nSin costo: ${sinCosto}`);
     mostrarToast(`✅ ${operaciones.length} juegos recalculados`, 'success');
 
   } catch (err) {
@@ -217,77 +181,40 @@ async function recalcularTodosLosPrecios(viejaCot, nuevaCot) {
   }
 }
 
-// ============================================================
-// GUARDAR COTIZACIÓN + RECÁLCULO AUTOMÁTICO
-// ============================================================
 $('btn-save-cot')?.addEventListener('click', async () => {
   try {
     const arsNueva = parseFloat($('admin-cot-ars').value);
     const usdNueva = parseFloat($('admin-cot-usd').value);
 
-    if (!(arsNueva > 0)) {
-      mostrarToast('La cotización ARS→UYU debe ser mayor a 0.', 'error');
-      return;
-    }
-    if (!(usdNueva > 0)) {
-      mostrarToast('La cotización USD→UYU debe ser mayor a 0.', 'error');
-      return;
-    }
+    if (!(arsNueva > 0)) return mostrarToast('La cotización ARS→UYU debe ser mayor a 0.', 'error');
+    if (!(usdNueva > 0)) return mostrarToast('La cotización USD→UYU debe ser mayor a 0.', 'error');
 
     const arsVieja = cotizacionesActuales.arsAUYU;
     const cambióARS = Math.abs(arsNueva - arsVieja) > 0.0000001;
 
-    // Guardar cotizaciones
-    await setDoc(doc(db, 'settings', 'cotizaciones'), {
-      arsAUYU: arsNueva,
-      usdAUYU: usdNueva,
-      actualizado: new Date().toISOString()
-    }, { merge: true });
+    await setDoc(doc(db, 'settings', 'cotizaciones'), { arsAUYU: arsNueva, usdAUYU: usdNueva, actualizado: new Date().toISOString() }, { merge: true });
 
     delete $('admin-cot-ars').dataset.dirty;
     delete $('admin-cot-usd').dataset.dirty;
-
     mostrarToast('✅ Cotizaciones guardadas');
 
-    // Si cambió la cotización ARS → recalcular todos los precios
-    if (cambióARS) {
-      setTimeout(async () => {
-        await recalcularTodosLosPrecios(arsVieja, arsNueva);
-      }, 500);
-    } else {
-      console.log('[GamesUy] Cotización ARS sin cambios → no se recalcula.');
-    }
-
+    if (cambióARS) setTimeout(async () => { await recalcularTodosLosPrecios(arsVieja, arsNueva); }, 500);
   } catch (err) {
-    console.error('[GamesUy] Error al guardar cotizaciones:', err);
+    console.error('[GamesUy] Error:', err);
     mostrarToast('❌ ' + err.message, 'error');
   }
 });
 
-// ============================================================
-// BOTÓN MANUAL: RECALCULAR (por si querés forzarlo)
-// ============================================================
 $('btn-recalcular-precios')?.addEventListener('click', async () => {
   const arsActual = cotizacionesActuales.arsAUYU;
-  // Factor 1: usar la misma cotización (recalcula desde cero)
-  // Pero necesitamos un factor distinto a 1. Entonces usamos la fórmula directa.
-  if (!confirm(
-    `🔄 RECALCULAR PRECIOS (manual)\n\n` +
-    `Cotización actual: ${arsActual}\n\n` +
-    `Esto recalcula el precio final de cada variante usando:\n` +
-    `  costoARS × ${arsActual} × (1 + ganancia%)\n\n` +
-    `Útil si algún precio quedó desactualizado.\n\n` +
-    `¿Proceder?`
-  )) return;
+  if (!confirm(`🔄 RECALCULAR PRECIOS (manual)\n\nCotización actual: ${arsActual}\n\n¿Proceder?`)) return;
 
   mostrarToast('🔄 Recalculando precios...', 'success');
 
   try {
     const snap = await getDocs(collection(db, 'products'));
     const operaciones = [];
-    let recalculadas = 0;
-    let sinGanancia = 0;
-    let sinCosto = 0;
+    let recalculadas = 0, sinGanancia = 0, sinCosto = 0;
 
     snap.docs.forEach(d => {
       const prod = { id: d.id, ...d.data() };
@@ -295,28 +222,18 @@ $('btn-recalcular-precios')?.addEventListener('click', async () => {
       if (variantes.length === 0) return;
 
       let huboCambios = false;
-
       const nuevasVariantes = variantes.map(v => {
         const costoARS = Number(v.costoARS) || 0;
-        const gananciaPct = (v.gananciaPct !== null && v.gananciaPct !== undefined)
-          ? Number(v.gananciaPct)
-          : null;
+        const gananciaPct = (v.gananciaPct !== null && v.gananciaPct !== undefined) ? Number(v.gananciaPct) : null;
 
         if (costoARS <= 0) { sinCosto++; return v; }
         if (gananciaPct === null || isNaN(gananciaPct)) { sinGanancia++; return v; }
 
         const nuevoPrecioUYU = roundUYU(costoARS * arsActual * (1 + gananciaPct));
-        const resultado = {
-          ...v,
-          precioFinalUYU: nuevoPrecioUYU,
-          updatedAt: new Date().toISOString()
-        };
+        const resultado = { ...v, precioFinalUYU: nuevoPrecioUYU, updatedAt: new Date().toISOString() };
 
         const ofertaCostoARS = Number(v.ofertaCostoARS) || 0;
-        const ofertaGanancia = (v.ofertaGananciaPct !== null && v.ofertaGananciaPct !== undefined)
-          ? Number(v.ofertaGananciaPct)
-          : null;
-
+        const ofertaGanancia = (v.ofertaGananciaPct !== null && v.ofertaGananciaPct !== undefined) ? Number(v.ofertaGananciaPct) : null;
         if (ofertaCostoARS > 0 && ofertaGanancia !== null && !isNaN(ofertaGanancia)) {
           resultado.ofertaPrecioUYU = roundUYU(ofertaCostoARS * arsActual * (1 + ofertaGanancia));
         }
@@ -327,17 +244,11 @@ $('btn-recalcular-precios')?.addEventListener('click', async () => {
       });
 
       if (huboCambios) {
-        operaciones.push({
-          ref: doc(db, 'products', prod.id),
-          data: { variants: nuevasVariantes, updatedAt: new Date().toISOString() }
-        });
+        operaciones.push({ ref: doc(db, 'products', prod.id), data: { variants: nuevasVariantes, updatedAt: new Date().toISOString() } });
       }
     });
 
-    if (operaciones.length === 0) {
-      mostrarToast('No hay precios para recalcular.', 'error');
-      return;
-    }
+    if (operaciones.length === 0) return mostrarToast('No hay precios para recalcular.', 'error');
 
     const TAM = 400;
     for (let i = 0; i < operaciones.length; i += TAM) {
@@ -347,25 +258,17 @@ $('btn-recalcular-precios')?.addEventListener('click', async () => {
       await batch.commit();
     }
 
-    alert(
-      `✅ RECÁLCULO COMPLETO\n\n` +
-      `Juegos actualizados:    ${operaciones.length}\n` +
-      `Variantes recalculadas: ${recalculadas}\n` +
-      `⚠️  Sin ganancia %:      ${sinGanancia}\n` +
-      `⚠️  Sin costo ARS:       ${sinCosto}`
-    );
+    alert(`✅ RECÁLCULO COMPLETO\n\nJuegos: ${operaciones.length}\nVariantes: ${recalculadas}\nSin ganancia %: ${sinGanancia}\nSin costo: ${sinCosto}`);
     mostrarToast(`✅ ${operaciones.length} juegos recalculados`, 'success');
-
   } catch (err) {
-    console.error('[GamesUy] Error al recalcular:', err);
+    console.error('[GamesUy] Error:', err);
     mostrarToast('❌ ' + err.message, 'error');
   }
 });
 
 // ============================================================
-// LOGO
+// 2. LOGO
 // ============================================================
-
 function pintarPreviewLogo(url) {
   const img = $('admin-logo-preview');
   const fb  = $('admin-logo-preview-fallback');
@@ -396,10 +299,7 @@ $('btn-save-logo')?.addEventListener('click', async () => {
       finalUrl = await validarImagen(fileInput.files[0], 300);
     }
 
-    if (!finalUrl) {
-      mostrarToast('Elegí un archivo o pegá una URL.', 'error');
-      return;
-    }
+    if (!finalUrl) return mostrarToast('Elegí un archivo o pegá una URL.', 'error');
 
     await setDoc(doc(db, 'settings', 'site'), { logoUrl: finalUrl }, { merge: true });
     fileInput.value = '';
@@ -407,7 +307,7 @@ $('btn-save-logo')?.addEventListener('click', async () => {
     delete urlInput.dataset.dirty;
     mostrarToast('✅ Logo actualizado');
   } catch (err) {
-    console.error('[GamesUy] Error al guardar logo:', err);
+    console.error('[GamesUy] Error:', err);
     mostrarToast('❌ ' + err.message, 'error');
   }
 });
@@ -419,9 +319,8 @@ $('btn-clear-logo')?.addEventListener('click', async () => {
 });
 
 // ============================================================
-// REDES
+// 3. REDES SOCIALES
 // ============================================================
-
 onSnapshot(doc(db, 'settings', 'social'), (snap) => {
   if (!snap.exists()) return;
   const s = snap.data();
@@ -448,15 +347,14 @@ $('btn-save-social')?.addEventListener('click', async () => {
     ['wa','ig','fb','tt'].forEach(k => delete $('admin-social-' + k).dataset.dirty);
     mostrarToast('✅ Redes sociales guardadas');
   } catch (err) {
-    console.error('[GamesUy] Error al guardar redes:', err);
+    console.error('[GamesUy] Error:', err);
     mostrarToast('❌ ' + err.message, 'error');
   }
 });
 
 // ============================================================
-// BANNER
+// 4. BANNER DE ANUNCIO
 // ============================================================
-
 onSnapshot(doc(db, 'settings', 'homeAnnouncement'), (snap) => {
   if (!snap.exists()) return;
   const b = snap.data();
@@ -501,36 +399,31 @@ $('btn-save-banner')?.addEventListener('click', async () => {
       .forEach(id => delete $(id).dataset.dirty);
     mostrarToast('✅ Banner actualizado');
   } catch (err) {
-    console.error('[GamesUy] Error al guardar banner:', err);
+    console.error('[GamesUy] Error:', err);
     mostrarToast('❌ ' + err.message, 'error');
   }
 });
 
 $('btn-clear-banner-img')?.addEventListener('click', async () => {
-  if (!confirm('¿Quitar solo la imagen del banner?\n\nEl texto, título y etiqueta se mantienen.')) return;
+  if (!confirm('¿Quitar solo la imagen del banner?')) return;
   try {
     await setDoc(doc(db, 'settings', 'homeAnnouncement'), { imageUrl: '' }, { merge: true });
-    const imgInput = $('admin-banner-img');
-    if (imgInput) imgInput.value = '';
-    const fileInput = $('admin-banner-file');
-    if (fileInput) fileInput.value = '';
-    const imgEl = $('admin-banner-img');
-    if (imgEl) delete imgEl.dataset.dirty;
-    mostrarToast('✅ Imagen del banner eliminada');
+    $('admin-banner-img').value = '';
+    $('admin-banner-file').value = '';
+    delete $('admin-banner-img').dataset.dirty;
+    mostrarToast('✅ Imagen eliminada');
   } catch (err) {
-    console.error('[GamesUy] Error al quitar imagen:', err);
+    console.error('[GamesUy] Error:', err);
     mostrarToast('❌ ' + err.message, 'error');
   }
 });
 
 $('btn-clear-banner')?.addEventListener('click', async () => {
-  if (!confirm('¿Ocultar el banner de la página de inicio?')) return;
-  await setDoc(doc(db, 'settings', 'homeAnnouncement'), {
-    label: '', title: '', text: '', imageUrl: '', link: ''
-  }, { merge: true });
+  if (!confirm('¿Ocultar el banner?')) return;
+  await setDoc(doc(db, 'settings', 'homeAnnouncement'), { label: '', title: '', text: '', imageUrl: '', link: '' }, { merge: true });
   ['admin-banner-label','admin-banner-title','admin-banner-text','admin-banner-img','admin-banner-link']
     .forEach(id => { const el = $(id); el.value = ''; delete el.dataset.dirty; });
   mostrarToast('Banner oculto');
 });
 
-console.log('[GamesUy] admin.js v2 cargado (con recálculo automático de precios)');
+console.log('[GamesUy] admin.js v5 cargado (con métodos de pago)');
